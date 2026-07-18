@@ -2,6 +2,16 @@
 
 *Layer 3 implementation brief. Consumed with: `@questra/contracts` + ADR index. Parent specs: Rules Engine §1 (design rationale — do not re-read per session; this brief is self-contained). All example data below is transcribed from the SRD 5.2.1 PDF, not invented — treat it as the QA reference for ingestion.*
 
+> **⚠️ ADR-0013 revalidation note — M1.1 (2026-07-18).** The JSON examples in §3–§6 predate the hardened `@questra/contracts` and have drifted. **The contracts are the authority (non-negotiable #1); ingest to the contracts shapes, not to this prose.** The four canonical fixtures in `packages/contracts/src/fixtures/` already conform and are byte-compared by the green contract tests — they, not the snippets below, are the byte-match target (acceptance #2). Drift points:
+> 1. **Envelope fields.** Contracts `BaseEntity` requires `version` and `qa: 'draft'|'verified'`, and carries `resolution` (default `'routine'`). §2/§3–§6 omit them. Canonical field order (see `fixtures/prone.json`): `id, entityType, name, source, version, qa, plain, srd_text, effects, resolution, meta`.
+> 2. **Prone's speed/movement (§3).** The brief writes `{ hook: 'modifier', scope: { kind: 'speed' }, value: 'movement_mode:crawl' }`. Contracts uses a dedicated hook: `{ hook: 'movement_mode', mode: 'crawl_only' }`. There is no `movement_mode:crawl` string value.
+> 3. **Fireball (§4).** `area_save.onSuccess` is the union `'none' | { damage: 'half' }` (not a bare object); `onFail` is `{ damage?, applyCondition? }`; `upcast.add` is `{ dice }` only. `TriggerEvent` for a spell is `{ event: 'cast' }`. Otherwise aligned.
+> 4. **Second Wind (§6).** `resource.partialRecharge` exists in contracts (`{ on: 'short_rest', amount }`) — the brief's shape is honoured. `activate` trigger cost enum is `action|bonus_action|reaction|free` and `spends` is a pool-id string.
+> 5. **`entityType` for features** is `'feat'` (no separate `feature` type); `feature.fighter.extra-attack` uses `resolution: 'engine_native'`.
+> 6. **Expression language** omits division (§expr grammar) — "round down" stays in prose/`meta`, never in a `Formula`.
+>
+> No contract changes are required for M1.1; this is a documentation-only reconciliation.
+
 **Scope:** the exact shapes of the rules dataset, the effect-hook vocabulary, and four fully worked entity encodings.
 **Non-goals:** the resolution pipeline (Brief 02), the ingestion *tooling* UX, homebrew builder UI (separate brief — homebrew *conforms to this schema*, nothing more is needed here).
 
