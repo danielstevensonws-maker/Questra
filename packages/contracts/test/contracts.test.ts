@@ -9,6 +9,7 @@ import {
   collapseAdvantage, bestCover, concentrationDc, passiveScore,
   eventVisibleTo, filterStream,
   parseExpr, evalExprString, isDeterministic, ExprParseError,
+  ComputedSheetSchema, derivationSumsToValue,
 } from '../src/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -58,6 +59,36 @@ describe('fixtures validate against the schemas (Brief 01 acceptance #1–#2)', 
 
     const ea = RulesEntitySchema.parse(f.extraAttack);
     expect(ea.resolution).toBe('engine_native');
+  });
+
+  it('torvald-sheet + wizard-3-sheet validate; every Derived sums to its value (Brief 03 §2/§4)', () => {
+    for (const name of ['torvald-sheet.json', 'wizard-3-sheet.json']) {
+      const sheet = ComputedSheetSchema.parse(fx(name));
+      // reconcile Torvald with the trace: +5 to hit = STR 3 + prof 2, longsword 1d8 + 3
+      if (name === 'torvald-sheet.json') {
+        const ls = sheet.attacks.find((a) => a.name === 'Longsword')!;
+        expect(ls.toHit).toBe(5);
+        expect(ls.damage).toBe('1d8 + 3');
+        expect(sheet.hp.value.max).toBe(12);
+        expect(sheet.acOptions[sheet.acDefault]!.value).toBe(18);
+      }
+      if (name === 'wizard-3-sheet.json') {
+        expect(sheet.spellcasting!.saveDc.value).toBe(13);
+        expect(sheet.spellcasting!.attackBonus.value).toBe(5);
+        expect(sheet.spellcasting!.slots).toEqual({ '1': 4, '2': 2 });
+      }
+      // property: every numeric Derived's derivation sums to its value
+      const numericDeriveds = [
+        sheet.profBonus, sheet.initiative, sheet.speedFt,
+        ...Object.values(sheet.abilities), ...Object.values(sheet.saves),
+        ...Object.values(sheet.skills), sheet.passives.perception,
+        sheet.passives.investigation, sheet.passives.insight,
+        ...sheet.acOptions,
+      ];
+      for (const d of numericDeriveds) {
+        expect(derivationSumsToValue(d as { value: number; derivation: { value: number }[] }), JSON.stringify(d)).toBe(true);
+      }
+    }
   });
 
   it('plain-language ban list holds for every fixture plain line (Brief 01 acceptance #5)', () => {

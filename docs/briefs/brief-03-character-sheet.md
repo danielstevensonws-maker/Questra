@@ -2,6 +2,13 @@
 
 *Layer 3. Consumed with `@questra/contracts` + ADR index. Parent: Character Wizard spec §5 (choices), Rules Engine §1 (data). Revalidate against contracts at build time (fixtures may have grown).*
 
+> **⚠️ ADR-0013 revalidation note — M2.2 (2026-07-19).** Checked against current `@questra/contracts`. The sheet shapes do NOT yet exist and §1 mandates adding them to contracts — so M2.2 ships as **two commits: a contracts PR (shapes + the 2 fixtures + tests) first, then the engine computation second** (contract-first discipline; user-authorized). Details:
+> 1. **Reuse, don't duplicate.** `NamedModifier`, `Ability`/`ABILITIES`, `Skill`/`SKILLS` already exist in contracts — the sheet schemas compose them.
+> 2. **Fixtures are new.** `torvald-sheet.json` and `wizard-3-sheet.json` are authored in the contracts PR and become the byte-match golden targets (§3/§4). Torvald's sheet must reconcile with `torvald-trace.json` (+5 to hit = STR 3 + prof 2; longsword `1d8 + 3`).
+> 3. **`Derived<T>` derivation sums to value** (§2 last rule) — a property test asserts this across random legal choices.
+> 4. **Computation lives in `packages/engine`** (`sim/sheet.ts`), a pure function `(CharacterChoices, rulesData) → ComputedSheet`; contracts owns only the shapes + validators, never the computation (ADR-0005 keeps the engine pure and AI-free).
+> 5. **Slot tables.** §2 says the caster slot table comes "from caster type + level … in rules data"; the M1.2 class dataset carries `casterType` + `levels` but not an explicit slot grid, so M2.2 encodes the standard full/half/third slot progression as engine data (a follow-up can move it into the rules dataset if a brief calls for it). Wizard-3 ⇒ slots {1:4, 2:2}.
+
 **Scope:** the pure function from wizard choices + rules data → the fully computed sheet, every value carrying its derivation.
 **Non-goals:** wizard UI (Brief 10 owns component work), level-up mutation (Brief 07), homebrew builder.
 

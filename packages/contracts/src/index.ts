@@ -9,5 +9,6 @@
 export * from './rules/expr.js';
 export * from './rules/effects.js';
 export * from './rules/entities.js';
+export * from './rules/sheet.js';
 export * from './play/events.js';
 export * from './play/visibility.js';
