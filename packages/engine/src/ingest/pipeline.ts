@@ -16,6 +16,7 @@ import { CONDITION_IDS } from '@questra/contracts';
 import { extractConditions, CONDITION_NAMES, type ConditionName } from './conditions.js';
 import { extractSpells } from './spells.js';
 import { extractMonsters } from './monsters.js';
+import { extractClasses, type ClassTable } from './classes.js';
 
 /** Dataset version stamped on ingested entities. Pinned; bumping is an append-only release (Brief 01 acceptance #6). */
 export const DATASET_VERSION = '2026.07.0';
@@ -149,4 +150,13 @@ export function ingestMonsters(rawSrdText: string): MonsterEntityDraft[] {
     resolution: 'routine' as const,
     meta: m.meta as unknown as Record<string, unknown>,
   }));
+}
+
+/** Parse the 12 class level tables (Brief 01 §6). The 1–20 rows the level table owns;
+ *  the core traits (hit die, saves, caster type, …) are authored in data/classes.ts. */
+export function ingestClasses(rawSrdText: string): ClassTable[] {
+  const lines = rawSrdText.replace(/\r/g, '').split('\n');
+  // classes live before the spell lists; bound the search to avoid the spell/monster regions
+  const bound = lines.findIndex((l) => l.trim() === 'Spell Descriptions');
+  return extractClasses(lines.slice(0, bound === -1 ? undefined : bound));
 }

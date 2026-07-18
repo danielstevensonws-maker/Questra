@@ -17,7 +17,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ingestConditions, ingestSpells, ingestMonsters } from '../src/ingest/pipeline.js';
+import { ingestConditions, ingestSpells, ingestMonsters, ingestClasses } from '../src/ingest/pipeline.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = here + '../../../';
@@ -56,3 +56,10 @@ const monsterDrafts = ingestMonsters(raw);
 const monsterOut = dataDir + 'monsters.draft.json';
 writeFileSync(monsterOut, JSON.stringify(monsterDrafts, null, 2) + '\n');
 console.log(`Wrote ${monsterDrafts.length} monster draft(s) → ${monsterOut}`);
+
+// Class level tables → committed data the verified class dataset combines with core traits.
+const classTables = ingestClasses(raw);
+const classOut = dataDir + 'classes.levels.json';
+const levelsById = Object.fromEntries(classTables.map((c) => [c.classId, c.levels]));
+writeFileSync(classOut, JSON.stringify(levelsById, null, 2) + '\n');
+console.log(`Wrote ${classTables.length} class level table(s) → ${classOut}`);
