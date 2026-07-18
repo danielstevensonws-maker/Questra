@@ -20,3 +20,12 @@ npm-debug.log*
 Thumbs.db
 *.swp
 .idea/
+.vscode/
+
+# Storybook static build
+storybook-static/
+
+# Visual prototype — reference only, never source (ADR-0014); do not import/extend its code
+Questra V1 Prototype/
+.image-slots.state.json
+.thumbnail

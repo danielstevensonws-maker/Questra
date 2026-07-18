@@ -1,0 +1,38 @@
+{
+  "name": "@questra/ui",
+  "version": "0.1.0",
+  "description": "Questra's primitive component library — the core + hud pieces from the design system, implemented in TypeScript against the --qa-* tokens. Consumes @questra/theme; invents no design values.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./core": { "types": "./dist/core/index.d.ts", "default": "./dist/core/index.js" },
+    "./hud": { "types": "./dist/hud/index.d.ts", "default": "./dist/hud/index.js" }
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "check": "tsc -p tsconfig.json --noEmit && vitest run"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "@questra/theme": "0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@questra/theme": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.1.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "jsdom": "^25.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.0.0"
+  }
+}

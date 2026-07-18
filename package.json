@@ -1,0 +1,15 @@
+{
+  "name": "questra",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build:contracts": "npm run build -w @questra/contracts",
+    "check": "npm run check -w @questra/contracts",
+    "predev": "npm run build:contracts",
+    "dev": "npm run dev -w @questra/web",
+    "prestorybook": "npm run build:contracts",
+    "storybook": "npm run storybook -w @questra/web",
+    "prebuild": "npm run build:contracts",
+    "build": "npm run build -w @questra/web"
+  }
+}

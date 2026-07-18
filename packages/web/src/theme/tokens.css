@@ -1,0 +1,89 @@
+/**
+ * ============================================================================
+ *  QUESTRA DESIGN TOKENS  —  THE ONE FILE TO REPLACE WITH YOUR CLAUDE DESIGN SET
+ * ============================================================================
+ *
+ *  ADR-0014: Claude Design authors the look; this file is where it lands.
+ *  Every primitive reads these CSS variables — NClaude component hardcodes a
+ *  color, size, or font. Swapping in the real token set = editing THIS FILE
+ *  ONLY. No component changes, no re-theming pass.
+ *
+ *  When your token set arrives:
+ *    1. Replace the values below (keep the variable NAMES stable, or update
+ *       usages in one search-replace if you rename).
+ *    2. That's it. Every screen re-themes.
+ *
+ *  The values below are a NEUTRAL PLACEHOLDER palette — deliberately plain
+ *  (warm parchment + ink, one accent) so it's obviously a stand-in, not a
+ *  design decision. Do not treat these as canon.
+ */
+:root {
+  /* ---- color: surfaces ---- */
+  --q-bg: #f4f0e6;            /* app background (parchment placeholder) */
+  --q-surface: #ffffff;      /* cards, panels */
+  --q-surface-raised: #fbf8f1;
+  --q-overlay: rgba(30, 24, 16, 0.45); /* modal scrim */
+
+  /* ---- color: ink / text ---- */
+  --q-ink: #241d15;          /* primary text */
+  --q-ink-soft: #5c5346;     /* secondary text */
+  --q-ink-faint: #9a917f;    /* tertiary / disabled */
+
+  /* ---- color: accent + semantic ---- */
+  --q-accent: #7a2e2e;       /* single accent (deep red placeholder) */
+  --q-accent-soft: #a85a5a;
+  --q-secret: #4a2f6e;       /* the public/secret split "secret" tint */
+  --q-danger: #a12b2b;
+  --q-success: #2f6e3a;
+  --q-line: #e3dccb;         /* borders, dividers */
+
+  /* ---- typography ---- */
+  --q-font-body: ui-serif, Georgia, 'Times New Roman', serif;
+  --q-font-display: ui-serif, Georgia, serif; /* Design likely swaps to a display face */
+  --q-font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --q-text-xs: 0.75rem;
+  --q-text-sm: 0.875rem;
+  --q-text-base: 1rem;
+  --q-text-lg: 1.125rem;
+  --q-text-xl: 1.375rem;
+  --q-text-2xl: 1.75rem;
+  --q-text-3xl: 2.25rem;
+
+  --q-leading-tight: 1.2;
+  --q-leading-normal: 1.55;
+
+  /* ---- spacing scale (4px base) ---- */
+  --q-space-1: 0.25rem;
+  --q-space-2: 0.5rem;
+  --q-space-3: 0.75rem;
+  --q-space-4: 1rem;
+  --q-space-5: 1.5rem;
+  --q-space-6: 2rem;
+  --q-space-8: 3rem;
+
+  /* ---- radii + elevation ---- */
+  --q-radius-sm: 4px;
+  --q-radius: 8px;
+  --q-radius-lg: 14px;
+  --q-shadow-panel: 0 2px 12px rgba(36, 29, 21, 0.10);
+  --q-shadow-pop: 0 8px 30px rgba(36, 29, 21, 0.18);
+
+  /* ---- motion (respect prefers-reduced-motion in components) ---- */
+  --q-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --q-dur-fast: 120ms;
+  --q-dur: 220ms;
+}
+
+/* Dark mode placeholder — Design may or may not define one; scaffold anticipates it. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --q-bg: #1a1611;
+    --q-surface: #241d15;
+    --q-surface-raised: #2e261c;
+    --q-ink: #f0eadd;
+    --q-ink-soft: #c3b8a4;
+    --q-ink-faint: #7c7362;
+    --q-line: #3a3025;
+  }
+}

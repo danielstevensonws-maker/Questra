@@ -24,3 +24,14 @@ You are building Questra, a D&D 5e (SRD 5.2.1) companion/VTT app. Read this file
 
 ## Locked decisions you must not re-litigate (full list: docs/adr/)
 Server-authoritative event-sourced Engine · contract-first · effects-as-data (no rules if-statements outside the dataset) · milestone leveling default, multiclass v2 · assisted-manual cover + DM-revealed fog v1 · server dice + physical-dice manual entry · AI always has a non-AI fallback · CC-BY SRD attribution screen ships in v1.
+
+## Repo layout (as of scaffold)
+- `packages/contracts` — the spine (built, tested). Import shapes from here only.
+- `packages/web` — React/Vite/Tailwind app + Storybook. Primitives in `src/primitives/`, theme in `src/theme/tokens.css` (the ONE file the Claude Design token set replaces — ADR-0014).
+- `packages/engine` — (to build, M2) pure event-sourced engine + sheet computation.
+- `packages/server` — (to build, M2) Fastify + ws sync, reusing the contracts visibility filter.
+- `packages/ai` — (to build, M2+) the three AI tiers, context service, fallbacks.
+- `docs/specs` · `docs/briefs` · `docs/adr` · `docs/MASTER-PLAN.md` · `docs/CLAUDE-CODE-PROMPTS.md`.
+
+## Build primitives before screens (Playbook §3)
+The InfoPanel primitive (`packages/web/src/primitives/InfoPanel.tsx`) is the reference for how a primitive is built: themed only via CSS variables, driven by contracts shapes (see `entityToInfoPanel.ts`), storybook against fixtures. Match its structure for every other primitive. Screens compose primitives — never build a standalone screen that reinvents one.

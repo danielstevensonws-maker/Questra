@@ -1,0 +1,22 @@
+{
+  "name": "@questra/theme",
+  "version": "0.1.0",
+  "description": "The repo theme: Questra design tokens (color/type/spacing/effects) and base ground/type roles, transcribed from Claude Design per ADR-0014. The single visual dependency every Questra UI package composes from.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./styles.css": "./src/styles.css",
+    "./index.css": "./src/index.css",
+    "./base.css": "./src/base.css",
+    "./tokens/*": "./src/tokens/*"
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "check": "tsc -p tsconfig.json --noEmit && vitest run"
+  },
+  "devDependencies": { "typescript": "^7.0.2", "vitest": "^4.0.0", "@types/node": "^24.0.0" }
+}
