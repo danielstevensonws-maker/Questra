@@ -17,7 +17,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ingestConditions, ingestSpells } from '../src/ingest/pipeline.js';
+import { ingestConditions, ingestSpells, ingestMonsters } from '../src/ingest/pipeline.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = here + '../../../';
@@ -45,8 +45,14 @@ writeFileSync(condOut, JSON.stringify(condDrafts, null, 2) + '\n');
 console.log(`Wrote ${condDrafts.length} condition draft(s) → ${condOut}`);
 
 // Spell draft entities → committed data the dataset imports (no runtime fs).
-const spellDrafts = ingestSpells(raw);
 const dataDir = here + '../src/data/';
+const spellDrafts = ingestSpells(raw);
 const spellOut = dataDir + 'spells.draft.json';
 writeFileSync(spellOut, JSON.stringify(spellDrafts, null, 2) + '\n');
 console.log(`Wrote ${spellDrafts.length} spell draft(s) → ${spellOut}`);
+
+// Monster draft entities.
+const monsterDrafts = ingestMonsters(raw);
+const monsterOut = dataDir + 'monsters.draft.json';
+writeFileSync(monsterOut, JSON.stringify(monsterDrafts, null, 2) + '\n');
+console.log(`Wrote ${monsterDrafts.length} monster draft(s) → ${monsterOut}`);
