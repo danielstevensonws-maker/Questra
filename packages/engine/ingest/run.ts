@@ -17,7 +17,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ingestConditions } from '../src/ingest/pipeline.js';
+import { ingestConditions, ingestSpells } from '../src/ingest/pipeline.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = here + '../../../';
@@ -37,7 +37,16 @@ if (!existsSync(rawPath) || process.argv.includes('--reextract')) {
 }
 
 const raw = readFileSync(rawPath, 'utf8');
-const drafts = ingestConditions(raw);
-const out = extractedDir + 'condition-drafts.json';
-writeFileSync(out, JSON.stringify(drafts, null, 2) + '\n');
-console.log(`Wrote ${drafts.length} condition draft(s) → ${out}`);
+
+// Condition draft skeletons (review artifact for the QA pass).
+const condDrafts = ingestConditions(raw);
+const condOut = extractedDir + 'condition-drafts.json';
+writeFileSync(condOut, JSON.stringify(condDrafts, null, 2) + '\n');
+console.log(`Wrote ${condDrafts.length} condition draft(s) → ${condOut}`);
+
+// Spell draft entities → committed data the dataset imports (no runtime fs).
+const spellDrafts = ingestSpells(raw);
+const dataDir = here + '../src/data/';
+const spellOut = dataDir + 'spells.draft.json';
+writeFileSync(spellOut, JSON.stringify(spellDrafts, null, 2) + '\n');
+console.log(`Wrote ${spellDrafts.length} spell draft(s) → ${spellOut}`);

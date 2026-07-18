@@ -8,14 +8,22 @@
  * d20 pipeline arrive in M2 (Brief 02).
  */
 export * from './ingest/conditions.js';
+export * from './ingest/spells.js';
 export * from './ingest/pipeline.js';
 export * from './data/conditions.js';
 export * from './data/slice.js';
+export * from './data/spells.js';
 export * from './data/loader.js';
 
 import { CONDITIONS } from './data/conditions.js';
 import { SLICE_ENTITIES } from './data/slice.js';
+import { draftSpells } from './data/spells.js';
 import type { RulesEntity } from '@questra/contracts';
 
-/** The full M1.1 verified dataset: 15 conditions + the 3 slice entities. */
-export const DATASET: RulesEntity[] = [...CONDITIONS, ...SLICE_ENTITIES];
+/** The verified dataset: 15 conditions + the 3 slice entities. Refused-nowhere; safe in real sessions. */
+export const VERIFIED_DATASET: RulesEntity[] = [...CONDITIONS, ...SLICE_ENTITIES];
+
+/** The full dataset including drafts (verified core + ~311 draft spells). Drafts are dev-only via the loader. */
+export function fullDataset(): RulesEntity[] {
+  return [...VERIFIED_DATASET, ...draftSpells()];
+}

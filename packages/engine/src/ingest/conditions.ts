@@ -42,7 +42,7 @@ function isGlossaryBoundary(raw: string): boolean {
 }
 
 /** Running page footer / bare page-number noise that pdftotext leaves inline. */
-function isPageNoise(line: string): boolean {
+export function isPageNoise(line: string): boolean {
   const t = line.trim();
   if (t === '') return false; // handled separately
   if (/^System Reference Document 5\.2\.1(\s+\d+)?$/.test(t)) return true;
