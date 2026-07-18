@@ -1,0 +1,112 @@
+/**
+ * The event-sourced projection — Brief 02 §3/§4. `fold(events)` replays the log
+ * into ProjectionState. This is the single definition of "current state"; the
+ * server and any client derive state the same way (ADR-0001).
+ *
+ * Undo folds like any other event: an `undo_applied` reverses the effects of the
+ * events it names by re-deriving state from the surviving log. We implement undo
+ * by REPLAY-WITHOUT-THE-UNDONE: an undone cause's events (and the undo marker)
+ * are skipped when folding. This makes the §4 property hold by construction —
+ * `fold(log) === fold(log + cause + undo(cause))` — because the appended cause
+ * and its cascade are exactly the events the undo marker removes.
+ */
+import type { PlayEvent, EventBody } from '@questra/contracts';
+import { cloneState, type Combatant, type ProjectionState } from './state.js';
+
+/** Build the initial state from a set of combatants (pre-combat setup). */
+export function initialState(combatants: Combatant[], nextSeq = 0): ProjectionState {
+  const byId: Record<string, Combatant> = {};
+  for (const c of combatants) byId[c.id] = c;
+  return { combatants: byId, round: 0, nextSeq };
+}
+
+/** Collect the seqs undone by `undo_applied` events, plus their causes, to skip on replay. */
+function undoneSeqs(events: readonly PlayEvent[]): Set<number> {
+  const skip = new Set<number>();
+  const bySeq = new Map<number, PlayEvent>();
+  for (const e of events) bySeq.set(e.seq, e);
+  for (const e of events) {
+    if (e.body.t === 'undo_applied') {
+      skip.add(e.seq); // the undo marker itself doesn't mutate state
+      for (const s of e.body.reversedSeqs) skip.add(s);
+      // also skip the cause event (the intent_declared) that started the group
+      const causeId = e.body.undoneCauseId;
+      for (const c of events) if (c.id === causeId) skip.add(c.seq);
+    }
+  }
+  return skip;
+}
+
+/** Apply one event body to a mutable state (the reducer step). */
+function apply(state: ProjectionState, event: PlayEvent): void {
+  const b: EventBody = event.body;
+  const c = (id: string): Combatant | undefined => state.combatants[id];
+  switch (b.t) {
+    case 'damage_applied': {
+      const t = c(b.creatureId);
+      if (t) t.hp = b.resultingHp;
+      break;
+    }
+    case 'healing_applied': {
+      const t = c(b.creatureId);
+      if (t) t.hp = b.resultingHp;
+      break;
+    }
+    case 'condition_applied': {
+      const t = c(b.creatureId);
+      if (t && !t.conditions.some((x) => x.conditionId === b.conditionId)) {
+        t.conditions.push({ conditionId: b.conditionId, appliedBySeq: event.seq });
+      }
+      break;
+    }
+    case 'condition_removed': {
+      const t = c(b.creatureId);
+      if (t) t.conditions = t.conditions.filter((x) => x.conditionId !== b.conditionId);
+      break;
+    }
+    case 'concentration_started': {
+      const t = c(b.creatureId);
+      if (t) t.concentratingOn = b.spellId;
+      break;
+    }
+    case 'concentration_ended': {
+      const t = c(b.creatureId);
+      if (t) delete t.concentratingOn;
+      break;
+    }
+    case 'creature_unconscious': {
+      const t = c(b.creatureId);
+      if (t && !t.conditions.some((x) => x.conditionId === 'condition.unconscious')) {
+        t.conditions.push({ conditionId: 'condition.unconscious', appliedBySeq: event.seq });
+      }
+      break;
+    }
+    case 'turn_advanced': {
+      state.round = b.round;
+      state.activeCreatureId = b.activeCreatureId;
+      break;
+    }
+    default:
+      // events that don't mutate combatant/turn state (intent_declared, roll_made,
+      // narration, whisper_sent, escalated_to_ruling, …) leave the projection as-is.
+      break;
+  }
+  if (event.seq >= state.nextSeq) state.nextSeq = event.seq + 1;
+}
+
+/**
+ * Fold an event log into state, starting from `base`. Undone events (and their
+ * causes / undo markers) are skipped, so the fold reflects the net state.
+ */
+export function fold(base: ProjectionState, events: readonly PlayEvent[]): ProjectionState {
+  const skip = undoneSeqs(events);
+  const state = cloneState(base);
+  for (const e of events) {
+    if (skip.has(e.seq)) {
+      if (e.seq >= state.nextSeq) state.nextSeq = e.seq + 1; // seqs still advance
+      continue;
+    }
+    apply(state, e);
+  }
+  return state;
+}

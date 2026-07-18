@@ -24,6 +24,10 @@ export * from './data/named.js';
 export * from './data/items.js';
 export * from './data/tables.js';
 export * from './data/loader.js';
+export * from './sim/state.js';
+export * from './sim/projection.js';
+export * from './sim/pipeline.js';
+export * from './sim/cascade.js';
 
 import { CONDITIONS } from './data/conditions.js';
 import { GOBLIN_WARRIOR, FIREBALL } from './data/slice.js';

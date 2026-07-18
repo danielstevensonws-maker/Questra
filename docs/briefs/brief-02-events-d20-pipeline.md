@@ -2,6 +2,13 @@
 
 *Layer 3 implementation brief. Consumed with: `@questra/contracts` + Brief 01 (the hook vocabulary it evaluates). Parent specs: Rules Engine §2–§3, Architecture §4–§5 — this brief is the buildable version; sessions read this, not those.*
 
+> **⚠️ ADR-0013 revalidation note — M2.1 (2026-07-19).** Checked against current `@questra/contracts`. **Ingest to the contracts + the `torvald-trace.json` fixture, which are the authority.** No contract changes for M2.1. Drift/clarifications:
+> 1. **`roll_made.sources`.** The brief §2 types it `RollSourceTag[]`; the contract is `z.array(z.string())` and the fixture uses plain ids (`["condition.prone"]`). Emit strings.
+> 2. **Loose payload types.** `PromptContext`, `RestSummary`, `LevelUpChoices`, `RulingContext` referenced in §1–§2 are loose in contracts (`z.record`/`z.unknown`) — deliberate, tightened per their own briefs. M2.1 only emits the trace's events (`intent_declared`, `roll_made`, `damage_applied`, `narration`, `undo_applied`, `whisper_sent`); it does not need those shapes.
+> 3. **Projection state is engine-internal, NOT a contract.** Contracts own the *event vocabulary* (the wire); the folded game state (`ProjectionState`/`Combatant`) is derived and lives in `packages/engine` (ADR-0001 event-sourcing; Rules-Engine spec confirms greying reads the same *flags*, via the same pure functions, not a shared state type). If client-side greying later needs the shape shared, that is a deliberate contract PR then.
+> 4. **No Torvald sheet fixture exists.** `torvald-trace.json` is the expected *event output* only; Torvald's stats live in its prose (STR 16, prof +2, longsword 1d8+3, Prone, Bless). The M2.1 golden test constructs his combatant state from those stated values (structured sheet computation is Brief 03 / M2.2). The Goblin's stats come from `goblin-warrior.json`.
+> 5. **Determinism via injected RNG.** The pipeline's dice use the contracts `evaluateExpr` RNG seam (`rng(sides) → int`); the golden test injects a scripted RNG that returns the fixture's exact rolls (Bless d4=3, d20 14/9, damage d8=6), so `roll_made`/`damage_applied` reproduce byte-for-byte. The Engine never calls an AI model (ADR-0005).
+
 **Scope:** the exact event types, the resolution algorithm step by step, one fully worked trace, acceptance criteria.
 **Non-goals:** transport/websockets (Brief 05), UI rendering of events, the Assistant's Ruling Suggestions (Brief 10 — this brief only defines the `escalated_to_ruling` event that hands off to it).
 
