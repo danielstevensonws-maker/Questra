@@ -12,6 +12,8 @@ export * from './ingest/spells.js';
 export * from './ingest/monsters.js';
 export * from './ingest/classes.js';
 export * from './ingest/namedEntities.js';
+export * from './ingest/items.js';
+export * from './ingest/tables.js';
 export * from './ingest/pipeline.js';
 export * from './data/conditions.js';
 export * from './data/slice.js';
@@ -19,6 +21,8 @@ export * from './data/spells.js';
 export * from './data/monsters.js';
 export * from './data/classes.js';
 export * from './data/named.js';
+export * from './data/items.js';
+export * from './data/tables.js';
 export * from './data/loader.js';
 
 import { CONDITIONS } from './data/conditions.js';
@@ -27,6 +31,7 @@ import { CLASSES } from './data/classes.js';
 import { draftSpells } from './data/spells.js';
 import { draftMonsters } from './data/monsters.js';
 import { draftNamed } from './data/named.js';
+import { draftItems } from './data/items.js';
 import type { RulesEntity } from '@questra/contracts';
 
 /**
@@ -36,7 +41,7 @@ import type { RulesEntity } from '@questra/contracts';
  */
 export const VERIFIED_DATASET: RulesEntity[] = [...CONDITIONS, GOBLIN_WARRIOR, FIREBALL, ...CLASSES];
 
-/** The full dataset including drafts (verified core + draft spells/monsters/species/backgrounds/feats). Drafts are dev-only via the loader. */
+/** The full dataset including drafts (verified core + draft spells/monsters/species/backgrounds/feats/items). Drafts are dev-only via the loader. */
 export function fullDataset(): RulesEntity[] {
-  return [...VERIFIED_DATASET, ...draftSpells(), ...draftMonsters(), ...draftNamed()];
+  return [...VERIFIED_DATASET, ...draftSpells(), ...draftMonsters(), ...draftNamed(), ...draftItems()];
 }

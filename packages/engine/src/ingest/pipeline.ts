@@ -18,6 +18,8 @@ import { extractSpells } from './spells.js';
 import { extractMonsters } from './monsters.js';
 import { extractClasses, type ClassTable } from './classes.js';
 import { extractNamed, SPECIES_NAMES, BACKGROUND_NAMES, FEAT_NAMES } from './namedEntities.js';
+import { extractItems, type ItemDraft } from './items.js';
+import { extractAdvancement, extractEncounterBudget, type AdvancementRow, type EncounterBudgetRow } from './tables.js';
 
 /** Dataset version stamped on ingested entities. Pinned; bumping is an append-only release (Brief 01 acceptance #6). */
 export const DATASET_VERSION = '2026.07.0';
@@ -209,4 +211,72 @@ export function ingestNamed(rawSrdText: string): NamedEntityDraft[] {
   const backgrounds = extractNamed(region('Character Backgrounds', 'Character Species'), BACKGROUND_NAMES).map((n) => toNamedDraft('background', n.name, n.srdText));
   const feats = extractNamed(region('Feat Descriptions', 'Equipment'), FEAT_NAMES).map((n) => toNamedDraft('feat', n.name, n.srdText));
   return [...species, ...backgrounds, ...feats];
+}
+
+/** A draft item entity — loose meta carrying the price in copper pieces. */
+export interface ItemEntityDraft {
+  id: string;
+  entityType: 'item';
+  name: string;
+  source: 'srd-5.2.1';
+  version: string;
+  qa: 'draft';
+  plain: string;
+  srd_text: string;
+  effects: [];
+  resolution: 'routine';
+  meta: { category: string; costCp?: number };
+}
+
+/** Index bounds of the equipment tables in the SRD (Weapons / Armor / Adventuring Gear). */
+function equipmentRegions(lines: string[]): { weapons: string[]; armor: string[]; gear: string[] } {
+  const at = (header: string, after = 0) => lines.findIndex((l, i) => i >= after && l.trim() === header);
+  const weaponsStart = at('Weapons');
+  const armorStart = at('Armor', weaponsStart + 1);
+  const gearStart = at('Adventuring Gear', armorStart + 1);
+  const gearEnd = at('Tools', gearStart + 1);
+  return {
+    weapons: lines.slice(weaponsStart, armorStart),
+    armor: lines.slice(armorStart, at('Tools', armorStart + 1) === -1 ? gearStart : at('Tools', armorStart + 1)),
+    gear: lines.slice(gearStart, gearEnd === -1 ? gearStart + 200 : gearEnd),
+  };
+}
+
+/** Ingest weapons, armor, and adventuring gear (with prices) to draft item entities. */
+export function ingestItems(rawSrdText: string): ItemEntityDraft[] {
+  const lines = rawSrdText.replace(/\r/g, '').split('\n');
+  const { weapons, armor, gear } = equipmentRegions(lines);
+  const items: ItemDraft[] = [
+    ...extractItems(weapons, 'weapon'),
+    ...extractItems(armor, 'armor'),
+    ...extractItems(gear, 'gear'),
+  ];
+  // de-dup across regions by id
+  const seen = new Set<string>();
+  return items.filter((it) => (seen.has(it.id) ? false : (seen.add(it.id), true))).map((it) => ({
+    id: it.id,
+    entityType: 'item' as const,
+    name: it.name,
+    source: 'srd-5.2.1' as const,
+    version: DATASET_VERSION,
+    qa: 'draft' as const,
+    plain: `${it.name} — SRD ${it.category}${it.costCp !== undefined ? ` (${it.costCp} cp)` : ''}.`,
+    srd_text: it.srdText,
+    effects: [] as [],
+    resolution: 'routine' as const,
+    meta: { category: it.category, ...(it.costCp !== undefined ? { costCp: it.costCp } : {}) },
+  }));
+}
+
+/** The reference tables (not entities): XP advancement + encounter XP budget. */
+export interface ReferenceTables {
+  advancement: AdvancementRow[];
+  encounterBudget: EncounterBudgetRow[];
+}
+export function ingestTables(rawSrdText: string): ReferenceTables {
+  const lines = rawSrdText.replace(/\r/g, '').split('\n');
+  return {
+    advancement: extractAdvancement(lines),
+    encounterBudget: extractEncounterBudget(lines),
+  };
 }

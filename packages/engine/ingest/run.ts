@@ -17,7 +17,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ingestConditions, ingestSpells, ingestMonsters, ingestClasses, ingestNamed } from '../src/ingest/pipeline.js';
+import { ingestConditions, ingestSpells, ingestMonsters, ingestClasses, ingestNamed, ingestItems, ingestTables } from '../src/ingest/pipeline.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = here + '../../../';
@@ -69,3 +69,15 @@ const namedDrafts = ingestNamed(raw);
 const namedOut = dataDir + 'named.draft.json';
 writeFileSync(namedOut, JSON.stringify(namedDrafts, null, 2) + '\n');
 console.log(`Wrote ${namedDrafts.length} named draft(s) (species/background/feat) → ${namedOut}`);
+
+// Item draft entities (weapons/armor/gear with prices).
+const itemDrafts = ingestItems(raw);
+const itemOut = dataDir + 'items.draft.json';
+writeFileSync(itemOut, JSON.stringify(itemDrafts, null, 2) + '\n');
+console.log(`Wrote ${itemDrafts.length} item draft(s) → ${itemOut}`);
+
+// Reference tables (XP advancement + encounter XP budget) — not entities.
+const tables = ingestTables(raw);
+const tablesOut = dataDir + 'tables.json';
+writeFileSync(tablesOut, JSON.stringify(tables, null, 2) + '\n');
+console.log(`Wrote reference tables (advancement ${tables.advancement.length}, budget ${tables.encounterBudget.length}) → ${tablesOut}`);
