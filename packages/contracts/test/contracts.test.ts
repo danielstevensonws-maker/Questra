@@ -10,6 +10,7 @@ import {
   eventVisibleTo, filterStream,
   parseExpr, evalExprString, isDeterministic, ExprParseError,
   ComputedSheetSchema, derivationSumsToValue,
+  ClientMsgSchema, ServerMsgSchema,
 } from '../src/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -204,5 +205,34 @@ describe('the Torvald trace (Brief 02 §5 fixture)', () => {
     expect(eventVisibleTo(whisperEvent, { role: 'player', accountId: 'acct-mira' })).toBe(false);
     expect(eventVisibleTo(whisperEvent, { role: 'table_display' })).toBe(false);
     expect(eventVisibleTo(whisperEvent, { role: 'dm' })).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------- wire (Brief 05 §1)
+describe('wire messages validate against the schemas', () => {
+  it('accepts each ClientMsg variant', () => {
+    const msgs = [
+      { m: 'hello', playSessionId: 'ps-1', token: 'tok', lastSeq: 40 },
+      { m: 'intent', envelope: { idempotencyKey: 'key-abcdef12', intent: { kind: 'move', tokenId: 't1', path: [{ x: 0, y: 0 }] } } },
+      { m: 'ruling_response', promptId: 'p1', response: { decision: 'ask_roll' } },
+      { m: 'ping' },
+    ];
+    for (const msg of msgs) expect(() => ClientMsgSchema.parse(msg)).not.toThrow();
+  });
+
+  it('accepts each ServerMsg variant, incl. an opaque welcome snapshot', () => {
+    const msgs = [
+      { m: 'welcome', viewer: { role: 'player' }, snapshotSeq: 40, snapshot: { anything: true } },
+      { m: 'intent_ack', idempotencyKey: 'key-abcdef12', accepted: true, firstSeq: 41 },
+      { m: 'intent_rejected', idempotencyKey: 'key-abcdef12', reason: "It isn't your turn." },
+      { m: 'presence', connected: [{ accountId: 'acct-torvald', role: 'player' }], activeCreatureId: 'pc-torvald' },
+      { m: 'error', code: 'rate_limited', detail: 'slow down' },
+      { m: 'pong' },
+    ];
+    for (const msg of msgs) expect(() => ServerMsgSchema.parse(msg)).not.toThrow();
+  });
+
+  it('rejects an unknown message discriminator', () => {
+    expect(() => ClientMsgSchema.parse({ m: 'nope' })).toThrow();
   });
 });

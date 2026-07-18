@@ -2,6 +2,14 @@
 
 *Layer 3. Consumed with contracts (events + visibility). Parent: Architecture §5. Revalidate at build time.*
 
+> **⚠️ ADR-0013 revalidation note — M2.3 (2026-07-19).** Checked against current `@questra/contracts`. Ships as **two commits: a contracts PR (play/wire.ts + tests) first, then packages/server** (contract-first; user-authorized). Details:
+> 1. **Wire types are new** — `play/wire.ts` (ClientMsg/ServerMsg) added to contracts, composing existing `ClientIntentEnvelopeSchema`, `PlayEventSchema`, `ViewerRole`, `ID`.
+> 2. **`ProjectionSnapshot` is opaque in the wire** — `welcome.snapshot` is a generic JSON value in contracts; the server fills it with the engine's `ProjectionState` (`fold(log)`), keeping projection engine-internal (M2.1 decision intact). Snapshot content is the engine's concern, not the wire schema's.
+> 3. **Visibility reuse (non-negotiable #3)** — all fan-out filtering uses the existing contracts `eventVisibleTo`/`filterStream`. No second implementation.
+> 4. **`fold(log)` reuse** — snapshots come from the engine's `fold` (M2.1), never a hand-maintained state (§2.8).
+> 5. **Transport seam (ADR-0011)** — `ws` on Node behind a thin transport interface so the wire logic is testable over an in-memory socket pair (the golden test drives that, no real network needed).
+> 6. **Reject == greying string (§2.4/§4.4)** — the server's `intent_rejected.reason` comes from the same engine legality function the client uses for greying; asserted by a shared-function test.
+
 **Scope:** the WebSocket wire protocol, join/replay/reconnect, idempotent intents, presence, the three viewer roles.
 **Non-goals:** game logic (Brief 02), prep-surface CRUD (Brief 11 — plain HTTP + light subscriptions), transport vendor choice (ADR-0011: `ws` on Node; interface keeps it swappable).
 
