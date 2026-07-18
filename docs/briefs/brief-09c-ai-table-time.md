@@ -2,6 +2,8 @@
 
 *Layer 3. Consumed with contracts + 09b's service + AI Orchestration §2.3. Revalidate at build time. This is the measured product risk — everything here exists to hit <2s first-token.*
 
+> **⚠️ ADR-0013 revalidation note — M2.4 (2026-07-19).** M2.4 builds the **minimal** ruling path (09c §1 one RulingSuggestion + §2 fallback ladder), contract-first. New in contracts: `RulingSuggestionSchema`, `NpcLineSchema` (AI output schemas — Orchestration §4 says every AI output conforms to a published contracts schema), and `table.difficulty-ladder` data. `packages/ai` ships with a **STUBBED streaming model** (ADR: AI always has a non-AI fallback) — the streaming interface, the accept/tweak/reject flow into the existing `AcceptTweakRejectCard`, and the difficulty-ladder fallback are all real; only the model call is stubbed. **Live p95 (§5) is measured in the slice environment, NOT CI** — CI runs stub-timing logic only (§6.5); the go/no-go ADR carries a metrics template + manual-run steps. The engine never calls the model (ADR-0005): escalation emits `escalated_to_ruling`, the AI tier proposes, `ruling_decided{ask_roll}` re-enters the pipeline.
+
 **Scope:** RulingSuggestion and NpcLine end-to-end, the Oracle, the latency stack, the fallback ladder, the difficulty-ladder data.
 **Non-goals:** Engine resolution (rulings only *propose*; `ruling_decided{ask_roll}` hands the chosen check to the pipeline).
 

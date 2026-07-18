@@ -2,6 +2,8 @@
 
 *Layer 3. Consumed with contracts + Brief 02. Parent: Session Planner §6, Rules Engine §8–§9, ADR-0012 (grid metric). Revalidate at build time.*
 
+> **⚠️ ADR-0013 revalidation note — M2.4 (2026-07-19).** §2 mandates `world/room.ts` in contracts and §4 puts `affectedCells`/geometry there — a spine change (user-authorized), shipped contract-first. M2.4 builds the **minimal** map (edit/play modes + geometry + fog payload cleanliness), not the full renderer polish. `distFt`, `affectedCells`, `Room`/`PlacedAsset`/`PlacedToken`, `CellMask` go in contracts; the React canvas primitive in `packages/web` calls them (the §4.5 "one geometry consumer" rule). Fog payload cleanliness (§6.3) reuses the visibility choke point — a `filterRoomForViewer` helper in contracts, same pattern as `eventVisibleTo`.
+
 **Scope:** grid model, the three-layer room, token movement + path cost, DM-revealed fog, AoE affected-cell math, the one renderer in three modes.
 **Non-goals:** image generation (Brief 09a), computed line-of-sight (v2 per ADR-0007), trigger automation (v1 manual per Session Planner).
 

@@ -2,6 +2,8 @@
 
 *Layer 3. Consumed with contracts + AI Orchestration spec §2.1. Parent: Portrait Style Prompt System (authoritative for the prompt content). Revalidate at build time.*
 
+> **⚠️ ADR-0013 revalidation note — M2.4 (2026-07-19).** M2.4 builds the **minimal** asset path (§1 assembler + §2 generation *interface* with a STUBBED vendor). The `assemblePortraitPrompt`/asset-prompt assemblers are pure and byte-testable (the acceptance target); the `ImageGen` interface is real but its vendor implementation is a deterministic stub (real image models + acceptability judgment are the slice-environment manual step, not CI). Vendor-swap-via-config and the import-graph rule (§5.4) hold with the stub. No new contracts shapes are strictly required for the minimal assembler (it takes/returns plain strings); token tables live as engine/ai data.
+
 **Scope:** the prompt assembler as code, the generation service interface, the library write path, quotas.
 **Non-goals:** prompt *content* design (Portrait spec owns it), model vendor lock (config).
 

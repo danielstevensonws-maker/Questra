@@ -11,6 +11,8 @@ import {
   parseExpr, evalExprString, isDeterministic, ExprParseError,
   ComputedSheetSchema, derivationSumsToValue,
   ClientMsgSchema, ServerMsgSchema,
+  distFt, affectedCells, filterRoomForViewer, cellKey, footprintOf, type Room,
+  RulingSuggestionSchema, NpcLineSchema, DIFFICULTY_LADDER, ladderFallback,
 } from '../src/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -234,5 +236,83 @@ describe('wire messages validate against the schemas', () => {
 
   it('rejects an unknown message discriminator', () => {
     expect(() => ClientMsgSchema.parse({ m: 'nope' })).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------- world/room (Brief 06)
+describe('grid geometry (ADR-0012: Chebyshev, diagonals cost 5 ft)', () => {
+  it('distFt: orthogonal and diagonal both 5 ft per step (§1)', () => {
+    expect(distFt({ x: 0, y: 0 }, { x: 3, y: 0 })).toBe(15);
+    expect(distFt({ x: 0, y: 0 }, { x: 3, y: 3 })).toBe(15); // diagonal = 5 ft/step
+    expect(distFt({ x: 0, y: 0 }, { x: 3, y: 1 })).toBe(15);
+  });
+  it('footprint by size', () => {
+    expect(footprintOf('medium')).toBe(1);
+    expect(footprintOf('large')).toBe(2);
+    expect(footprintOf('gargantuan')).toBe(4);
+  });
+  it('affectedCells: a 20-ft-radius sphere = every cell within Chebyshev 20 ft (§4)', () => {
+    const cells = affectedCells({ kind: 'sphere', radiusFt: 20 }, { x: 5, y: 5 });
+    // radius 20 ft = 4 cells each direction → 9x9 block = 81 cells
+    expect(cells).toHaveLength(81);
+    expect(cells.every((c) => distFt({ x: 5, y: 5 }, c) <= 20)).toBe(true);
+  });
+  it('affectedCells: a 10-ft cube is 2x2 from the anchor', () => {
+    const cells = affectedCells({ kind: 'cube', sizeFt: 10 }, { x: 0, y: 0 });
+    expect(cells).toHaveLength(4);
+  });
+});
+
+describe('fog / player payload cleanliness (Brief 06 §6.3 — the choke point)', () => {
+  const room: Room = {
+    id: 'room-1', terrainImageRef: 'img', gridSize: { w: 4, h: 4 },
+    cellTags: { '0,0': { light: 'bright' }, '3,3': { difficultTerrain: true } },
+    revealed: ['0,0', '1,0'],
+    assets: [
+      { id: 'a-open', imageRef: 'i', cell: { x: 0, y: 0 }, footprint: { w: 1, h: 1 }, flags: { blocking: false, movable: false, interactive: true, difficultTerrain: false }, prepNote: 'secret lever' },
+      { id: 'a-hidden', imageRef: 'i', cell: { x: 3, y: 3 }, footprint: { w: 1, h: 1 }, flags: { blocking: true, movable: false, interactive: false, difficultTerrain: false } },
+    ],
+    tokens: [
+      { id: 't-visible', creatureRef: 'pc-torvald', cell: { x: 0, y: 0 }, size: 'medium', hidden: false, staged: false },
+      { id: 't-hidden', creatureRef: 'npc-goblin-1', cell: { x: 3, y: 3 }, size: 'small', hidden: true, staged: false },
+      { id: 't-staged', creatureRef: 'npc-boss', cell: { x: 1, y: 0 }, size: 'large', hidden: false, staged: true },
+    ],
+  };
+
+  it('a player payload contains zero unrevealed-cell data and zero hidden/staged tokens', () => {
+    const player = filterRoomForViewer(room, { role: 'player', accountId: 'acct-torvald' });
+    // only revealed cellTags survive
+    expect(Object.keys(player.cellTags)).toEqual(['0,0']);
+    // hidden/staged tokens gone; only the visible one on a revealed cell remains
+    expect(player.tokens.map((t) => t.id)).toEqual(['t-visible']);
+    // the asset on an unrevealed cell is gone; the revealed one keeps NO prepNote
+    expect(player.assets.map((a) => a.id)).toEqual(['a-open']);
+    expect(player.assets[0]!).not.toHaveProperty('prepNote');
+  });
+
+  it('the DM sees the full room, prep notes and all', () => {
+    const dm = filterRoomForViewer(room, { role: 'dm', accountId: 'acct-dm' });
+    expect(dm.tokens).toHaveLength(3);
+    expect(dm.assets[0]!.prepNote).toBe('secret lever');
+  });
+});
+
+// ---------------------------------------------------------------- AI schemas (Brief 09c)
+describe('AI output schemas + difficulty ladder', () => {
+  it('RulingSuggestion validates', () => {
+    const r = { check: { kind: 'ability_check', ability: 'dex', skill: 'acrobatics' }, dc: 14, failConsequence: 'You fall.', rationale: 'Swinging on a rope is Acrobatics.' };
+    expect(() => RulingSuggestionSchema.parse(r)).not.toThrow();
+  });
+  it('NpcLine validates with an attitude delta', () => {
+    expect(() => NpcLineSchema.parse({ line: 'Well met.', attitudeDelta: 1 })).not.toThrow();
+  });
+  it('the difficulty ladder is the five SRD-style rungs', () => {
+    expect(DIFFICULTY_LADDER.map((r) => r.dc)).toEqual([10, 13, 15, 18, 20]);
+  });
+  it('ladderFallback produces a valid RulingSuggestion with no model', () => {
+    const rung = DIFFICULTY_LADDER.find((r) => r.label === 'Hard')!;
+    const suggestion = ladderFallback('dex', rung);
+    expect(() => RulingSuggestionSchema.parse(suggestion)).not.toThrow();
+    expect(suggestion.dc).toBe(15);
   });
 });
