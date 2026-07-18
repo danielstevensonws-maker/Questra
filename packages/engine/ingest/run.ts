@@ -17,7 +17,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ingestConditions, ingestSpells, ingestMonsters, ingestClasses } from '../src/ingest/pipeline.js';
+import { ingestConditions, ingestSpells, ingestMonsters, ingestClasses, ingestNamed } from '../src/ingest/pipeline.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = here + '../../../';
@@ -63,3 +63,9 @@ const classOut = dataDir + 'classes.levels.json';
 const levelsById = Object.fromEntries(classTables.map((c) => [c.classId, c.levels]));
 writeFileSync(classOut, JSON.stringify(levelsById, null, 2) + '\n');
 console.log(`Wrote ${classTables.length} class level table(s) → ${classOut}`);
+
+// Species / backgrounds / feats draft entities (loose meta).
+const namedDrafts = ingestNamed(raw);
+const namedOut = dataDir + 'named.draft.json';
+writeFileSync(namedOut, JSON.stringify(namedDrafts, null, 2) + '\n');
+console.log(`Wrote ${namedDrafts.length} named draft(s) (species/background/feat) → ${namedOut}`);
