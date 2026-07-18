@@ -1,0 +1,21 @@
+{
+  "name": "@questra/ai",
+  "version": "0.1.0",
+  "description": "The AI tiers: table-time rulings/roleplay, creative text, image gen — each behind an interface with a non-AI fallback (ADR: AI always has a non-AI fallback). Every output conforms to a contracts schema and renders in the accept/tweak/reject card. The Engine never imports this package (ADR-0005).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "check": "tsc -p tsconfig.json --noEmit && vitest run"
+  },
+  "dependencies": {
+    "@questra/contracts": "*"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.0.0",
+    "@types/node": "^24.0.0"
+  }
+}
