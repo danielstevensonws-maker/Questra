@@ -1,0 +1,27 @@
+{
+  "name": "@questra/server",
+  "version": "0.1.0",
+  "description": "The sync server: Fastify + ws WebSocket wire protocol, join/replay/reconnect, idempotent intents, presence, prompt timeouts. Reuses the contracts visibility filter (no second implementation) and the engine fold/pipeline. Never imports AI directly.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "check": "tsc -p tsconfig.json --noEmit && vitest run",
+    "dev": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@questra/contracts": "*",
+    "@questra/engine": "*",
+    "fastify": "^5.2.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.0.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.5.0"
+  }
+}
