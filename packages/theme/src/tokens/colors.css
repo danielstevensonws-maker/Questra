@@ -42,6 +42,10 @@
   --qa-steel:   #8FA3B8;  /* martial / neutral cool (slate blue) */
   --qa-gold:    #D6965A;  /* rare / notable / candle warmth */
 
+  /* DM-only / secret authoring tint — "what only you know". Shares the
+     candle-gold value on purpose: secrets are warmth held back, not danger. */
+  --qa-secret: #D6965A;
+
   /* HP bar fills: warm at full, ember when low */
   --qa-hp-full: #C4AE87;
   --qa-hp-low:  #C05B41;
