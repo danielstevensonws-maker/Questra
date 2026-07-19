@@ -30,6 +30,8 @@ export * from './sim/pipeline.js';
 export * from './sim/cascade.js';
 export * from './sim/sheet.js';
 export * from './sim/narration.js';
+export * from './sim/duration.js';
+export * from './sim/dying.js';
 
 import { CONDITIONS } from './data/conditions.js';
 import { GOBLIN_WARRIOR, FIREBALL } from './data/slice.js';
