@@ -1,5 +1,6 @@
 import type { StorybookConfig } from '@storybook/react-vite';
 import { contractsSrcAlias } from '../contracts-src-alias';
+import { engineSrcAlias } from '../engine-src-alias';
 
 const config: StorybookConfig = {
   stories: ['../src/**/*.stories.@(ts|tsx)'],
@@ -10,6 +11,7 @@ const config: StorybookConfig = {
     cfg.resolve.alias = [
       ...(Array.isArray(cfg.resolve.alias) ? cfg.resolve.alias : []),
       contractsSrcAlias,
+      engineSrcAlias,
     ];
     return cfg;
   },

@@ -36,6 +36,7 @@ export * from './sim/rest.js';
 export * from './sim/advancement.js';
 export * from './sim/shop.js';
 export * from './sim/prompts.js';
+export * from './sim/legality.js';
 
 import { CONDITIONS } from './data/conditions.js';
 import { GOBLIN_WARRIOR, FIREBALL } from './data/slice.js';
