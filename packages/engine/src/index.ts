@@ -29,6 +29,7 @@ export * from './sim/projection.js';
 export * from './sim/pipeline.js';
 export * from './sim/cascade.js';
 export * from './sim/sheet.js';
+export * from './sim/narration.js';
 
 import { CONDITIONS } from './data/conditions.js';
 import { GOBLIN_WARRIOR, FIREBALL } from './data/slice.js';
