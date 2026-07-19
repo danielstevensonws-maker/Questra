@@ -10,7 +10,7 @@
     "test": "vitest run",
     "check": "tsc -p tsconfig.json --noEmit && vitest run",
     "dev": "tsx src/main.ts",
-    "migrate": "node-pg-migrate -j ts --tsconfig tsconfig.json -m src/store/migrations",
+    "migrate": "node scripts/migrate.mjs",
     "migrate:up": "npm run migrate up",
     "migrate:down": "npm run migrate down"
   },
