@@ -2,6 +2,12 @@
 
 *Layer 3. Consumed with contracts + Briefs 01–02. Parent: Rules Engine §3–§5. Revalidate at build time.*
 
+> **⚠️ ADR-0013 revalidation note — M3.1 (2026-07-19).** Much of this brief already landed in earlier milestones; M3.1 completes the rest. Status:
+> - **§1 fifteen encodings** — all 15 conditions are already ingested + verified (M1.1/M1.2, `data/conditions.ts`). The two small **contract PRs §1 mandates are the genuine new work** (user-authorized): add `restrict_target` to the `action_restriction` hook (Charmed's "can't target the charmer") and allow `resistance: 'all'` (Petrified). Done first, with the Charmed/Petrified encodings + tests updated to use them (Charmed/Petrified move from `resolution:'novel'` toward `routine`).
+> - **Duration schema** — `DurationSchema` (save_ends / while_concentrating / rounds / end_of_next_turn / start_of_turn / until_removed) already exists in contracts (M2.1). §2's **state machine** (the fold-time expiry logic: save_ends auto-prompt, while_concentrating cascade, stacking rule) is new engine work.
+> - **§3 dying** — the death-save + 0-HP-branch **helpers** already exist (`sim/cascade.ts`, M2.1: `deathSave`, `deathOutcome`, the result enum). The **dying state machine** that orchestrates the full ladder (0 HP → death-save card → stabilize → damage → died) is new engine work.
+> - No Torvald-fixture changes; new golden fixtures for Hold Person + the dying ladder are authored here. Engine stays pure/AI-free (ADR-0005).
+
 **Scope:** the full 15-condition dataset, the duration/expiry state machine, the dying state machine.
 **Non-goals:** dying UI (Brief 10), condition *sources* like spells (their own entities apply conditions via hooks — already expressible).
 

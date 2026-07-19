@@ -13,6 +13,7 @@ import {
   ClientMsgSchema, ServerMsgSchema,
   distFt, affectedCells, filterRoomForViewer, cellKey, footprintOf, type Room,
   RulingSuggestionSchema, NpcLineSchema, DIFFICULTY_LADDER, ladderFallback,
+  EffectHookSchema,
 } from '../src/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -314,5 +315,21 @@ describe('AI output schemas + difficulty ladder', () => {
     const suggestion = ladderFallback('dex', rung);
     expect(() => RulingSuggestionSchema.parse(suggestion)).not.toThrow();
     expect(suggestion.dc).toBe(15);
+  });
+});
+
+// ---------------------------------------------------------------- brief-04 §1 hook extensions
+describe('effect-hook extensions (Brief 04 §1)', () => {
+  it('action_restriction accepts restrictTarget: source (Charmed)', () => {
+    expect(() => EffectHookSchema.parse({ hook: 'action_restriction', restrict: ['action'], restrictTarget: 'source' })).not.toThrow();
+    // still valid without it (Incapacitated)
+    expect(() => EffectHookSchema.parse({ hook: 'action_restriction', restrict: ['action', 'bonus_action', 'reaction', 'speech'] })).not.toThrow();
+    // only 'source' is allowed
+    expect(() => EffectHookSchema.parse({ hook: 'action_restriction', restrict: ['action'], restrictTarget: 'self' })).toThrow();
+  });
+  it("resistance accepts 'all' (Petrified) or a damage-type list", () => {
+    expect(() => EffectHookSchema.parse({ hook: 'resistance', to: 'all' })).not.toThrow();
+    expect(() => EffectHookSchema.parse({ hook: 'resistance', to: ['fire', 'cold'] })).not.toThrow();
+    expect(() => EffectHookSchema.parse({ hook: 'resistance', to: 'some' })).toThrow();
   });
 });

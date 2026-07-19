@@ -138,6 +138,10 @@ export const EffectHookSchema = z.discriminatedUnion('hook', [
   z.object({
     hook: z.literal('action_restriction'),
     restrict: z.array(z.enum(['action', 'bonus_action', 'reaction', 'movement', 'speech'])).nonempty(),
+    // Brief 04 §1: Charmed can't attack/target the SOURCE of the condition. When
+    // present, the restriction applies only to actions aimed at `source` (the
+    // charmer), not to all actions.
+    restrictTarget: z.literal('source').optional(),
   }),
   z.object({
     hook: z.literal('auto_state'),
@@ -158,7 +162,8 @@ export const EffectHookSchema = z.discriminatedUnion('hook', [
   }),
   z.object({ hook: z.literal('includes_condition'), condition: ConditionIdSchema }),
   z.object({ hook: z.literal('immunity'), to: z.union([z.array(DamageTypeSchema).nonempty(), z.array(ConditionIdSchema).nonempty()]) }),
-  z.object({ hook: z.literal('resistance'), to: z.array(DamageTypeSchema).nonempty() }),
+  // Brief 04 §1: Petrified resists ALL damage — `'all'` avoids enumerating every type.
+  z.object({ hook: z.literal('resistance'), to: z.union([z.literal('all'), z.array(DamageTypeSchema).nonempty()]) }),
   z.object({ hook: z.literal('vulnerability'), to: z.array(DamageTypeSchema).nonempty() }),
 ]);
 export type EffectHook = z.infer<typeof EffectHookSchema>;
