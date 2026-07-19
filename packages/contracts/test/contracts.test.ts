@@ -15,6 +15,7 @@ import {
   RulingSuggestionSchema, NpcLineSchema, DIFFICULTY_LADDER, ladderFallback,
   EffectHookSchema,
   EventBodySchema,
+  PromptContextSchema,
 } from '../src/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -355,5 +356,40 @@ describe('rest/leveling event extensions (Brief 07 §2/§4)', () => {
     expect(() => EventBodySchema.parse({ ...buy, direction: 'trade' })).toThrow();
     // coinsDelta must carry all five denominations
     expect(() => EventBodySchema.parse({ ...buy, coinsDelta: { gp: -100 } })).toThrow();
+  });
+});
+
+describe('boss machinery (Brief 08 §1/§2)', () => {
+  it('PromptContext is a typed discriminated union over the six prompt kinds', () => {
+    expect(() => PromptContextSchema.parse({ kind: 'opportunity_attack', moverId: 'm', provokerId: 'p', pathStep: { from: { x: 0, y: 0 }, to: { x: 1, y: 0 } }, attackOptions: ['Longsword'] })).not.toThrow();
+    expect(() => PromptContextSchema.parse({ kind: 'feature', featureId: 'feature.shield', trigger: 'targeted_by_attack' })).not.toThrow();
+    expect(() => PromptContextSchema.parse({ kind: 'readied', triggerText: 'when it steps in', response: 'Attack with the halberd' })).not.toThrow();
+    expect(() => PromptContextSchema.parse({ kind: 'legendary_action', poolRemaining: 3, options: [{ name: 'Tail Attack', cost: 1 }] })).not.toThrow();
+    expect(() => PromptContextSchema.parse({ kind: 'legendary_resistance', save: { ability: 'wis', dc: 18 }, usesLeft: 2 })).not.toThrow();
+    expect(() => PromptContextSchema.parse({ kind: 'lair', options: [] })).not.toThrow();
+    // closed: an unknown kind, or an empty attackOptions on an OA, is rejected
+    expect(() => PromptContextSchema.parse({ kind: 'telepathy' })).toThrow();
+    expect(() => PromptContextSchema.parse({ kind: 'opportunity_attack', moverId: 'm', provokerId: 'p', pathStep: { from: { x: 0, y: 0 }, to: { x: 1, y: 0 } }, attackOptions: [] })).toThrow();
+  });
+
+  it('reaction_prompted carries a typed context + optional timeout; declines carry a reason', () => {
+    expect(() => EventBodySchema.parse({ t: 'reaction_prompted', promptId: 'x', creatureId: 'c', timeoutSec: 60, context: { kind: 'lair', options: [] } })).not.toThrow();
+    expect(() => EventBodySchema.parse({ t: 'reaction_declined', promptId: 'x', reason: 'timeout' })).not.toThrow();
+    expect(() => EventBodySchema.parse({ t: 'reaction_taken', promptId: 'x', choice: 'Tail Attack' })).not.toThrow();
+    // an untyped context record no longer validates
+    expect(() => EventBodySchema.parse({ t: 'reaction_prompted', promptId: 'x', creatureId: 'c', context: {} })).toThrow();
+  });
+
+  it('monster meta accepts a legendary pool + lair actions', () => {
+    // Start from the canonical goblin fixture and add the boss machinery, so the
+    // rest of MonsterMeta is real (not hand-guessed) and only §2's fields are under test.
+    const goblin = fx('goblin-warrior.json');
+    const legendary = { pool: 3, options: [{ name: 'Tail Attack', cost: 1, action: 'attack' }, { name: 'Wing Attack', cost: 2, action: 'aoe' }], resistance: 3 };
+    const lair = { initiative: 20, options: [{ name: 'Grasping Roots', text: 'Difficult terrain.' }] };
+    const boss = { ...goblin, meta: { ...goblin.meta, legendary, lair } };
+    expect(() => RulesEntitySchema.parse(boss)).not.toThrow();
+    // lair initiative is fixed at 20; a legendary option needs a positive cost
+    expect(() => RulesEntitySchema.parse({ ...boss, meta: { ...boss.meta, lair: { ...lair, initiative: 15 } } })).toThrow();
+    expect(() => RulesEntitySchema.parse({ ...boss, meta: { ...boss.meta, legendary: { ...legendary, options: [{ name: 'x', cost: 0, action: 'y' }] } } })).toThrow();
   });
 });

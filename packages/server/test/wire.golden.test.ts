@@ -159,7 +159,9 @@ describe('§4 #5 — prompt timeout ⇒ auto-decline, table proceeds', () => {
           return { ok: true, events: [{
             seq: 42, id: 'evt-prompt', causeId: 'evt-0041', at: '2026-07-19T00:00:00.000Z',
             actor: { kind: 'engine' }, visibility: 'public',
-            body: { t: 'reaction_prompted', promptId: 'prompt-1', creatureId: 'pc-torvald', kind: 'opportunity_attack', context: {} },
+            body: { t: 'reaction_prompted', promptId: 'prompt-1', creatureId: 'pc-torvald', timeoutSec: 60,
+              context: { kind: 'opportunity_attack', moverId: 'npc-goblin', provokerId: 'pc-torvald',
+                pathStep: { from: { x: 5, y: 5 }, to: { x: 6, y: 5 } }, attackOptions: ['Longsword'] } },
           } as PlayEvent] };
         }
         return { ok: false, reason: 'no' };

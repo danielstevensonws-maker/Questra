@@ -54,6 +54,63 @@ export const DurationSchema = z.discriminatedUnion('kind', [
 ]);
 export type Duration = z.infer<typeof DurationSchema>;
 
+// ---- prompt context (Brief 08 §1: one component, six ways) ---------------
+
+/** A single legendary/lair option the holder can spend on. */
+export const PromptOptionSchema = z.object({
+  name: z.string(),
+  cost: z.number().int().positive().optional(),  // legendary-action cost in pool points
+});
+export type PromptOption = z.infer<typeof PromptOptionSchema>;
+
+/**
+ * The typed context carried by a `reaction_prompted` event — a discriminated
+ * union over `kind` (Brief 08 §1, replacing the v0.1 loose record). The same six
+ * kinds the one PromptCard component renders. The engine builds the context; the
+ * holder's screen formats it into plain lines.
+ */
+export const PromptContextSchema = z.discriminatedUnion('kind', [
+  // Opportunity attack: a mover left a threatened square.
+  z.object({
+    kind: z.literal('opportunity_attack'),
+    moverId: ID, provokerId: ID,
+    pathStep: z.object({ from: CellSchema, to: CellSchema }),
+    attackOptions: z.array(z.string()).nonempty(),   // action names the holder may swing with
+  }),
+  // Reaction feature (Shield, Redirect Attack…): a trigger the engine matched.
+  z.object({
+    kind: z.literal('feature'),
+    featureId: ID,
+    trigger: z.enum(['take_damage', 'targeted_by_attack', 'custom']),
+    triggerText: z.string().optional(),
+  }),
+  // Readied action: authored at ready-time; the DM marked the trigger met.
+  z.object({
+    kind: z.literal('readied'),
+    triggerText: z.string(),
+    response: z.string(),           // the prepared response (an action or spell)
+    spellId: ID.optional(),         // set if the readied response is a spell (slot already spent)
+  }),
+  // Legendary actions: the affordable options at a turn boundary.
+  z.object({
+    kind: z.literal('legendary_action'),
+    poolRemaining: z.number().int().nonnegative(),
+    options: z.array(PromptOptionSchema).nonempty(),
+  }),
+  // Legendary resistance: a failed save the boss may flip to a success.
+  z.object({
+    kind: z.literal('legendary_resistance'),
+    save: z.object({ ability: AbilitySchema, dc: z.number().int() }),
+    usesLeft: z.number().int().positive(),
+  }),
+  // Lair action: the lair's initiative-20 turn.
+  z.object({
+    kind: z.literal('lair'),
+    options: z.array(PromptOptionSchema),   // may be empty ⇒ the only choice is skip
+  }),
+]);
+export type PromptContext = z.infer<typeof PromptContextSchema>;
+
 // ---- intents (client → server) ------------------------------------------
 
 export const IntentSchema = z.discriminatedUnion('kind', [
@@ -119,12 +176,16 @@ export const EventBodySchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('turn_advanced'), round: z.number().int().positive(), activeCreatureId: ID }),
   z.object({
     t: z.literal('reaction_prompted'),
-    promptId: ID, creatureId: ID,
-    kind: z.enum(['opportunity_attack', 'feature', 'legendary', 'lair']),
-    context: z.record(z.string(), z.unknown()),
+    promptId: ID,
+    /** the holder who must answer (a PC's account for player reactions, or the DM). */
+    creatureId: ID,
+    /** the typed context; its `kind` is the prompt kind (Brief 08 §1, the six ways). */
+    context: PromptContextSchema,
+    /** seconds until auto-decline (Brief 05 rule 7 default 60). */
+    timeoutSec: z.number().int().positive().optional(),
   }),
-  z.object({ t: z.literal('reaction_taken'), promptId: ID }),
-  z.object({ t: z.literal('reaction_declined'), promptId: ID }),
+  z.object({ t: z.literal('reaction_taken'), promptId: ID, choice: z.string().optional() }),
+  z.object({ t: z.literal('reaction_declined'), promptId: ID, reason: z.enum(['holder', 'timeout', 'dm']).optional() }),
   z.object({
     t: z.literal('death_save_rolled'),
     creatureId: ID, d20: z.number().int().min(1).max(20),

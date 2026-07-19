@@ -100,6 +100,19 @@ export const MonsterMetaSchema = z.object({
   })),
   bonusActions: z.array(z.object({ name: z.string(), effect: z.unknown() })).optional(),
   reactions: z.array(z.object({ name: z.string(), text: z.string() })).optional(),
+  // Boss machinery (Brief 08 §2). A legendary pool resets at the boss's turn
+  // start; options are offered at other creatures' turn ends. Legendary
+  // resistance flips a limited number of failed saves to successes.
+  legendary: z.object({
+    pool: z.number().int().positive(),
+    options: z.array(z.object({ name: z.string(), cost: z.number().int().positive(), action: z.string() })).nonempty(),
+    resistance: z.number().int().positive().optional(),  // uses per day, if any
+  }).optional(),
+  // A lair acts on initiative 20 (losing ties) — a pseudo-combatant.
+  lair: z.object({
+    initiative: z.literal(20),
+    options: z.array(z.object({ name: z.string(), text: z.string() })).nonempty(),
+  }).optional(),
 });
 
 const LevelRowSchema = z.object({
