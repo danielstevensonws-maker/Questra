@@ -14,6 +14,7 @@ import {
   distFt, affectedCells, filterRoomForViewer, cellKey, footprintOf, type Room,
   RulingSuggestionSchema, NpcLineSchema, DIFFICULTY_LADDER, ladderFallback,
   EffectHookSchema,
+  EventBodySchema,
 } from '../src/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -331,5 +332,28 @@ describe('effect-hook extensions (Brief 04 §1)', () => {
     expect(() => EffectHookSchema.parse({ hook: 'resistance', to: 'all' })).not.toThrow();
     expect(() => EffectHookSchema.parse({ hook: 'resistance', to: ['fire', 'cold'] })).not.toThrow();
     expect(() => EffectHookSchema.parse({ hook: 'resistance', to: 'some' })).toThrow();
+  });
+});
+
+describe('rest/leveling event extensions (Brief 07 §2/§4)', () => {
+  it('xp_awarded: even split, defeat or manual source', () => {
+    expect(() => EventBodySchema.parse({ t: 'xp_awarded', characterIds: ['pc-1', 'pc-2'], perCharacter: 12, source: 'defeat' })).not.toThrow();
+    expect(() => EventBodySchema.parse({ t: 'xp_awarded', characterIds: ['pc-1'], perCharacter: 100, source: 'manual', reason: 'clever plan' })).not.toThrow();
+    // must award to at least one character; perCharacter is non-negative; source is closed
+    expect(() => EventBodySchema.parse({ t: 'xp_awarded', characterIds: [], perCharacter: 12, source: 'defeat' })).toThrow();
+    expect(() => EventBodySchema.parse({ t: 'xp_awarded', characterIds: ['pc-1'], perCharacter: -5, source: 'defeat' })).toThrow();
+    expect(() => EventBodySchema.parse({ t: 'xp_awarded', characterIds: ['pc-1'], perCharacter: 12, source: 'quest' })).toThrow();
+  });
+  it('shop_transaction: atomic coins + itemized lines, buy or sell', () => {
+    const buy = { t: 'shop_transaction', characterId: 'pc-1', direction: 'buy',
+      lines: [{ itemId: 'item.potion-healing', qty: 2, unitPriceCp: 5000 }],
+      coinsDelta: { cp: 0, sp: 0, ep: 0, gp: -100, pp: 0 } };
+    expect(() => EventBodySchema.parse(buy)).not.toThrow();
+    // at least one line; qty positive; direction closed
+    expect(() => EventBodySchema.parse({ ...buy, lines: [] })).toThrow();
+    expect(() => EventBodySchema.parse({ ...buy, lines: [{ itemId: 'x', qty: 0, unitPriceCp: 1 }] })).toThrow();
+    expect(() => EventBodySchema.parse({ ...buy, direction: 'trade' })).toThrow();
+    // coinsDelta must carry all five denominations
+    expect(() => EventBodySchema.parse({ ...buy, coinsDelta: { gp: -100 } })).toThrow();
   });
 });

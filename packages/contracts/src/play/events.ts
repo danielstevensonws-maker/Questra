@@ -25,6 +25,14 @@ export type Visibility = z.infer<typeof VisibilitySchema>;
 export const CellSchema = z.object({ x: z.number().int(), y: z.number().int() });
 export type Cell = z.infer<typeof CellSchema>;
 
+/** The five SRD coin denominations. A shop delta is signed per denomination
+ *  (buying spends ⇒ negative gp; selling earns ⇒ positive). Mirrors the coins
+ *  bag on ComputedSheet (rules/sheet.ts). */
+export const CoinsSchema = z.object({
+  cp: z.number().int(), sp: z.number().int(), ep: z.number().int(), gp: z.number().int(), pp: z.number().int(),
+});
+export type Coins = z.infer<typeof CoinsSchema>;
+
 export const RollKindSchema = z.enum([
   'attack_roll', 'ability_check', 'saving_throw', 'initiative', 'death_save', 'concentration_save',
 ]);
@@ -133,6 +141,25 @@ export const EventBodySchema = z.discriminatedUnion('t', [
     applied: z.record(z.string(), z.unknown()),
   }),
   z.object({ t: z.literal('character_level_up'), characterId: ID, toLevel: z.number().int().min(2).max(20), choices: z.record(z.string(), z.unknown()) }),
+  // Brief 07 §2 — XP mode. Defeated-monster XP split evenly + DM manual awards;
+  // the engine tallies and flags a level offer when a threshold is crossed.
+  z.object({
+    t: z.literal('xp_awarded'),
+    characterIds: z.array(ID).nonempty(),
+    perCharacter: z.number().int().nonnegative(),
+    source: z.enum(['defeat', 'manual']),
+    reason: z.string().optional(),
+  }),
+  // Brief 07 §4 — shop. Buy/sell as ONE atomic transaction: a signed coins
+  // delta + the itemized inventory lines, committed together under one causeId
+  // (undo reverses both). `unitPrice` is in copper for a single lossless integer.
+  z.object({
+    t: z.literal('shop_transaction'),
+    characterId: ID,
+    direction: z.enum(['buy', 'sell']),
+    lines: z.array(z.object({ itemId: ID, qty: z.number().int().positive(), unitPriceCp: z.number().int().nonnegative() })).nonempty(),
+    coinsDelta: CoinsSchema,
+  }),
   z.object({ t: z.literal('override_set'), path: z.string(), value: z.unknown() }),
   z.object({ t: z.literal('undo_applied'), undoneCauseId: ID, reversedSeqs: z.array(z.number().int()) }),
   z.object({ t: z.literal('whisper_sent'), text: z.string() }),
