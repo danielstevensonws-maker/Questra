@@ -9,13 +9,16 @@
  *
  * SECURITY BOUNDARY DISCLAIMER (CLAUDE.md non-negotiable #3): this is authoring
  * UI, NOT the filter. Secret text is kept out of player payloads SERVER-SIDE by
- * eventVisibleTo/filterStream — never by this component. The visual "secret"
- * treatment here is a reminder to the DM, not a protection. A player client must
- * never be sent the secret half in the first place.
+ * eventVisibleTo/filterStream — never by this component. The gold `--qa-secret`
+ * tint is a reminder to the DM about what they're typing, not a lock. A player
+ * client must never be sent the secret half in the first place.
  *
- * Themed entirely via theme/tokens.css variables. No hardcoded look.
+ * Design: the Questra V1 Prototype sheet, §PublicSecretField. Themed entirely
+ * via --qa-* tokens; the secret half carries the `--qa-secret` tint and the
+ * focused half wears the one `--qa-focus-ring` (ADR-0014).
  */
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type CSSProperties, type ReactNode } from 'react';
+import { Label } from '@questra/ui';
 import type { Visibility } from '@questra/contracts';
 
 /** The field's value: a part everyone sees, and a part only the DM sees. */
@@ -57,21 +60,20 @@ export function PublicSecretField({
   const secretId = useId();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--q-space-2)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--qa-space-4)' }}>
       <div>
-        <span
-          style={{
-            fontFamily: 'var(--q-font-mono)',
-            fontSize: 'var(--q-text-xs)',
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            color: 'var(--q-ink-soft)',
-          }}
-        >
-          {label}
-        </span>
+        <Label tone="faint">{label}</Label>
         {help && (
-          <p style={{ margin: '2px 0 0', fontSize: 'var(--q-text-sm)', color: 'var(--q-ink-faint)' }}>{help}</p>
+          <p
+            style={{
+              margin: '4px 0 0',
+              fontSize: 11.5,
+              fontStyle: 'italic',
+              color: 'var(--qa-vellum-dim)',
+            }}
+          >
+            {help}
+          </p>
         )}
       </div>
 
@@ -87,7 +89,7 @@ export function PublicSecretField({
       <Half
         id={secretId}
         tone="secret"
-        badge="Secret · DM only"
+        badge="Secret · Only you see this"
         placeholder={secretPlaceholder}
         multiline={multiline}
         value={value.secret}
@@ -114,60 +116,70 @@ function Half({
   value: string;
   onChange: (text: string) => void;
 }) {
-  const accent = tone === 'secret' ? 'var(--q-secret)' : 'var(--q-ink-faint)';
-  const wrapStyle: React.CSSProperties = {
-    position: 'relative',
-    background: 'var(--q-surface)',
-    border: `1px solid ${tone === 'secret' ? 'color-mix(in srgb, var(--q-secret) 35%, var(--q-line))' : 'var(--q-line)'}`,
-    borderLeft: `3px solid ${accent}`,
-    borderRadius: 'var(--q-radius)',
-    padding: 'var(--q-space-2) var(--q-space-3)',
+  // Focus lives here so the whole half can wear the one focus ring — the inner
+  // control is chromeless, so a ring on the input alone would read as nothing.
+  const [focused, setFocused] = useState(false);
+  const secret = tone === 'secret';
+
+  const wrapStyle: CSSProperties = {
+    border: secret
+      ? `1px solid color-mix(in srgb, var(--qa-secret) 45%, transparent)`
+      : '1px solid var(--qa-hairline-soft)',
+    borderLeft: `3px solid ${secret ? 'var(--qa-secret)' : 'var(--qa-hairline)'}`,
+    borderRadius: 'var(--qa-radius-sm)',
+    padding: '9px 12px',
     display: 'flex',
     flexDirection: 'column',
-    gap: 'var(--q-space-1)',
+    gap: 5,
+    background: secret
+      ? 'color-mix(in srgb, var(--qa-secret) 5%, var(--qa-ink-raised))'
+      : 'var(--qa-ink-raised)',
+    ...(focused ? { boxShadow: 'var(--qa-focus-ring)' } : {}),
+    transition: 'box-shadow var(--qa-dur-fast) var(--qa-ease)',
   };
-  const fieldStyle: React.CSSProperties = {
+
+  const fieldStyle: CSSProperties = {
     width: '100%',
     background: 'transparent',
     border: 'none',
     outline: 'none',
-    color: 'var(--q-ink)',
-    fontFamily: 'var(--q-font-body)',
-    fontSize: 'var(--q-text-base)',
-    lineHeight: 'var(--q-leading-normal)',
-    resize: multiline ? 'vertical' : 'none',
+    padding: 0,
+    color: 'var(--qa-vellum)',
+    fontFamily: 'var(--qa-font-body)',
+    fontSize: 14,
+    ...(multiline ? { lineHeight: 1.5, resize: 'vertical' as const } : {}),
   };
 
   return (
     <div style={wrapStyle}>
-      <label
-        htmlFor={id}
-        style={{
-          fontSize: 'var(--q-text-xs)',
-          fontWeight: 600,
-          letterSpacing: '0.03em',
-          color: accent,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--q-space-1)',
-        }}
-      >
-        {tone === 'secret' && <LockMark />}
-        {badge}
+      <label htmlFor={id}>
+        <Label {...(secret ? { accent: 'var(--qa-secret)' } : { tone: 'faint' as const })}>
+          {badge}
+        </Label>
       </label>
       {multiline ? (
-        <textarea id={id} rows={2} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} style={fieldStyle} />
+        <textarea
+          id={id}
+          rows={2}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={fieldStyle}
+        />
       ) : (
-        <input id={id} type="text" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} style={fieldStyle} />
+        <input
+          id={id}
+          type="text"
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={fieldStyle}
+        />
       )}
     </div>
-  );
-}
-
-function LockMark() {
-  return (
-    <span aria-hidden style={{ fontSize: 'var(--q-text-xs)', lineHeight: 1 }}>
-      🔒
-    </span>
   );
 }
