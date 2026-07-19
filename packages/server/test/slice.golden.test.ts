@@ -8,7 +8,7 @@
  * This is the automatable half of the go/no-go gate: it proves the packages
  * connect and the deterministic path reproduces. The LIVE metrics (first-token
  * p95, roll→narration round-trip on two real devices, asset acceptability) are
- * the slice-environment manual step recorded in docs/adr/0015-slice-metrics.md.
+ * the slice-environment manual step recorded in docs/adr/0017-slice-metrics.md.
  */
 import { describe, it, expect } from 'vitest';
 import {

@@ -1,0 +1,40 @@
+name: CI
+
+# GAP-AUDIT A4 / Playbook §4: "no Engine PR merges red."
+# Runs the full check suite (typecheck + tests, incl. the engine golden suites)
+# on every PR and on pushes to main. A red check blocks merge.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    name: check:all (typecheck + tests + engine goldens)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # Install workspaces. Ingestion tests read the committed srd-raw.txt, so no
+      # poppler/pdftotext is needed at test time — the suite is hermetic.
+      - name: Install
+        run: npm ci
+
+      # check:all = contracts + theme + ui + engine + server + ai (typecheck +
+      # vitest, incl. the Torvald trace / sheet / wire / slice golden tests).
+      # precheck:all builds contracts + engine first (server/ai import their dist).
+      - name: check:all
+        run: npm run check:all
+
+      # The web package builds through Vite/Storybook, not tsc-in-check:all;
+      # build it to catch story/primitive breakage on PRs too.
+      - name: web build + storybook
+        run: |
+          npm run build -w @questra/web
+          npm run build-storybook -w @questra/web

@@ -1,4 +1,4 @@
-# ADR-0015 — Vertical-slice metrics (the M2 go/no-go gate)
+# ADR-0017 — Vertical-slice metrics (the M2 go/no-go gate)
 
 *Status: OPEN (awaiting slice-environment measurement). Proposed 2026-07-19.*
 
