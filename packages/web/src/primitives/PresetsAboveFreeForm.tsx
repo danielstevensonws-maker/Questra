@@ -3,7 +3,7 @@
  * primitive, reused by wizard steps, premise chips, scene creation, and
  * onboarding Floor 1. The shape teaches the beginner (tap a preset) without
  * caging the veteran (type your own) — presets are a starting point, never a
- * fence.
+ * fence. Edit the text and the chip quietly lets go.
  *
  * Two selection shapes:
  *   - 'pick' (single): choosing a preset REPLACES the free-form text — the field
@@ -11,11 +11,15 @@
  *     is fine and leaves the chips unselected (you've gone your own way).
  *   - 'tags' (multi): presets are toggles that live alongside free-form additions
  *     — the value is a list (scene tags, appearance traits). Free-form entries
- *     become tags too (Enter to add).
+ *     become tags too (Enter to add), and render as first-class chips.
  *
- * Themed entirely via theme/tokens.css variables. No hardcoded look.
+ * Design: the Questra V1 Prototype sheet, §Picker and Presets. Themed entirely
+ * via --qa-* tokens. The chips are body-font sentence-case buttons (NOT the
+ * @questra/ui Chip, which is a mono uppercase status pill for a different job),
+ * and focus wears the one --qa-focus-ring.
  */
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState, type CSSProperties, type ReactNode } from 'react';
+import { Label } from '@questra/ui';
 
 export interface Preset {
   id: string;
@@ -53,24 +57,27 @@ export function PresetsAboveFreeForm(props: PresetsAboveFreeFormProps) {
 
 function PickField({ label, presets, value, onChange, help, placeholder }: PickProps) {
   const id = useId();
+  // Derived, not stored: type your own and every chip quietly lets go.
   const activeId = presets.find((p) => p.label === value)?.id ?? null;
 
   return (
     <Field label={label} help={help} htmlFor={id}>
       <ChipRow>
         {presets.map((p) => (
-          <Chip key={p.id} on={p.id === activeId} onClick={() => onChange(p.id === activeId ? '' : p.label)}>
+          <PresetChip
+            key={p.id}
+            on={p.id === activeId}
+            onClick={() => onChange(p.id === activeId ? '' : p.label)}
+          >
             {p.label}
-          </Chip>
+          </PresetChip>
         ))}
       </ChipRow>
-      <input
+      <TextInput
         id={id}
-        type="text"
         value={value}
         placeholder={placeholder ?? 'Or write your own…'}
-        onChange={(e) => onChange(e.target.value)}
-        style={inputStyle}
+        onChange={onChange}
       />
     </Field>
   );
@@ -102,30 +109,23 @@ function TagsField({ label, presets, value, onChange, help, placeholder }: TagsP
     <Field label={label} help={help} htmlFor={id}>
       <ChipRow>
         {presets.map((p) => (
-          <Chip key={p.id} on={chosen.has(p.label)} onClick={() => toggle(p.label)}>
+          <PresetChip key={p.id} on={chosen.has(p.label)} onClick={() => toggle(p.label)}>
             {p.label}
-          </Chip>
+          </PresetChip>
         ))}
         {customTags.map((t) => (
-          <Chip key={`custom-${t}`} on onClick={() => toggle(t)} removable>
+          <PresetChip key={`custom-${t}`} on custom onRemove={() => toggle(t)}>
             {t}
-          </Chip>
+          </PresetChip>
         ))}
       </ChipRow>
-      <input
+      <TextInput
         id={id}
-        type="text"
         value={draft}
         placeholder={placeholder ?? 'Add your own — press Enter'}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            addDraft();
-          }
-        }}
+        onChange={setDraft}
+        onEnter={addDraft}
         onBlur={addDraft}
-        style={inputStyle}
       />
     </Field>
   );
@@ -133,23 +133,35 @@ function TagsField({ label, presets, value, onChange, help, placeholder }: TagsP
 
 // ---- shared bits ---------------------------------------------------------
 
-function Field({ label, help, htmlFor, children }: { label: string; help?: ReactNode; htmlFor: string; children: ReactNode }) {
+function Field({
+  label,
+  help,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  help?: ReactNode;
+  htmlFor: string;
+  children: ReactNode;
+}) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--q-space-2)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div>
-        <label
-          htmlFor={htmlFor}
-          style={{
-            fontFamily: 'var(--q-font-mono)',
-            fontSize: 'var(--q-text-xs)',
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            color: 'var(--q-ink-soft)',
-          }}
-        >
-          {label}
+        <label htmlFor={htmlFor}>
+          <Label tone="dim">{label}</Label>
         </label>
-        {help && <p style={{ margin: '2px 0 0', fontSize: 'var(--q-text-sm)', color: 'var(--q-ink-faint)' }}>{help}</p>}
+        {help && (
+          <p
+            style={{
+              margin: '4px 0 0',
+              fontSize: 11.5,
+              fontStyle: 'italic',
+              color: 'var(--qa-vellum-dim)',
+            }}
+          >
+            {help}
+          </p>
+        )}
       </div>
       {children}
     </div>
@@ -157,44 +169,148 @@ function Field({ label, help, htmlFor, children }: { label: string; help?: React
 }
 
 function ChipRow({ children }: { children: ReactNode }) {
-  return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--q-space-2)' }}>{children}</div>;
+  return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{children}</div>;
 }
 
-function Chip({ children, on, onClick, removable }: { children: ReactNode; on: boolean; onClick: () => void; removable?: boolean }) {
+/**
+ * A preset chip. Body font, sentence case — deliberately NOT the @questra/ui
+ * Chip, which is a mono uppercase status pill (Bloodied, Concentrating) doing a
+ * different job. A custom (free-form) tag is first-class: same chip, plus an
+ * ember wash and a remove control.
+ */
+function PresetChip({
+  children,
+  on,
+  custom = false,
+  onClick,
+  onRemove,
+}: {
+  children: ReactNode;
+  on: boolean;
+  custom?: boolean;
+  onClick?: () => void;
+  onRemove?: () => void;
+}) {
+  const [focused, setFocused] = useState(false);
+
+  const shell: CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    fontFamily: 'var(--qa-font-body)',
+    fontSize: 12,
+    padding: '5px 12px',
+    borderRadius: 'var(--qa-radius-sm)',
+    border: on
+      ? '1px solid color-mix(in srgb, var(--qa-ember) 55%, transparent)'
+      : '1px solid var(--qa-hairline)',
+    background: custom
+      ? 'color-mix(in srgb, var(--qa-ember) 10%, transparent)'
+      : on
+        ? 'var(--qa-vellum-ghost)'
+        : 'transparent',
+    color: on ? 'var(--qa-vellum-bright)' : 'var(--qa-vellum-dim)',
+    cursor: onClick ? 'pointer' : 'default',
+    ...(focused ? { boxShadow: 'var(--qa-focus-ring)' } : {}),
+    transition:
+      'background var(--qa-dur-fast) var(--qa-ease), border-color var(--qa-dur-fast) var(--qa-ease), color var(--qa-dur-fast) var(--qa-ease)',
+  };
+
+  // A custom tag is a span carrying its own remove button, so the two controls
+  // stay separately reachable rather than nesting a button inside a button.
+  if (custom) {
+    return (
+      <span style={shell}>
+        {children}
+        <button
+          type="button"
+          title="Remove"
+          aria-label={`Remove ${String(children)}`}
+          onClick={onRemove}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={{
+            border: 'none',
+            background: 'none',
+            color: 'var(--qa-vellum-dim)',
+            cursor: 'pointer',
+            padding: 0,
+            fontSize: 11,
+            lineHeight: 1,
+          }}
+        >
+          ✕
+        </button>
+      </span>
+    );
+  }
+
   return (
     <button
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 'var(--q-space-1)',
-        background: on ? 'var(--q-accent)' : 'var(--q-surface)',
-        color: on ? '#fff' : 'var(--q-ink-soft)',
-        border: `1px solid ${on ? 'var(--q-accent)' : 'var(--q-line)'}`,
-        borderRadius: '999px',
-        padding: 'var(--q-space-1) var(--q-space-3)',
-        fontSize: 'var(--q-text-sm)',
-        cursor: 'pointer',
-        transition: 'background var(--q-dur-fast) var(--q-ease), color var(--q-dur-fast) var(--q-ease), border-color var(--q-dur-fast) var(--q-ease)',
-      }}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={shell}
     >
       {children}
-      {removable && <span aria-hidden style={{ opacity: 0.8 }}>✕</span>}
     </button>
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: 'var(--q-surface)',
-  border: '1px solid var(--q-line)',
-  borderRadius: 'var(--q-radius)',
-  color: 'var(--q-ink)',
-  fontFamily: 'var(--q-font-body)',
-  fontSize: 'var(--q-text-base)',
-  lineHeight: 'var(--q-leading-normal)',
-  padding: 'var(--q-space-2) var(--q-space-3)',
-  outline: 'none',
-};
+function TextInput({
+  id,
+  value,
+  placeholder,
+  onChange,
+  onEnter,
+  onBlur,
+}: {
+  id: string;
+  value: string;
+  placeholder: string;
+  onChange: (text: string) => void;
+  onEnter?: () => void;
+  onBlur?: () => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <input
+      id={id}
+      type="text"
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={
+        onEnter
+          ? (e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                onEnter();
+              }
+            }
+          : undefined
+      }
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        setFocused(false);
+        onBlur?.();
+      }}
+      style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        fontFamily: 'var(--qa-font-body)',
+        fontSize: 14,
+        color: 'var(--qa-vellum)',
+        background: 'var(--qa-vellum-ghost)',
+        border: '1px solid var(--qa-hairline)',
+        borderRadius: 'var(--qa-radius-sm)',
+        padding: '9px 11px',
+        outline: 'none',
+        ...(focused ? { boxShadow: 'var(--qa-focus-ring)' } : {}),
+        transition: 'box-shadow var(--qa-dur-fast) var(--qa-ease)',
+      }}
+    />
+  );
+}

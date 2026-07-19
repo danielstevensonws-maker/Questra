@@ -3,16 +3,20 @@
  * §3 primitive, reused by cast→scene, locations, rewards, and recurring maps:
  * anywhere you reference something that already exists in the campaign instead
  * of authoring it fresh. Reference, don't duplicate — the picked item stays one
- * source of truth; the scene just points at it.
+ * source of truth; the scene just points at it. Edit the member once and every
+ * scene that references them follows.
  *
  * Content-agnostic: it takes a list of PickableItem view-models (id, name, a
  * kind label, an optional one-line hint) and reports which ids were picked.
  * The caller maps its campaign entities (cast, locations, …) into that shape —
  * the same seam entityToInfoPanel is for the InfoPanel. Single- or multi-select.
  *
- * Themed entirely via theme/tokens.css variables. No hardcoded look.
+ * Design: the Questra V1 Prototype sheet, §Picker and Presets. Themed entirely
+ * via --qa-* tokens; rows wash on hover, the selected row wears an ember tint,
+ * and focus wears the one --qa-focus-ring.
  */
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { Chip, Label } from '@questra/ui';
 
 export interface PickableItem {
   id: string;
@@ -47,6 +51,7 @@ export function PullFromCampaignPicker({
   searchPlaceholder = 'Search the campaign…',
 }: PullFromCampaignPickerProps) {
   const [query, setQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const searchId = useId();
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
 
@@ -54,7 +59,10 @@ export function PullFromCampaignPicker({
     const q = query.trim().toLowerCase();
     if (!q) return items;
     return items.filter(
-      (it) => it.name.toLowerCase().includes(q) || it.kind.toLowerCase().includes(q) || (it.hint?.toLowerCase().includes(q) ?? false),
+      (it) =>
+        it.name.toLowerCase().includes(q) ||
+        it.kind.toLowerCase().includes(q) ||
+        (it.hint?.toLowerCase().includes(q) ?? false),
     );
   }, [items, query]);
 
@@ -72,96 +80,131 @@ export function PullFromCampaignPicker({
   return (
     <section
       style={{
-        background: 'var(--q-surface)',
-        border: '1px solid var(--q-line)',
-        borderRadius: 'var(--q-radius-lg)',
-        boxShadow: 'var(--q-shadow-panel)',
+        border: '1px solid var(--qa-hairline-soft)',
+        borderRadius: 'var(--qa-radius-md)',
+        background: 'var(--qa-ink-raised)',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         maxHeight: 420,
       }}
     >
-      <header className="px-5 py-3" style={{ borderBottom: '1px solid var(--q-line)' }}>
-        <h3 style={{ margin: 0, fontFamily: 'var(--q-font-display)', fontSize: 'var(--q-text-lg)', color: 'var(--q-ink)' }}>{title}</h3>
-        <div style={{ marginTop: 'var(--q-space-2)' }}>
-          <label htmlFor={searchId} className="sr-only" style={srOnly}>
-            {searchPlaceholder}
-          </label>
-          <input
-            id={searchId}
-            type="search"
-            value={query}
-            placeholder={searchPlaceholder}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{
-              width: '100%',
-              background: 'var(--q-surface-raised)',
-              border: '1px solid var(--q-line)',
-              borderRadius: 'var(--q-radius)',
-              color: 'var(--q-ink)',
-              fontFamily: 'var(--q-font-body)',
-              fontSize: 'var(--q-text-sm)',
-              padding: 'var(--q-space-2) var(--q-space-3)',
-              outline: 'none',
-            }}
-          />
-        </div>
-      </header>
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--qa-hairline-soft)' }}>
+        <Label tone="dim" style={{ display: 'block', marginBottom: 8 }}>
+          {title}
+        </Label>
+        <label htmlFor={searchId} style={srOnly}>
+          {searchPlaceholder}
+        </label>
+        <input
+          id={searchId}
+          type="search"
+          value={query}
+          placeholder={searchPlaceholder}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            fontFamily: 'var(--qa-font-body)',
+            fontSize: 13,
+            color: 'var(--qa-vellum)',
+            background: 'var(--qa-vellum-ghost)',
+            border: '1px solid var(--qa-hairline)',
+            borderRadius: 'var(--qa-radius-sm)',
+            padding: '8px 10px',
+            outline: 'none',
+            ...(searchFocused ? { boxShadow: 'var(--qa-focus-ring)' } : {}),
+            transition: 'box-shadow var(--qa-dur-fast) var(--qa-ease)',
+          }}
+        />
+      </div>
 
-      <ul role="listbox" aria-multiselectable={mode === 'multi'} style={{ margin: 0, padding: 0, listStyle: 'none', overflowY: 'auto' }}>
+      <div
+        role="listbox"
+        aria-multiselectable={mode === 'multi'}
+        style={{ display: 'flex', flexDirection: 'column', overflowY: 'auto' }}
+      >
         {filtered.length === 0 ? (
-          <li style={{ padding: 'var(--q-space-5)', color: 'var(--q-ink-faint)', fontSize: 'var(--q-text-sm)', textAlign: 'center' }}>
+          // Typed-but-no-match and fresh-campaign are different facts; each says so.
+          <p
+            style={{
+              margin: 0,
+              padding: '18px 12px',
+              fontSize: 12.5,
+              fontStyle: 'italic',
+              color: 'var(--qa-vellum-dim)',
+            }}
+          >
             {query.trim() ? 'No matches.' : emptyLabel}
-          </li>
+          </p>
         ) : (
-          filtered.map((it) => {
-            const isSelected = selected.has(it.id);
-            return (
-              <li key={it.id}>
-                <button
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={() => toggle(it.id)}
-                  className="flex w-full items-center gap-3 text-left"
-                  style={{
-                    width: '100%',
-                    background: isSelected ? 'color-mix(in srgb, var(--q-accent) 8%, transparent)' : 'transparent',
-                    border: 'none',
-                    borderBottom: '1px solid var(--q-line)',
-                    padding: 'var(--q-space-3) var(--q-space-4)',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--q-space-3)',
-                  }}
-                >
-                  <Check on={isSelected} />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', color: 'var(--q-ink)', fontSize: 'var(--q-text-base)' }}>{it.name}</span>
-                    {it.hint && (
-                      <span style={{ display: 'block', color: 'var(--q-ink-faint)', fontSize: 'var(--q-text-sm)' }}>{it.hint}</span>
-                    )}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: 'var(--q-font-mono)',
-                      fontSize: 'var(--q-text-xs)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                      color: 'var(--q-ink-faint)',
-                    }}
-                  >
-                    {it.kind}
-                  </span>
-                </button>
-              </li>
-            );
-          })
+          filtered.map((it) => (
+            <Row
+              key={it.id}
+              item={it}
+              selected={selected.has(it.id)}
+              onToggle={() => toggle(it.id)}
+            />
+          ))
         )}
-      </ul>
+      </div>
     </section>
+  );
+}
+
+function Row({
+  item,
+  selected,
+  onToggle,
+}: {
+  item: PickableItem;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  const [focused, setFocused] = useState(false);
+
+  const background = selected
+    ? 'color-mix(in srgb, var(--qa-ember) 8%, transparent)'
+    : hover
+      ? 'var(--qa-vellum-ghost)'
+      : 'transparent';
+
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      onClick={onToggle}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        width: '100%',
+        textAlign: 'left',
+        padding: '10px 12px',
+        border: 'none',
+        background,
+        cursor: 'pointer',
+        ...(focused ? { boxShadow: 'var(--qa-focus-ring)' } : {}),
+        transition: 'background var(--qa-dur-fast) var(--qa-ease)',
+      }}
+    >
+      <Check on={selected} />
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--qa-vellum)' }}>{item.name}</span>
+        {item.hint && (
+          <span style={{ fontSize: 10.5, color: 'var(--qa-vellum-dim)' }}>{item.hint}</span>
+        )}
+      </span>
+      <Chip>{item.kind}</Chip>
+    </button>
   );
 }
 
@@ -170,19 +213,20 @@ function Check({ on }: { on: boolean }) {
     <span
       aria-hidden
       style={{
-        width: 18,
-        height: 18,
-        flexShrink: 0,
-        borderRadius: 'var(--q-radius-sm)',
-        border: `1px solid ${on ? 'var(--q-accent)' : 'var(--q-line)'}`,
-        background: on ? 'var(--q-accent)' : 'transparent',
-        color: '#fff',
+        width: 16,
+        height: 16,
+        flex: 'none',
+        borderRadius: 'var(--qa-radius-xs)',
+        border: `1px solid ${on ? 'var(--qa-ember)' : 'var(--qa-hairline)'}`,
+        background: on ? 'color-mix(in srgb, var(--qa-ember) 30%, transparent)' : 'transparent',
+        color: 'var(--qa-vellum-bright)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: 12,
+        fontSize: 10,
         lineHeight: 1,
-        transition: 'background var(--q-dur-fast) var(--q-ease), border-color var(--q-dur-fast) var(--q-ease)',
+        transition:
+          'background var(--qa-dur-fast) var(--qa-ease), border-color var(--qa-dur-fast) var(--qa-ease)',
       }}
     >
       {on ? '✓' : ''}
@@ -190,7 +234,7 @@ function Check({ on }: { on: boolean }) {
   );
 }
 
-const srOnly: React.CSSProperties = {
+const srOnly: CSSProperties = {
   position: 'absolute',
   width: 1,
   height: 1,
