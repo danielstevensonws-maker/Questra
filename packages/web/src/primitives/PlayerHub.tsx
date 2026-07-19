@@ -7,10 +7,13 @@
  * First-contact (§2, Brief 13): `firstContact` dims the tabs/inventory-until-earned
  * and seeds a reduced tile set — passed as a prop now, wired to Brief 13 flags later.
  *
- * Composes the design-system Avatar for the portrait (Playbook §3).
+ * Design: the Questra V1 Prototype sheet, §PlayerHub. Each section of the hub is
+ * its OWN floating glass panel with its own blur — the map reads between them.
+ * That separation is the whole look: one flat column of sections reads as a
+ * sidebar, not as a HUD over a table. Composes @questra/ui Panel + Avatar.
  */
-import type { ReactElement, ReactNode } from 'react';
-import { Avatar } from '@questra/ui';
+import type { CSSProperties, ReactElement, ReactNode } from 'react';
+import { Avatar, Panel } from '@questra/ui';
 import { VitalsBar } from './VitalsBar.js';
 import { ActionBar } from './ActionBar.js';
 import { DeathSaveCard } from './DeathSaveCard.js';
@@ -18,7 +21,15 @@ import { DiceLog, type DiceLogEntry } from './DiceLog.js';
 import type { VitalsVM, ActionTileVM, DeathSaveVM } from './sheetToPlayerHub.js';
 
 export interface PlayerHubProps {
-  identity: { name: string; level: number; portraitRef?: string };
+  identity: {
+    name: string;
+    level: number;
+    /** e.g. "Fighter" — renders as "Fighter · Level 3". View-model only. */
+    className?: string;
+    /** a --qa-class-* token for the avatar tint. */
+    classColor?: string;
+    portraitRef?: string;
+  };
   vitals: VitalsVM;
   tiles: ActionTileVM[];
   log: DiceLogEntry[];
@@ -33,34 +44,88 @@ export interface PlayerHubProps {
   sideSheets?: ReactNode;
 }
 
+/** The hub's panels share one shell: glass, hairline, blur, radius-md. */
+const SECTION: CSSProperties = { padding: '11px 13px', gap: 8 };
+
 export function PlayerHub({
-  identity, vitals, tiles, log, dying, firstContact = false, onUse, onExplain, onRollDeathSave, sideSheets,
+  identity,
+  vitals,
+  tiles,
+  log,
+  dying,
+  firstContact = false,
+  onUse,
+  onExplain,
+  onRollDeathSave,
+  sideSheets,
 }: PlayerHubProps): ReactElement {
   const isDying = dying !== undefined && dying.phase !== 'up';
+
   return (
-    <div className="flex flex-col gap-2" aria-label={`${identity.name}'s hub`}>
-      {/* IdentityHeader */}
-      <header className="flex items-center gap-3 px-4 pt-3">
-        <Avatar initial={identity.name.charAt(0)} shape="circle" size={44} />
-        <div className="flex flex-col">
-          <span className="text-base font-semibold text-ink">{identity.name}</span>
-          <span className="text-xs text-ink-faint">Level {identity.level}</span>
+    <div
+      aria-label={`${identity.name}'s hub`}
+      style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 344 }}
+    >
+      {/* IdentityHeader — its own panel, so the portrait floats free of the vitals */}
+      <Panel style={{ padding: '10px 13px', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Avatar
+          initial={identity.name.charAt(0)}
+          shape="square"
+          size={40}
+          {...(identity.classColor ? { color: identity.classColor } : {})}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <span
+            style={{
+              fontFamily: 'var(--qa-font-display)',
+              fontSize: 'var(--qa-text-xl)',
+              letterSpacing: 'var(--qa-track-name)',
+              color: 'var(--qa-glass-text)',
+              lineHeight: 1.05,
+            }}
+          >
+            {identity.name}
+          </span>
+          <span
+            style={{
+              fontFamily: 'var(--qa-font-mono)',
+              fontSize: 10,
+              letterSpacing: 'var(--qa-track-label)',
+              textTransform: 'uppercase',
+              color: 'var(--qa-glass-dim)',
+            }}
+          >
+            {identity.className ? `${identity.className} · ` : ''}Level {identity.level}
+          </span>
         </div>
-      </header>
+      </Panel>
 
-      <VitalsBar vitals={vitals} {...(onExplain ? { onExplain } : {})} dimmed={isDying} />
+      <Panel style={SECTION}>
+        <VitalsBar vitals={vitals} {...(onExplain ? { onExplain } : {})} dimmed={isDying} />
+      </Panel>
 
-      {/* the flip: ActionBar ⇄ DeathSaveCard */}
+      {/* the flip: ActionBar ⇄ DeathSaveCard. The death-save card brings its own
+          raised shell, so it is NOT wrapped in a Panel — it replaces one. */}
       {isDying ? (
-        <div className="px-4 py-2">
-          <DeathSaveCard state={dying} onRoll={() => onRollDeathSave?.()} />
-        </div>
+        <DeathSaveCard state={dying} onRoll={() => onRollDeathSave?.()} />
       ) : (
-        <ActionBar tiles={tiles} onUse={onUse} {...(onExplain ? { onExplain } : {})} />
+        <Panel style={SECTION}>
+          <ActionBar tiles={tiles} onUse={onUse} {...(onExplain ? { onExplain } : {})} />
+        </Panel>
       )}
 
-      <div style={{ opacity: firstContact ? 0.5 : 1, transition: 'opacity var(--q-dur) var(--q-ease)' }}>
-        <DiceLog entries={log} />
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          opacity: firstContact ? 0.5 : 1,
+          transition: 'opacity var(--qa-dur) var(--qa-ease)',
+        }}
+      >
+        <Panel label="TABLE LOG" style={{ gap: 0 }}>
+          <DiceLog entries={log} />
+        </Panel>
         {sideSheets}
       </div>
     </div>

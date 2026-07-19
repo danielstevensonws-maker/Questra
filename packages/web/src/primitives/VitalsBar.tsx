@@ -1,14 +1,18 @@
 /**
  * VitalsBar — the player hub's at-a-glance state (Brief 10 §2): HP (watched), AC,
  * and conditions, each condition and AC carrying a tap-"?" to its InfoPanel
- * derivation (§1: no orphan math). Composes the design-system primitives
- * (@questra/ui HPBar + Chip) rather than reinventing bars/pills (Playbook §3).
+ * derivation (§1: no orphan math). Composes the design-system HPBar rather than
+ * reinventing the bar (Playbook §3).
  *
  * Presentational: it takes the VitalsVM view-model (built by sheetToPlayerHub)
  * and an onExplain callback the "?" fires — it holds no game state.
+ *
+ * Design: the Questra V1 Prototype sheet, §VitalsBar. A glass row that floats
+ * over the map — HP label, bar, readout and the AC chip on one line, condition
+ * buttons beneath. Bloodied reads danger-outlined; other conditions whisper.
  */
-import type { ReactElement } from 'react';
-import { HPBar, Chip } from '@questra/ui';
+import { useState, type CSSProperties, type ReactElement } from 'react';
+import { HPBar } from '@questra/ui';
 import type { VitalsVM } from './sheetToPlayerHub.js';
 
 export interface VitalsBarProps {
@@ -19,45 +23,139 @@ export interface VitalsBarProps {
   dimmed?: boolean;
 }
 
+/** The micro-label used inside the glass row — glass-dim, not vellum. */
+const microLabel: CSSProperties = {
+  fontFamily: 'var(--qa-font-mono)',
+  fontSize: 8.5,
+  letterSpacing: 'var(--qa-track-label)',
+  color: 'var(--qa-glass-dim)',
+};
+
 export function VitalsBar({ vitals, onExplain, dimmed = false }: VitalsBarProps): ReactElement {
   const { hp, ac, conditions, bloodied } = vitals;
   return (
     <div
-      className="flex items-center gap-4 px-4 py-3"
-      style={{ opacity: dimmed ? 0.45 : 1, transition: 'opacity var(--q-dur) var(--q-ease)' }}
       aria-label="Vitals"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        opacity: dimmed ? 0.45 : 1,
+        transition: 'opacity var(--qa-dur) var(--qa-ease)',
+      }}
     >
-      {/* HP — watched; the bar turns ember when bloodied (the colour IS the info). */}
-      <div className="min-w-[140px] flex-1">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-xs text-ink-faint">Hit Points</span>
-          {bloodied && <Chip tone="danger">Bloodied</Chip>}
-        </div>
-        <HPBar value={hp.current} max={hp.max} height={7} />
-        {hp.temp > 0 && <span className="mt-1 block text-xs text-ink-soft">+{hp.temp} temporary</span>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={microLabel}>HP</span>
+        {/* the bar turns ember when low — the colour IS the information */}
+        <HPBar value={hp.current} max={hp.max} showText={false} height={5} style={{ flex: 1 }} />
+        <span style={{ fontFamily: 'var(--qa-font-mono)', fontSize: 10, color: 'var(--qa-glass-dim)' }}>
+          {hp.current}/{hp.max}
+        </span>
+        <ExplainButton
+          label={`Armor Class ${ac.value} — explain`}
+          onClick={onExplain ? () => onExplain('ac') : undefined}
+        >
+          AC {ac.value} <span style={{ color: 'var(--qa-glass-dim)' }}>?</span>
+        </ExplainButton>
       </div>
 
-      {/* AC — tap-"?" reveals its derivation. */}
-      <button
-        type="button"
-        className="flex flex-col items-center rounded-sm px-2 py-1 hover:bg-surface-raised"
-        onClick={() => onExplain?.('ac')}
-        aria-label={`Armor Class ${ac.value} — explain`}
-      >
-        <span className="text-lg font-semibold text-ink">{ac.value}</span>
-        <span className="text-xs text-ink-faint">AC&nbsp;?</span>
-      </button>
+      {hp.temp > 0 && (
+        <span style={{ fontFamily: 'var(--qa-font-mono)', fontSize: 10, color: 'var(--qa-heal)' }}>
+          +{hp.temp} temporary
+        </span>
+      )}
 
-      {/* Conditions — each a tap-"?" chip. */}
-      {conditions.length > 0 && (
-        <div className="flex flex-wrap gap-1">
+      {(bloodied || conditions.length > 0) && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {/* Bloodied is a derived state, not a condition — it reads danger. */}
+          {bloodied && (
+            <ConditionButton tone="danger" onClick={onExplain ? () => onExplain('bloodied') : undefined}>
+              Bloodied
+            </ConditionButton>
+          )}
           {conditions.map((c) => (
-            <button key={c.id} type="button" onClick={() => onExplain?.(c.id)} aria-label={`${c.name} — explain`}>
-              <Chip tone="steel">{c.name}&nbsp;?</Chip>
-            </button>
+            <ConditionButton key={c.id} onClick={onExplain ? () => onExplain(c.id) : undefined}>
+              {c.name}
+            </ConditionButton>
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+/** The AC readout — a chip-shaped button carrying the quiet "?". */
+function ExplainButton({
+  children,
+  label,
+  onClick,
+}: {
+  children: React.ReactNode;
+  label: string;
+  onClick?: (() => void) | undefined;
+}): ReactElement {
+  const [focused, setFocused] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={{
+        fontFamily: 'var(--qa-font-mono)',
+        fontSize: 10,
+        letterSpacing: 1,
+        color: 'var(--qa-glass-text)',
+        background: 'var(--qa-glass-chip)',
+        border: '1px solid var(--qa-glass-border)',
+        borderRadius: 'var(--qa-radius-xs)',
+        padding: '3px 8px',
+        cursor: onClick ? 'pointer' : 'default',
+        ...(focused ? { boxShadow: 'var(--qa-focus-ring)' } : {}),
+        transition: 'box-shadow var(--qa-dur-fast) var(--qa-ease)',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** A condition chip that is also a button — every one opens its InfoPanel. */
+function ConditionButton({
+  children,
+  tone,
+  onClick,
+}: {
+  children: React.ReactNode;
+  tone?: 'danger';
+  onClick?: (() => void) | undefined;
+}): ReactElement {
+  const [focused, setFocused] = useState(false);
+  const danger = tone === 'danger';
+  return (
+    <button
+      type="button"
+      aria-label={`${String(children)} — explain`}
+      onClick={onClick}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={{
+        fontFamily: 'var(--qa-font-mono)',
+        fontSize: 8.5,
+        letterSpacing: 'var(--qa-track-label)',
+        textTransform: 'uppercase',
+        padding: '2px 7px',
+        borderRadius: 'var(--qa-radius-xs)',
+        color: danger ? 'var(--qa-danger)' : 'var(--qa-vellum-dim)',
+        background: danger ? 'transparent' : 'var(--qa-vellum-ghost)',
+        border: danger ? '1px solid color-mix(in srgb, var(--qa-danger) 50%, transparent)' : 'none',
+        cursor: onClick ? 'pointer' : 'default',
+        ...(focused ? { boxShadow: 'var(--qa-focus-ring)' } : {}),
+        transition: 'box-shadow var(--qa-dur-fast) var(--qa-ease)',
+      }}
+    >
+      {children} ?
+    </button>
   );
 }
