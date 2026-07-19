@@ -9,20 +9,26 @@
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "check": "tsc -p tsconfig.json --noEmit && vitest run",
-    "dev": "tsx src/main.ts"
+    "dev": "tsx src/main.ts",
+    "migrate": "node-pg-migrate -j ts --tsconfig tsconfig.json -m src/store/migrations",
+    "migrate:up": "npm run migrate up",
+    "migrate:down": "npm run migrate down"
   },
   "dependencies": {
     "@questra/contracts": "*",
     "@questra/engine": "*",
     "fastify": "^5.2.0",
+    "pg": "^8.13.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@questra/ai": "*",
-    "typescript": "^7.0.2",
-    "vitest": "^4.0.0",
-    "tsx": "^4.19.0",
     "@types/node": "^24.0.0",
-    "@types/ws": "^8.5.0"
+    "@types/pg": "^8.11.0",
+    "@types/ws": "^8.5.0",
+    "node-pg-migrate": "^7.9.0",
+    "tsx": "^4.19.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.0.0"
   }
 }

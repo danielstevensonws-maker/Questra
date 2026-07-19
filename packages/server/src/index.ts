@@ -6,3 +6,5 @@
  */
 export * from './transport.js';
 export * from './sync-core.js';
+export * from './store/event-store.js';
+export * from './store/postgres-event-store.js';

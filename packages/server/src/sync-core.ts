@@ -24,6 +24,7 @@ import {
 } from '@questra/contracts';
 import { fold, initialState, type Combatant, type ProjectionState } from '@questra/engine';
 import type { Connection } from './transport.js';
+import { InMemoryEventStore, type EventStore } from './store/event-store.js';
 
 /** A signed session token resolves to who the connection is. */
 export interface ResolvedToken {
@@ -52,15 +53,25 @@ export interface SyncCoreOptions {
   promptTimeoutMs?: number;
   /** intent rate: burst / sustained per second. */
   rate?: { burst: number; perSecond: number };
+  /**
+   * The durable event store (ADR-0015). Defaults to in-memory (dev/tests). A
+   * Postgres store makes the log survive restarts: on session load the log is
+   * hydrated from here, and appends write through, so fold(reloaded) ===
+   * fold(pre-restart).
+   */
+  store?: EventStore;
 }
 
 interface SessionState {
+  /** In-memory mirror of the durable log (a cache of the event store). */
   log: PlayEvent[];
   base: ProjectionState;
   /** idempotencyKey → firstSeq (§2.3). */
   idempotency: Map<string, number>;
   /** connId → attached viewer. */
   viewers: Map<string, { conn: Connection; viewer: Viewer; role: ViewerRole; accountId: string }>;
+  /** serializes durable appends so writes land in seq order. */
+  writeChain: Promise<void>;
 }
 
 interface PendingPrompt {
@@ -74,9 +85,13 @@ export class SyncCore {
   private connToSession = new Map<string, string>();
   private prompts = new Map<string, PendingPrompt>();
   private opts: Required<Pick<SyncCoreOptions, 'promptTimeoutMs' | 'rate'>> & SyncCoreOptions;
+  private store: EventStore;
+  /** sessions whose in-memory mirror has been hydrated from the store. */
+  private hydrated = new Map<string, Promise<void>>();
 
   constructor(options: SyncCoreOptions) {
     this.opts = { promptTimeoutMs: 60_000, rate: { burst: 5, perSecond: 2 }, ...options };
+    this.store = options.store ?? new InMemoryEventStore();
   }
 
   // ---- transport handlers -----------------------------------------------
@@ -113,10 +128,31 @@ export class SyncCore {
     let s = this.sessions.get(playSessionId);
     if (!s) {
       const combatants = this.opts.initialCombatants?.(playSessionId) ?? [];
-      s = { log: [], base: initialState(combatants), idempotency: new Map(), viewers: new Map() };
+      s = { log: [], base: initialState(combatants), idempotency: new Map(), viewers: new Map(), writeChain: Promise.resolve() };
       this.sessions.set(playSessionId, s);
     }
     return s;
+  }
+
+  /**
+   * Hydrate a session's in-memory mirror from the durable store (ADR-0015).
+   * Call once before a session goes live after a (re)start — the live server
+   * awaits this on the first `hello` for a session; the durability test calls it
+   * explicitly. Idempotent per session. A fresh in-memory store loads nothing,
+   * so dev/tests are unaffected.
+   */
+  async hydrate(playSessionId: string): Promise<void> {
+    let done = this.hydrated.get(playSessionId);
+    if (done) return done;
+    done = (async () => {
+      const s = this.session(playSessionId);
+      const [log, idem] = await Promise.all([this.store.load(playSessionId), this.store.loadIdempotency(playSessionId)]);
+      // only adopt the durable log if this session hasn't already produced events in-memory
+      if (s.log.length === 0 && log.length > 0) s.log = log;
+      for (const [k, v] of idem) if (!s.idempotency.has(k)) s.idempotency.set(k, v);
+    })();
+    this.hydrated.set(playSessionId, done);
+    return done;
   }
 
   private onHello(conn: Connection, msg: Extract<ClientMsg, { m: 'hello' }>): void {
@@ -179,6 +215,10 @@ export class SyncCore {
       this.fanOut(s, e);
       if (e.body.t === 'reaction_prompted') this.armPrompt(sid, e.body.promptId);
     }
+    // durable write-through (ADR-0015), serialized per session so rows land in
+    // seq order; the in-memory mirror + fan-out already happened, so the socket
+    // path is not blocked on the DB.
+    this.persist(s, sid, result.events, envelope.idempotencyKey, firstSeq);
     conn.send({ m: 'intent_ack', idempotencyKey: envelope.idempotencyKey, accepted: true, firstSeq });
   }
 
@@ -233,10 +273,28 @@ export class SyncCore {
     };
     s.log.push(event);
     this.fanOut(s, event);
+    this.persist(s, playSessionId, [event]);
   }
 
   private err(conn: Connection, code: 'auth' | 'not_member' | 'bad_message' | 'rate_limited'): void {
     conn.send({ m: 'error', code });
+  }
+
+  // ---- durability (ADR-0015) --------------------------------------------
+
+  /** Write events (and optionally an idempotency record) through to the store,
+   *  serialized per session on its writeChain so rows land in seq order. */
+  private persist(s: SessionState, playSessionId: string, events: readonly PlayEvent[], idempotencyKey?: string, firstSeq?: number): void {
+    s.writeChain = s.writeChain
+      .then(() => this.store.append(playSessionId, events))
+      .then(() => (idempotencyKey !== undefined && firstSeq !== undefined ? this.store.recordIdempotency(playSessionId, idempotencyKey, firstSeq) : undefined))
+      .then(() => undefined)
+      .catch((err) => { console.error(`[SyncCore] durable write failed for ${playSessionId}:`, err); });
+  }
+
+  /** Await all pending durable writes for a session (tests / graceful shutdown). */
+  async flush(playSessionId: string): Promise<void> {
+    await this.sessions.get(playSessionId)?.writeChain;
   }
 
   // ---- test / introspection helpers -------------------------------------
