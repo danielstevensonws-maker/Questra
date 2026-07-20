@@ -95,7 +95,7 @@ export function createApp(config: ServerConfig): App {
  * folds from. Ids match web/src/screens/sliceConfig (pc-torvald + npc-goblin-1) so
  * the client's hub finds its own creature and the map lines its tokens up.
  */
-function sliceCombatants(): Combatant[] {
+export function sliceCombatants(): Combatant[] {
   const pc = (id: string, name: string, hp: number, maxHp: number, ac: number): Combatant => ({
     id, name, abilities: { str: 16, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
     profBonus: 2, maxHp, hp, tempHp: 0, ac, conditions: [], isPlayer: true,
@@ -121,7 +121,7 @@ function sliceCombatants(): Combatant[] {
  * else rejects with a plain-language reason (the greying string). The full
  * per-intent resolver is play-slice scope.
  */
-function makeSliceResolver(): IntentResolver {
+export function makeSliceResolver(): IntentResolver {
   const rules: RulesData = buildRulesData(CONDITIONS.map((c) => RulesEntitySchema.parse(c)));
   // Rng = (sides) => an integer face in [1, sides]. Real dice for the dev server;
   // the golden tests script their own rng, so Math.random never touches a test.
@@ -145,7 +145,10 @@ function makeSliceResolver(): IntentResolver {
       state, rules, rng,
       {
         seq: base,
-        timestamps: [`t-${n}-a`, `t-${n}-b`, `t-${n}-c`],
+        // real ISO datetimes — PlayEventSchema requires z.string().datetime(); the
+        // client's ServerMsgSchema drops any event whose `at` isn't ISO (a bad
+        // placeholder here silently dropped every event client-side).
+        timestamps: [new Date().toISOString(), new Date().toISOString(), new Date().toISOString()],
         ids: [`e-${n}-a`, `e-${n}-b`, `e-${n}-c`],
         rollId: `roll-${n}`,
         actor: { kind: 'player', accountId: attacker.id, creatureId: attacker.id },
