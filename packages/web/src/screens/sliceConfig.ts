@@ -19,6 +19,18 @@ export const SLICE_IDENTITY = {
 /** The player's own creature id in the projection (whose hub this is). */
 export const SLICE_MY_CREATURE_ID = 'pc-torvald';
 
+/** Scene chrome (title + place/time). Round + whose-turn come from live state. */
+export const SLICE_SCENE = {
+  title: 'The Ruined Steading',
+  subtitle: 'Outskirts · Dusk',
+};
+
+/** The party rail. The slice seeds only Torvald server-side; HP overlays from live
+ *  projection, so members without a live combatant simply read empty until seeded. */
+export const SLICE_PARTY = [
+  { id: 'pc-torvald', name: 'Torvald', klass: 'Fighter · Lv 3', classColor: 'var(--qa-class-fighter)' },
+];
+
 export const SLICE_ROOM: Room = {
   id: 'yard',
   terrainImageRef: 'terrain/yard',

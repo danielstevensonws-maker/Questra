@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PlayerView } from './screens/PlayerView.js';
 import {
-  SLICE_SHEET, SLICE_IDENTITY, SLICE_MY_CREATURE_ID, SLICE_ROOM,
+  SLICE_SHEET, SLICE_IDENTITY, SLICE_MY_CREATURE_ID, SLICE_ROOM, SLICE_SCENE, SLICE_PARTY,
 } from './screens/sliceConfig.js';
 import '@questra/theme/styles.css';
 import './theme/index.css';
@@ -31,6 +31,8 @@ createRoot(document.getElementById('root')!).render(
       sheet={SLICE_SHEET}
       identity={SLICE_IDENTITY}
       room={SLICE_ROOM}
+      scene={SLICE_SCENE}
+      party={SLICE_PARTY}
     />
   </StrictMode>,
 );
