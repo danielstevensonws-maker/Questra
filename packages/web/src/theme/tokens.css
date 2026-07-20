@@ -1,89 +1,107 @@
 /**
  * ============================================================================
- *  QUESTRA DESIGN TOKENS  —  THE ONE FILE TO REPLACE WITH YOUR CLAUDE DESIGN SET
+ *  QUESTRA WEB TOKENS — AN ALIAS LAYER OVER THE REAL DESIGN SYSTEM
  * ============================================================================
  *
- *  ADR-0014: Claude Design authors the look; this file is where it lands.
- *  Every primitive reads these CSS variables — NClaude component hardcodes a
- *  color, size, or font. Swapping in the real token set = editing THIS FILE
- *  ONLY. No component changes, no re-theming pass.
+ *  ADR-0014: Claude Design authors the look. That design now lives in
+ *  `@questra/theme` as the `--qa-*` token set, byte-identical to the "Questra
+ *  V1 Prototype" source (guarded by packages/theme/test/byte-identity.test.ts).
  *
- *  When your token set arrives:
- *    1. Replace the values below (keep the variable NAMES stable, or update
- *       usages in one search-replace if you rename).
- *    2. That's it. Every screen re-themes.
+ *  This file no longer DEFINES a palette. It maps the `--q-*` names the web
+ *  primitives were built against onto the real `--qa-*` tokens, so the whole
+ *  app re-themes from one file instead of 14 component rewrites.
  *
- *  The values below are a NEUTRAL PLACEHOLDER palette — deliberately plain
- *  (warm parchment + ink, one accent) so it's obviously a stand-in, not a
- *  design decision. Do not treat these as canon.
+ *  RULES
+ *   - Never hardcode a color/size/font here. Every value is `var(--qa-*)`.
+ *     The exceptions are commented inline and justified.
+ *   - New components should read `--qa-*` DIRECTLY. This layer exists to carry
+ *     the already-built primitives across; it is a bridge, not a second system.
+ *   - Changing the design means changing `@questra/theme` (and re-syncing it
+ *     from the Design project), never editing values here.
+ *
+ *  Requires `@questra/theme/styles.css` — that is what declares the --qa-*
+ *  custom properties this file references.
  */
+@import '@questra/theme/styles.css';
+
 :root {
-  /* ---- color: surfaces ---- */
-  --q-bg: #f4f0e6;            /* app background (parchment placeholder) */
-  --q-surface: #ffffff;      /* cards, panels */
-  --q-surface-raised: #fbf8f1;
-  --q-overlay: rgba(30, 24, 16, 0.45); /* modal scrim */
+  /* ---- surfaces ------------------------------------------------------
+     The design's panels are translucent GLASS over a dark ground, not
+     opaque cards. `--q-surface` therefore maps to the glass fill: panels
+     are meant to sit over the map and read as lit from behind.         */
+  --q-bg: var(--qa-ink);
+  --q-surface: var(--qa-glass);
+  --q-surface-raised: var(--qa-glass-raised);
+  /* No --qa-* scrim token exists. This is the vignette's foot colour
+     (effects.css --qa-vignette) — the design's own "darkness behind a
+     modal" value. Revisit if Design ships a real scrim token. */
+  --q-overlay: rgba(9, 7, 4, 0.62);
 
-  /* ---- color: ink / text ---- */
-  --q-ink: #241d15;          /* primary text */
-  --q-ink-soft: #5c5346;     /* secondary text */
-  --q-ink-faint: #9a917f;    /* tertiary / disabled */
+  /* ---- ink ---- */
+  --q-ink: var(--qa-vellum);
+  --q-ink-soft: var(--qa-vellum-dim);
+  --q-ink-faint: var(--qa-vellum-faint);
 
-  /* ---- color: accent + semantic ---- */
-  --q-accent: #7a2e2e;       /* single accent (deep red placeholder) */
-  --q-accent-soft: #a85a5a;
-  --q-secret: #4a2f6e;       /* the public/secret split "secret" tint */
-  --q-danger: #a12b2b;
-  --q-success: #2f6e3a;
-  --q-line: #e3dccb;         /* borders, dividers */
+  /* ---- accent + semantic ---------------------------------------------
+     The design spends its only six hues on stated meanings:
+       active(ember) · danger · heal · arcane · steel · gold
+     Anything not on that list is expressed with vellum + dimming, NOT a
+     new colour ("no decorative color" — tokens/colors.css).            */
+  --q-accent: var(--qa-ember);
+  --q-accent-soft: var(--qa-ember-bright);
+  --q-danger: var(--qa-danger);
+
+  /* Death-save SUCCESS pips. The design has no "success" hue; --qa-heal
+     ("healing · rest") is its green and the closest true meaning — a
+     death-save success is literally not-dying. Approved 2026-07-20. */
+  --q-success: var(--qa-heal);
+
+  /* The public/secret split. The design deliberately does NOT tint secret
+     content: the DM View's "WHAT ONLY YOU KNOW" panel renders in plain
+     dimmed vellum (rgba(230,220,196,.56) == --qa-vellum-dim). Secrecy is
+     carried by DIMMING + an explicit label, never by hue — a tint would
+     collide with --qa-arcane, which already means "spell effects".
+     Approved 2026-07-20 (option 1: follow the design). */
+  --q-secret: var(--qa-vellum-dim);
+
+  --q-line: var(--qa-hairline);
 
   /* ---- typography ---- */
-  --q-font-body: ui-serif, Georgia, 'Times New Roman', serif;
-  --q-font-display: ui-serif, Georgia, serif; /* Design likely swaps to a display face */
-  --q-font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --q-font-body: var(--qa-font-body);
+  --q-font-display: var(--qa-font-display);
+  --q-font-mono: var(--qa-font-mono);
 
-  --q-text-xs: 0.75rem;
-  --q-text-sm: 0.875rem;
-  --q-text-base: 1rem;
-  --q-text-lg: 1.125rem;
-  --q-text-xl: 1.375rem;
-  --q-text-2xl: 1.75rem;
-  --q-text-3xl: 2.25rem;
+  --q-text-xs: var(--qa-text-xs);
+  --q-text-sm: var(--qa-text-sm);
+  --q-text-base: var(--qa-text-base);
+  --q-text-lg: var(--qa-text-lg);
+  --q-text-xl: var(--qa-text-xl);
+  --q-text-2xl: var(--qa-text-2xl);
+  --q-text-3xl: var(--qa-text-3xl);
 
-  --q-leading-tight: 1.2;
-  --q-leading-normal: 1.55;
+  --q-leading-tight: 1.2;                      /* no --qa-* equivalent */
+  --q-leading-normal: var(--qa-leading-body);
 
-  /* ---- spacing scale (4px base) ---- */
-  --q-space-1: 0.25rem;
-  --q-space-2: 0.5rem;
-  --q-space-3: 0.75rem;
-  --q-space-4: 1rem;
-  --q-space-5: 1.5rem;
-  --q-space-6: 2rem;
-  --q-space-8: 3rem;
+  /* ---- spacing (both scales are 4px-based) ---- */
+  --q-space-1: var(--qa-space-1);
+  --q-space-2: var(--qa-space-3);
+  --q-space-3: var(--qa-space-4);
+  --q-space-4: var(--qa-space-5);
+  --q-space-5: var(--qa-space-7);
+  --q-space-6: var(--qa-space-8);
+  --q-space-8: 32px;                           /* above the design's scale */
 
-  /* ---- radii + elevation ---- */
-  --q-radius-sm: 4px;
-  --q-radius: 8px;
-  --q-radius-lg: 14px;
-  --q-shadow-panel: 0 2px 12px rgba(36, 29, 21, 0.10);
-  --q-shadow-pop: 0 8px 30px rgba(36, 29, 21, 0.18);
+  /* ---- radii — the design is markedly tighter than the placeholder was ---- */
+  --q-radius-sm: var(--qa-radius-sm);
+  --q-radius: var(--qa-radius);
+  --q-radius-lg: var(--qa-radius-lg);
 
-  /* ---- motion (respect prefers-reduced-motion in components) ---- */
-  --q-ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --q-dur-fast: 120ms;
-  --q-dur: 220ms;
-}
+  /* ---- elevation: hairlines + blur, not drop shadows ---- */
+  --q-shadow-panel: none;
+  --q-shadow-pop: var(--qa-shadow-menu);
 
-/* Dark mode placeholder — Design may or may not define one; scaffold anticipates it. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --q-bg: #1a1611;
-    --q-surface: #241d15;
-    --q-surface-raised: #2e261c;
-    --q-ink: #f0eadd;
-    --q-ink-soft: #c3b8a4;
-    --q-ink-faint: #7c7362;
-    --q-line: #3a3025;
-  }
+  /* ---- motion ---- */
+  --q-ease: var(--qa-ease);
+  --q-dur-fast: var(--qa-dur-fast);
+  --q-dur: var(--qa-dur);
 }

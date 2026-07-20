@@ -18,6 +18,7 @@ import { DeathSaveCard } from './DeathSaveCard.js';
 import { DiceLog } from './DiceLog.js';
 import { PlayerHub } from './PlayerHub.js';
 import { ComposeRollSheet } from './ComposeRollSheet.js';
+import { DiceTray } from './DiceTray.js';
 import {
   toVitals, toActionTiles,
   type DeathSaveVM, type ComposeDraftVM, type ComposeSubjectVM, type RollResultVM,
@@ -252,6 +253,7 @@ export const HubComposedReview: Story = {
       tileId: 'attack.Longsword', position: 'straight', situational: 0,
     });
     const [result, setResult] = useState<RollResultVM | undefined>(undefined);
+    const [settled, setSettled] = useState(false);
     const [pending, setPending] = useState(false);
 
     const subject: ComposeSubjectVM = {
@@ -261,35 +263,44 @@ export const HubComposedReview: Story = {
     };
 
     return (
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <PlayerHub
-          identity={identity}
-          vitals={toVitals(sheet, { ...torvald, hp: 6, conditions: [{ conditionId: 'condition.prone' }] })}
-          tiles={toActionTiles(sheet, torvald, state, 'npc-goblin-1', { activeTurnEnforced: true })}
-          log={hubLog}
-          onUse={() => {}}
-          onExplain={() => {}}
-        />
-
-        <div style={{ width: 360, flex: 'none' }}>
-          <ComposeRollSheet
-            subject={subject}
-            draft={draft}
-            onDraftChange={setDraft}
-            pending={pending}
-            result={result}
-            onCommit={() => {
-              setPending(true);
-              setTimeout(() => setResult({
-                rollId: 'roll-review', kind: 'attack_roll', d20: 14, secondD20: 6,
-                collapsed: 'advantage', modifiers: subject.modifiers, total: 19,
-                vs: { type: 'ac', value: 15 }, outcome: 'hit', entry: 'server',
-              }), 400);
-            }}
-            onCancel={() => { setResult(undefined); setPending(false); }}
-          />
+      <>
+        {/* the dice roll on the map behind everything */}
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <DiceTray result={result} onSettled={() => setSettled(true)} />
         </div>
-      </div>
+
+        <div style={{ position: 'relative', display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', maxWidth: '100%' }}>
+          <PlayerHub
+            identity={identity}
+            vitals={toVitals(sheet, { ...torvald, hp: 6, conditions: [{ conditionId: 'condition.prone' }] })}
+            tiles={toActionTiles(sheet, torvald, state, 'npc-goblin-1', { activeTurnEnforced: true })}
+            log={hubLog}
+            onUse={() => {}}
+            onExplain={() => {}}
+          />
+
+          <div style={{ flex: 'none' }}>
+            <ComposeRollSheet
+              subject={subject}
+              draft={draft}
+              onDraftChange={setDraft}
+              pending={pending}
+              result={result}
+              settled={settled}
+              onCommit={() => {
+                setSettled(false);
+                setPending(true);
+                setTimeout(() => setResult({
+                  rollId: 'roll-review', kind: 'attack_roll', d20: 14, secondD20: 6,
+                  collapsed: 'advantage', modifiers: subject.modifiers, total: 19,
+                  vs: { type: 'ac', value: 15 }, outcome: 'hit', entry: 'server',
+                }), 300);
+              }}
+              onCancel={() => { setResult(undefined); setSettled(false); setPending(false); }}
+            />
+          </div>
+        </div>
+      </>
     );
   },
 };

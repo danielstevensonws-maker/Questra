@@ -9,6 +9,7 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { ComposeRollSheet } from './ComposeRollSheet.js';
+import { DiceTray } from './DiceTray.js';
 import { TableBackdrop } from './TableBackdrop.js';
 import type { ComposeDraftVM, ComposeSubjectVM, RollResultVM } from './sheetToPlayerHub.js';
 
@@ -42,69 +43,66 @@ const CRIT: RollResultVM = {
 const meta: Meta<typeof ComposeRollSheet> = {
   title: 'Primitives/ComposeRollSheet',
   component: ComposeRollSheet,
-  // glass is judged over the map, never on a flat canvas
-  decorators: [(Story) => <TableBackdrop height={520} center><Story /></TableBackdrop>],
+  // glass + dice are judged over the map, never on a flat canvas
+  decorators: [(Story) => <TableBackdrop height={520}><Story /></TableBackdrop>],
 };
 export default meta;
 type Story = StoryObj<typeof ComposeRollSheet>;
 
-/** The full loop: compose → commit → the fixture result arrives → the die settles. */
+/**
+ * The full loop as it will run at the table: compose in the panel → commit →
+ * the fixture `roll_made` arrives → the 3D dice tumble ON THE MAP (DiceTray) →
+ * the tray's `dice-settled` flips the panel to its verdict. No die in the panel.
+ */
 function Harness({ answer }: { answer: RollResultVM }): React.ReactElement {
   const [draft, setDraft] = useState<ComposeDraftVM>({ tileId: subject.tileId, position: 'straight', situational: 0 });
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<RollResultVM | undefined>(undefined);
+  const [settled, setSettled] = useState(false);
 
-  const reset = (): void => { setResult(undefined); setPending(false); };
+  const reset = (): void => { setResult(undefined); setSettled(false); setPending(false); };
 
   return (
-    <div style={{ width: 420 }}>
-      <ComposeRollSheet
-        subject={subject}
-        draft={draft}
-        onDraftChange={setDraft}
-        pending={pending}
-        result={result}
-        // stands in for "intent sent, server rolled, roll_made came back"
-        onCommit={() => { setPending(true); setTimeout(() => setResult(answer), 400); }}
-        onCancel={reset}
-        onSettled={() => {}}
-      />
-      {result && (
-        <button type="button" onClick={reset} style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>
-          ↺ compose again
-        </button>
-      )}
+    <div style={{ position: 'absolute', inset: 0 }}>
+      {/* the dice roll on the map, filling the stage behind the panel */}
+      <div style={{ position: 'absolute', inset: 0 }}>
+        <DiceTray result={result} onSettled={() => setSettled(true)} />
+      </div>
+
+      {/* the compose panel — self-contained, floated CENTERED over the map */}
+      <div
+        style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: 12, pointerEvents: 'none',
+        }}
+      >
+        <div style={{ pointerEvents: 'auto' }}>
+          <ComposeRollSheet
+            subject={subject}
+            draft={draft}
+            onDraftChange={setDraft}
+            pending={pending}
+            result={result}
+            settled={settled}
+            // stands in for "intent sent, server rolled, roll_made came back"
+            onCommit={() => { setPending(true); setTimeout(() => setResult(answer), 300); }}
+            onCancel={reset}
+          />
+        </div>
+        {result && (
+          <button type="button" onClick={reset}
+            style={{ pointerEvents: 'auto', fontSize: 12, opacity: 0.7, background: 'none', border: 'none', color: 'var(--qa-glass-dim)', cursor: 'pointer' }}>
+            ↺ compose again
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
 export const Compose: Story = { render: () => <Harness answer={HIT} /> };
-
-/** Server rolled with advantage and kept the 14 — the 6 is named as dropped. */
-export const HitWithAdvantage: Story = {
-  render: () => {
-    const [draft, setDraft] = useState<ComposeDraftVM>({ tileId: subject.tileId, position: 'advantage', situational: 0 });
-    return (
-      <div style={{ width: 420 }}>
-        <ComposeRollSheet subject={subject} draft={draft} onDraftChange={setDraft}
-          onCommit={() => {}} onCancel={() => {}} result={HIT} />
-      </div>
-    );
-  },
-};
-
+export const HitWithAdvantage: Story = { render: () => <Harness answer={HIT} /> };
 export const Miss: Story = { render: () => <Harness answer={MISS} /> };
 export const CriticalHit: Story = { render: () => <Harness answer={CRIT} /> };
-
-/** Physical dice entered by hand — same surface, flagged (ADR-0008). */
-export const EnteredByHand: Story = {
-  render: () => {
-    const [draft, setDraft] = useState<ComposeDraftVM>({ tileId: subject.tileId, position: 'straight', situational: 0 });
-    return (
-      <div style={{ width: 420 }}>
-        <ComposeRollSheet subject={subject} draft={draft} onDraftChange={setDraft}
-          onCommit={() => {}} onCancel={() => {}} result={{ ...HIT, entry: 'manual' }} />
-      </div>
-    );
-  },
-};
+export const EnteredByHand: Story = { render: () => <Harness answer={{ ...HIT, entry: 'manual' }} /> };

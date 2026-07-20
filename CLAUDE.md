@@ -1,37 +1,77 @@
-# Questra — Standing Orders for Every Session
+# Questra — Agent Instructions
 
-You are building Questra, a D&D 5e (SRD 5.2.1) companion/VTT app. Read this file's rules before doing anything.
+Read this file first, every session. Then read `docs/` as needed. If a request conflicts with
+this file, say so before writing code.
 
-## Context routing (read ONLY what your task needs)
-- Your task will name **one implementation brief** in `docs/briefs/`. Read it, plus `packages/contracts/src/`, plus `docs/adr/INDEX.md`. **Do not** read all ten design specs; briefs are self-contained.
-- Design specs live in `docs/specs/` for reference when a brief explicitly points at one.
-- If no brief covers your task, STOP and say so — do not improvise shapes.
+## What we're building
 
-## The non-negotiables
-1. **Conform to `@questra/contracts`.** Types change only via a dedicated contract PR that also updates fixtures and tests. Never define a parallel/duplicate shape inline in a feature.
-2. **The Engine never calls an AI model.** Determinism stays deterministic.
-3. **Secret data is filtered server-side** (`packages/contracts/src/play/visibility.ts` is the choke point). Never rely on client-side hiding.
-4. **Engine changes require golden tests** in the same PR. A rules bug fix ships with the test that would have caught it.
-5. **Suggests, never commits:** every AI output renders in the accept/tweak/reject card; nothing auto-applies.
-6. **Check the primitives table** (Build Playbook §3) before writing new UI — the component you need probably exists.
-7. **Plain language in all user-facing strings:** never "beat" (say scene), never "node" (say member/portrait). `violatesPlainLanguage()` in contracts checks this; UI string tests must use it.
-8. **Fixtures are canonical.** `packages/contracts/src/fixtures/` (Prone, Fireball, Goblin Warrior, Fighter, the Torvald trace) are byte-compared in tests — regenerate mocks from them, never hand-roll sample data.
+A single app that lets five friends who have never played D&D finish a real session together,
+remotely, on the same night they decide to try. Not a toolbox. A session, start to finish.
 
-## Session hygiene
-- One vertical concern per session/PR. Start by reading (not recalling) the brief + contracts.
-- `npm run check` in `packages/contracts` must pass before and after your change.
-- New events/hooks/AI schemas → propose in a contract PR first, feature second.
+**Platform: desktop web app. Browser only — no install.**
+The MVP promise is "click a link and play tonight." An Electron download is 90 seconds of friction
+at the exact moment we're asking five people to commit, and it will cost us groups. Desktop-first
+layout (the DM needs a map and panels; players need a HUD). Phone as a second screen is a v2 idea,
+not a v1 one.
 
-## Locked decisions you must not re-litigate (full list: docs/adr/)
-Server-authoritative event-sourced Engine · contract-first · effects-as-data (no rules if-statements outside the dataset) · milestone leveling default, multiclass v2 · assisted-manual cover + DM-revealed fog v1 · server dice + physical-dice manual entry · AI always has a non-AI fallback · CC-BY SRD attribution screen ships in v1.
+## The five laws
 
-## Repo layout (as of scaffold)
-- `packages/contracts` — the spine (built, tested). Import shapes from here only.
-- `packages/web` — React/Vite/Tailwind app + Storybook. Primitives in `src/primitives/`, theme in `src/theme/tokens.css` (the ONE file the Claude Design token set replaces — ADR-0014).
-- `packages/engine` — (to build, M2) pure event-sourced engine + sheet computation.
-- `packages/server` — (to build, M2) Fastify + ws sync, reusing the contracts visibility filter.
-- `packages/ai` — (to build, M2+) the three AI tiers, context service, fallbacks.
-- `docs/specs` · `docs/briefs` · `docs/adr` · `docs/MASTER-PLAN.md` · `docs/CLAUDE-CODE-PROMPTS.md`.
+1. **Automate the math, never the ruling.**
+   The engine resolves dice, HP, ranges, spell slots, conditions, durations. The engine never
+   decides *whether* a roll is needed, *what happens* on success, or *what the fiction is*. The
+   DM does that. AI may *suggest* a DC or a roll type; the DM confirms or overrides in one tap.
+   Violating this makes the DM a spectator at their own table. It is the fastest way to kill this
+   product.
 
-## Build primitives before screens (Playbook §3)
-The InfoPanel primitive (`packages/web/src/primitives/InfoPanel.tsx`) is the reference for how a primitive is built: themed only via CSS variables, driven by contracts shapes (see `entityToInfoPanel.ts`), storybook against fixtures. Match its structure for every other primitive. Screens compose primitives — never build a standalone screen that reinvents one.
+2. **The app must never say no.**
+   Every screen has an escape hatch. Free-text "just describe what happens." DM can override any
+   number, any result, any state, at any time. No rules engine can model D&D. If a player invents
+   something the app doesn't support, the app gets out of the way. An app that says no is a jail,
+   and tables abandon jails within one session.
+
+3. **Everything is undoable.**
+   Game state is an append-only event log. Every mutation is an event. Undo is a first-class,
+   always-available action for the DM. Misclicks happen constantly and a table that can't undo
+   stops trusting the app.
+
+4. **Screen time is a cost, not a goal.**
+   D&D is five people imagining together. If a player is looking at their phone during someone
+   else's turn, we are losing. Nothing on screen may *require* reading while another player is
+   talking. Prefer glanceable state, audio cues, and animation over text.
+
+5. **Teach by doing, never by explaining.**
+   No tutorial walls, no tooltips nobody reads. The interface teaches the rules by only ever
+   offering legal actions and showing why. See `docs/09-onboarding.md`.
+
+## Non-goals for v1
+
+Stated so you don't drift. Do not build these unless explicitly asked:
+
+- Map *editor* (we ship pre-made maps; see `docs/02-scope.md`)
+- AI portrait / asset generation
+- Voice chat (v1 assumes players are on Discord)
+- Multiclassing, feats, variant rules, homebrew classes
+- Encumbrance, food/water, ammunition tracking
+- Matchmaking / finding strangers to play with
+- Anything above level 5
+
+## How to work
+
+- **TypeScript, strict. No `any`.** Rules-engine code is pure functions with unit tests. If you
+  can't test it, you've structured it wrong.
+- **Server is authoritative.** Clients send intents, never state. See `docs/03-architecture.md`.
+- **Build vertical slices, not layers.** "A goblin can be attacked and die, end to end" beats
+  "the combat data model is complete."
+- **When you're unsure about a rule, ask — don't guess.** Wrong D&D rules destroy trust with the
+  exact users we're trying to win, because they *can't tell* the app is wrong. That's worse than
+  a crash.
+- **Content is CC-licensed SRD 5.2 only.** See `docs/11-content-pipeline.md`. Never use D&D
+  trademarks or reserved IP (Beholder, Aasimar, Artificer, "Dungeons & Dragons") in content, the
+  product, or marketing copy. Attribution notice ships in the app.
+
+## Definition of done for any feature
+
+- Works when a client disconnects and rejoins mid-session
+- The DM can override or undo it
+- It makes a sound
+- A person who has never played D&D can use it without being told how

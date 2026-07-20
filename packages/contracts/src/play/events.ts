@@ -36,6 +36,7 @@ export type Coins = z.infer<typeof CoinsSchema>;
 export const RollKindSchema = z.enum([
   'attack_roll', 'ability_check', 'saving_throw', 'initiative', 'death_save', 'concentration_save',
 ]);
+export type RollKind = z.infer<typeof RollKindSchema>;
 
 export const NamedModifierSchema = z.object({
   label: z.string(),          // "STR", "Proficiency", "Bless (1d4)", "Exhaustion 3"
