@@ -96,7 +96,7 @@ export function PlayerView({
 
   return (
     <TableBackdrop room={room} height={1080}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24, height: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', height: '100%' }}>
         {/* the hub — glass column, floats over the map */}
         {hub ? (
           <PlayerHub
@@ -109,12 +109,23 @@ export function PlayerView({
         ) : (
           <ConnectingPanel status={state.status} error={state.error} />
         )}
-
-        {/* the dice tray — reveal-only, driven by the server's roll_made (ADR-0008) */}
-        <div style={{ width: 320, height: 320, alignSelf: 'flex-end' }}>
-          <DiceTray result={lastRoll} />
-        </div>
       </div>
+
+      {/* the dice reveal — a centered overlay so the roll is a table-focus moment.
+          Reveal-only, driven by the server's roll_made (ADR-0008); pointer-events off
+          so it never blocks the map. Only mounted once a roll exists. */}
+      {lastRoll && (
+        <div
+          style={{
+            position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
+            pointerEvents: 'none', zIndex: 50,
+          }}
+        >
+          <div style={{ width: 360, height: 360 }}>
+            <DiceTray result={lastRoll} />
+          </div>
+        </div>
+      )}
     </TableBackdrop>
   );
 }

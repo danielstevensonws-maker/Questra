@@ -170,7 +170,12 @@ export class SyncCore {
     // verify + membership lookup, Brief 14 §1) defers the same completion to a
     // microtask; nothing else in the hello path is order-sensitive.
     if (resolved instanceof Promise) {
-      void resolved.then((r) => this.completeHello(conn, msg, r));
+      // a rejection (DB error, token-verify throw) must not hang the client with no
+      // welcome and no error — surface it as an auth failure so the UI can react.
+      resolved.then(
+        (r) => this.completeHello(conn, msg, r),
+        (err) => { console.error('[SyncCore] resolveToken failed:', err); this.err(conn, 'auth'); },
+      );
     } else {
       this.completeHello(conn, msg, resolved);
     }
