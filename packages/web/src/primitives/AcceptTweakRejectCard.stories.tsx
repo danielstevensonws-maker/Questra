@@ -34,11 +34,17 @@ function Frame({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** A creative-text draft seeded from the Fireball fixture's plain line — all three motions. */
+/**
+ * A creative-text read-aloud draft — all three motions. The copy is the
+ * prototype sheet's exact line; parsing the Fireball fixture proves the fixture
+ * is real and available (the production draft arrives from an AI schema over
+ * that same rules data), but the sheet's flavour is what's shown, not the raw
+ * plain text.
+ */
 export const TextDraft: Story = {
   render: () => {
-    const spell = RulesEntitySchema.parse(fireball);
-    const seed = `A bright streak flashes to a point, then blooms with a low roar — ${spell.plain.toLowerCase()}`;
+    RulesEntitySchema.parse(fireball); // the fixture is real; the AI seeds from it in production
+    const seed = 'A bright streak flashes to a point, then blooms with a low roar — flame fills the chamber, and the tapestries catch.';
     return (
       <Frame>
         <Resolvable>
