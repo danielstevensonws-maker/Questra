@@ -45,7 +45,15 @@ export type IntentResolver = (
 ) => { ok: true; events: PlayEvent[] } | { ok: false; reason: string };
 
 export interface SyncCoreOptions {
-  resolveToken: (token: string, playSessionId: string) => ResolvedToken | null;
+  /**
+   * Resolve a session token to who the connection is. May be sync (a fixed test
+   * table) or async (real auth: JWT verify + a membership lookup — Brief 14 §1).
+   * `onHello` awaits either; existing synchronous resolvers are unchanged.
+   */
+  resolveToken: (
+    token: string,
+    playSessionId: string,
+  ) => (ResolvedToken | null) | Promise<ResolvedToken | null>;
   resolveIntent: IntentResolver;
   /** initial combatants per session (pre-combat setup); the log folds on top. */
   initialCombatants?: (playSessionId: string) => Combatant[];
@@ -157,6 +165,22 @@ export class SyncCore {
 
   private onHello(conn: Connection, msg: Extract<ClientMsg, { m: 'hello' }>): void {
     const resolved = this.opts.resolveToken(msg.token, msg.playSessionId);
+    // A sync resolver (fixed test table) settles the hello inline — existing wire
+    // tests still see `welcome` synchronously. An async resolver (real auth: JWT
+    // verify + membership lookup, Brief 14 §1) defers the same completion to a
+    // microtask; nothing else in the hello path is order-sensitive.
+    if (resolved instanceof Promise) {
+      void resolved.then((r) => this.completeHello(conn, msg, r));
+    } else {
+      this.completeHello(conn, msg, resolved);
+    }
+  }
+
+  private completeHello(
+    conn: Connection,
+    msg: Extract<ClientMsg, { m: 'hello' }>,
+    resolved: ResolvedToken | null,
+  ): void {
     if (!resolved) return this.err(conn, 'auth');
     if (resolved.playSessionId !== msg.playSessionId) return this.err(conn, 'not_member');
 

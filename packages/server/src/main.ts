@@ -3,11 +3,11 @@
  * WebSocket sockets to SyncCore through the Connection interface. All protocol
  * logic lives in SyncCore; this file only translates sockets ↔ messages.
  *
- * Run with `npm run dev -w @questra/server`. Token resolution and intent
- * resolution are wired to stubs here for the slice; production injects the real
- * auth (Brief 05 §3) and the engine pipeline (Brief 02).
+ * Run with `npm run dev -w @questra/server`. The SyncCore passed in carries the
+ * real `resolveToken` (Brief 14 §1: `makeResolveToken`) when auth is wired; the
+ * intent resolver is still the engine pipeline seam (Brief 02).
  */
-import Fastify from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { ClientMsgSchema, type ServerMsg } from '@questra/contracts';
 import { SyncCore } from './sync-core.js';
@@ -16,12 +16,19 @@ import type { Connection } from './transport.js';
 export interface StartOptions {
   port?: number;
   core: SyncCore;
+  /**
+   * Optional auth wiring (Brief 14 §1). When present, /auth/* routes mount and the
+   * SyncCore's `resolveToken` should be `makeResolveToken(repo, tokenCfg)`. Absent
+   * ⇒ a bare sync server (dev without accounts, tests).
+   */
+  auth?: (app: FastifyInstance) => void;
 }
 
 /** Start the HTTP (Fastify) + WebSocket (ws) server. Returns a stop() handle. */
 export async function start(opts: StartOptions): Promise<{ port: number; stop: () => Promise<void> }> {
   const app = Fastify({ logger: false });
   app.get('/health', async () => ({ ok: true }));
+  opts.auth?.(app);
 
   const server = app.server;
   const wss = new WebSocketServer({ server });
