@@ -6,6 +6,11 @@
 **Non-goals:** billing/plan enforcement UI (M8; tiers per ADR-0016 decision), OAuth providers beyond one (start email+password or one OAuth, config seam for more), native apps (non-goal D3).
 
 ## 1. Accounts (M2/M3)
+> **Build-ready sub-brief:** [brief-14-1-accounts-tokens.md](brief-14-1-accounts-tokens.md)
+> extracts and revalidates this section (ADR-0013) with exact contract shapes, the
+> `resolveToken` swap, migrations, worked ladder, and 1:1 acceptance tests. Build from
+> there. The paragraph below is the original scope note it expands.
+
 `Account {id, email (unique, verified flag), displayName, passwordHash?, oauth?, createdAt, onboarding (brief-13's state), settings, ageBracket?}` — `ageBracket` reserved for the C5 minors decision; nullable until decided, schema ready so signup doesn't churn later.
 Flows: signup (email+password, argon2id; verification email), login, logout, password reset (tokened email), account deletion (soft-delete + 30-day purge job; campaign ownership must transfer or archive — DM-owned campaigns block deletion until resolved, plain-language explanation). Email delivery via one provider behind a `Mailer` interface (config seam, ADR-0011 spirit).
 Session tokens: short-lived signed JWT (accountId + issuedAt), refresh via httpOnly cookie; the same token is what brief-05's `hello` consumes — **this brief mints what brief-05 assumed.** Rate-limit auth endpoints; lockout with backoff on repeated failures.

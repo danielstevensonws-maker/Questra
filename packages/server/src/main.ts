@@ -3,11 +3,12 @@
  * WebSocket sockets to SyncCore through the Connection interface. All protocol
  * logic lives in SyncCore; this file only translates sockets ↔ messages.
  *
- * Run with `npm run dev -w @questra/server`. Token resolution and intent
- * resolution are wired to stubs here for the slice; production injects the real
- * auth (Brief 05 §3) and the engine pipeline (Brief 02).
+ * Run with `npm run dev -w @questra/server`. The SyncCore passed in carries the
+ * real `resolveToken` (Brief 14 §1: `makeResolveToken`) when auth is wired; the
+ * intent resolver is still the engine pipeline seam (Brief 02).
  */
-import Fastify from 'fastify';
+import { pathToFileURL } from 'node:url';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { ClientMsgSchema, type ServerMsg } from '@questra/contracts';
 import { SyncCore } from './sync-core.js';
@@ -16,12 +17,19 @@ import type { Connection } from './transport.js';
 export interface StartOptions {
   port?: number;
   core: SyncCore;
+  /**
+   * Optional auth wiring (Brief 14 §1). When present, /auth/* routes mount and the
+   * SyncCore's `resolveToken` should be `makeResolveToken(repo, tokenCfg)`. Absent
+   * ⇒ a bare sync server (dev without accounts, tests).
+   */
+  auth?: (app: FastifyInstance) => void;
 }
 
 /** Start the HTTP (Fastify) + WebSocket (ws) server. Returns a stop() handle. */
 export async function start(opts: StartOptions): Promise<{ port: number; stop: () => Promise<void> }> {
   const app = Fastify({ logger: false });
   app.get('/health', async () => ({ ok: true }));
+  opts.auth?.(app);
 
   const server = app.server;
   const wss = new WebSocketServer({ server });
@@ -59,4 +67,25 @@ export async function start(opts: StartOptions): Promise<{ port: number; stop: (
       await app.close();
     },
   };
+}
+
+// ---------------------------------------------------------------- entrypoint
+/**
+ * Run directly (`npm run dev -w @questra/server`) — the ADR-0015 dev-env entrypoint.
+ * Loads .env.local, builds the wired app (Postgres if DATABASE_URL is set), mounts
+ * /auth/* + the real resolveToken, and listens on 0.0.0.0 so a second physical
+ * device can join. Guarded so importing this module (tests) does not start a server.
+ */
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const { loadDotEnvLocal, readConfig } = await import('./config.js');
+  const { createApp } = await import('./app.js');
+  loadDotEnvLocal();
+  const config = readConfig();
+  const built = createApp(config);
+  const { port } = await start({ core: built.core, auth: built.auth, port: config.port });
+  const where = config.databaseUrl ? 'Postgres (durable)' : 'in-memory (no DATABASE_URL)';
+  console.log(`[questra] server on http://0.0.0.0:${port} — store: ${where}`);
+  const shutdown = async () => { await built.close(); process.exit(0); };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }

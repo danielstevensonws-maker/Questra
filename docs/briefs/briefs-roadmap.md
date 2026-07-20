@@ -1,10 +1,15 @@
 # Questra — Implementation Briefs Roadmap (Layer 3)
 
-*The index of every implementation brief the build needs. Briefs 01–02 are written; the rest are enumerated here with scope, dependencies, and non-goals so each can be produced just-in-time (write a brief right before its milestone, not months early — briefs written far from their build date rot). Each brief follows the 01/02 pattern: self-contained, exact shapes, worked example, acceptance criteria mapping 1:1 to tests, explicit non-goals. A Claude Code session gets exactly one brief + contracts + ADRs.*
+*The index of every implementation brief the build needs. All briefs now exist (per owner decision); each carries scope, dependencies, and non-goals, and follows the 01/02 pattern: self-contained, exact shapes, worked example, acceptance criteria mapping 1:1 to tests, explicit non-goals. A Claude Code session gets exactly one brief + contracts + ADRs. Revalidate a brief against current contracts at build time (ADR-0013) — several are now implemented ahead of this index's original framing.*
+
+> **Reconciled 2026-07-20.** This index was written when only 01–02 existed as briefs; it now lags the code. Current build reality (see MASTER-PLAN + `npm run check:all`): the **engine** work for briefs **02–08** is implemented and green (the full `packages/engine/src/sim/` layer — pipeline, conditions/duration, dying, rests/leveling, boss prompts, legality, narration, sheet, shop). **Brief 05** (sync) + **ADR-0015 persistence** ship in `packages/server` (SyncCore + in-memory & Postgres event stores). **Brief 14 §1** (accounts + session tokens) is implemented (`packages/server/src/auth/`, the real `resolveToken`). The **UI-brief primitives** (10, plus the AI-touchpoint cards) live in `packages/web` — see the [Storybook catalogue](../storybook/README.md). The per-brief scope notes below remain the reference for what each brief covers; treat "to write" as "reference for the remaining UI/prep/community/onboarding milestones," not a claim that the listed engine briefs are unbuilt.
 
 ## Written — ALL BRIEFS NOW EXIST (per owner decision; ADR-0013 revalidation rule applies)
-- **01 — Rules Data Schema & Ingestion** ✅ (fixtures: Prone, Fireball, Goblin Warrior, Fighter)
-- **02 — Event Vocabulary & d20 Pipeline** ✅ (fixture: the Torvald trace)
+- **01 — Rules Data Schema & Ingestion** ✅ *(built: engine ingestion + data + goldens)*
+- **02 — Event Vocabulary & d20 Pipeline** ✅ *(built: engine sim pipeline; Torvald trace green)*
+- **03–08 — engine halves** ✅ *(built in `packages/engine/src/sim`: sheet, conditions/duration/dying, rests/leveling, boss prompts, legality)*
+- **05 — Sync Channel & Permission Filter** ✅ *(built: `packages/server` SyncCore + wire goldens)*
+- **14 §1 — Accounts & Session Tokens** ✅ *(built: `packages/server/src/auth`; the real `resolveToken`)*
 
 ## To write, in build order
 
@@ -39,4 +44,4 @@
 - **The difficulty ladder table** (09c's fallback) is rules *content*: typical DCs 10/13/15/18/20 with plain-language labels — five rows, but it must exist as data.
 - **Telemetry taxonomy** — accept/tweak/reject logging (AI spec §4) plus slice latency metrics need one small analytics event schema in contracts before anything can be measured.
 
-*Total: 13 briefs (15 files counting 09's split), two done. Suggested cadence: write 03–05 before Milestone 2 (the slice consumes them); everything after just-in-time.*
+*Total: 13 briefs (15 files counting 09's split). As of 2026-07-20 the engine halves (01–08), sync (05), and accounts §1 (14 §1) are implemented; the remaining work is the UI/prep/community/onboarding milestones (10–13, 11, 12, 15) and the rest of brief-14. Suggested cadence for what's left: just-in-time, revalidated against contracts at build (ADR-0013).*
