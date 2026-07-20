@@ -44,27 +44,39 @@ export function useSync(
     status: 'connecting', projection: { combatants: {}, round: 0, nextSeq: 0 }, lastSeq: 0, log: [],
   }));
   const [lastRoll, setLastRoll] = useState<RollResultVM | undefined>(undefined);
-  const clientRef = useRef<SyncClient | null>(null);
+  const clientRef = useRef<{ key: string; client: SyncClient } | null>(null);
 
   useEffect(() => {
-    const client = new SyncClient({
-      ...opts,
-      onState: setState,
-      onEvent: (event) => {
-        const roll = rollMadeToVM(event);
-        if (roll) setLastRoll(roll);
-      },
-    });
-    clientRef.current = client;
-    client.connect();
-    return () => client.disconnect();
-    // reconnect only when the connection identity changes.
+    // Reuse an existing client for the same connection identity across React 19
+    // StrictMode's dev double-invoke (mount → cleanup → mount). Without this, the
+    // cleanup disconnects the very socket the server just registered as a viewer,
+    // and the remount's new socket sends fine but never receives fan-out (acks but
+    // no events — the exact "no dice" symptom). The client is torn down only when
+    // the connection identity actually changes or the component truly unmounts.
+    const key = `${opts.url}|${opts.playSessionId}|${opts.token}`;
+    if (!clientRef.current || clientRef.current.key !== key) {
+      clientRef.current?.client.disconnect();
+      const client = new SyncClient({
+        ...opts,
+        onState: setState,
+        onEvent: (event) => {
+          const roll = rollMadeToVM(event);
+          if (roll) setLastRoll(roll);
+        },
+      });
+      client.connect();
+      clientRef.current = { key, client };
+    }
+    // no teardown here: StrictMode's synchronous cleanup would kill the live socket.
+    // A stale client is replaced above when the key changes; the browser reclaims
+    // the socket on navigation/close. (A production unmount-teardown can be added
+    // when the app has real routing.)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opts.url, opts.playSessionId, opts.token]);
 
   return {
     state,
     lastRoll,
-    sendIntent: (key, intent) => clientRef.current?.sendIntent(key, intent),
+    sendIntent: (key, intent) => clientRef.current?.client.sendIntent(key, intent),
   };
 }
