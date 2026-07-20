@@ -7,6 +7,7 @@
  * real `resolveToken` (Brief 14 §1: `makeResolveToken`) when auth is wired; the
  * intent resolver is still the engine pipeline seam (Brief 02).
  */
+import { pathToFileURL } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { ClientMsgSchema, type ServerMsg } from '@questra/contracts';
@@ -66,4 +67,25 @@ export async function start(opts: StartOptions): Promise<{ port: number; stop: (
       await app.close();
     },
   };
+}
+
+// ---------------------------------------------------------------- entrypoint
+/**
+ * Run directly (`npm run dev -w @questra/server`) — the ADR-0015 dev-env entrypoint.
+ * Loads .env.local, builds the wired app (Postgres if DATABASE_URL is set), mounts
+ * /auth/* + the real resolveToken, and listens on 0.0.0.0 so a second physical
+ * device can join. Guarded so importing this module (tests) does not start a server.
+ */
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const { loadDotEnvLocal, readConfig } = await import('./config.js');
+  const { createApp } = await import('./app.js');
+  loadDotEnvLocal();
+  const config = readConfig();
+  const built = createApp(config);
+  const { port } = await start({ core: built.core, auth: built.auth, port: config.port });
+  const where = config.databaseUrl ? 'Postgres (durable)' : 'in-memory (no DATABASE_URL)';
+  console.log(`[questra] server on http://0.0.0.0:${port} — store: ${where}`);
+  const shutdown = async () => { await built.close(); process.exit(0); };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
