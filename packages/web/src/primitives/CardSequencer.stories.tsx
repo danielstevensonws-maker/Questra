@@ -1,13 +1,14 @@
 /**
  * CardSequencer stories — reordering scenes in a session and sessions in a
- * campaign (the two canonical uses). State lives in the harness so the reorder
- * and remove controls are exercised live. Labels stay plain-language: scenes
- * and sessions, never beats or nodes.
+ * campaign (the two canonical uses), restyled to the Questra V1 Prototype sheet.
+ * State lives in the harness so the reorder and remove controls are exercised
+ * live. Labels stay plain-language: scenes and sessions, never beats or nodes.
  */
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { CardSequencer, type SequenceItem } from './CardSequencer.js';
 
+import '@questra/theme/styles.css';
 import '../theme/index.css';
 
 const meta: Meta<typeof CardSequencer> = {
@@ -18,36 +19,36 @@ export default meta;
 type Story = StoryObj<typeof CardSequencer>;
 
 function Frame({ children }: { children: React.ReactNode }) {
-  return <div style={{ maxWidth: 560, padding: 24, background: 'var(--q-bg)' }}>{children}</div>;
+  return <div style={{ maxWidth: 560, padding: 24, background: 'var(--qa-ink)' }}>{children}</div>;
 }
 
-interface Scene {
+interface Row {
   id: string;
   title: string;
   note: string;
 }
 
-function SceneCard({ scene }: { scene: Scene }) {
+function RowCard({ row }: { row: Row }) {
   return (
-    <div>
-      <div style={{ fontFamily: 'var(--q-font-display)', fontSize: 'var(--q-text-lg)', color: 'var(--q-ink)' }}>{scene.title}</div>
-      <div style={{ fontSize: 'var(--q-text-sm)', color: 'var(--q-ink-soft)' }}>{scene.note}</div>
-    </div>
+    <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--qa-vellum)' }}>{row.title}</span>
+      <span style={{ fontSize: 11, color: 'var(--qa-vellum-dim)' }}>{row.note}</span>
+    </span>
   );
 }
 
-const START: Scene[] = [
-  { id: 's1', title: 'The shuttered market', note: 'Social — the party arrives at dusk.' },
-  { id: 's2', title: 'Ambush at the fountain', note: 'Combat — two cutpurses, a Goblin Warrior.' },
-  { id: 's3', title: 'The almshouse door', note: 'Investigation — Sister Aldous stalls them.' },
-  { id: 's4', title: 'Down into the vault', note: 'Exploration — the sunless descent.' },
+const START: Row[] = [
+  { id: 's1', title: 'The night market', note: 'Meet the fence, hear the rumor' },
+  { id: 's2', title: 'Ambush in the alley', note: 'Two cutpurses, Perception DC 13' },
+  { id: 's3', title: 'The almshouse', note: 'Sister Aldous, and the ledger' },
+  { id: 's4', title: 'The vault', note: 'The tomb, the trap, the goblin boss' },
 ];
 
-/** Scenes in a session — reorder with the up/down controls or drag. */
+/** Scenes in a session — reorder with the up/down controls or drag; remove enabled. */
 export const ScenesInASession: Story = {
   render: () => {
-    const [scenes, setScenes] = useState<Scene[]>(START);
-    const items: SequenceItem[] = scenes.map((s) => ({ id: s.id, render: <SceneCard scene={s} /> }));
+    const [scenes, setScenes] = useState<Row[]>(START);
+    const items: SequenceItem[] = scenes.map((s) => ({ id: s.id, render: <RowCard row={s} /> }));
     return (
       <Frame>
         <CardSequencer
@@ -61,19 +62,36 @@ export const ScenesInASession: Story = {
   },
 };
 
-/** Sessions in a campaign — same primitive, different noun. */
+/** Sessions in a campaign — same primitive, different noun, no remove. */
 export const SessionsInACampaign: Story = {
   render: () => {
-    const [sessions, setSessions] = useState<Scene[]>([
-      { id: 'e1', title: 'Session 1 — The summons', note: 'The letter from Ambergate.' },
-      { id: 'e2', title: 'Session 2 — The long road', note: 'Wilderness travel, a first fight.' },
-      { id: 'e3', title: 'Session 3 — The vault', note: 'The dungeon proper.' },
+    const [sessions, setSessions] = useState<Row[]>([
+      { id: 'e1', title: 'The Broken Crown', note: 'Session one — played June 30' },
+      { id: 'e2', title: "The Paymaster's Ledger", note: 'Session two — next up' },
     ]);
-    const items: SequenceItem[] = sessions.map((s) => ({ id: s.id, render: <SceneCard scene={s} /> }));
+    const items: SequenceItem[] = sessions.map((s) => ({ id: s.id, render: <RowCard row={s} /> }));
     return (
       <Frame>
-        <CardSequencer itemNoun="sessions" items={items} onReorder={(ids) => setSessions(ids.map((id) => sessions.find((s) => s.id === id)!))} />
+        <CardSequencer
+          itemNoun="sessions"
+          items={items}
+          onReorder={(ids) => setSessions(ids.map((id) => sessions.find((s) => s.id === id)!))}
+        />
       </Frame>
     );
   },
+};
+
+/** Empty — a fresh session with no scenes; the dashed prompt to add the first. */
+export const Empty: Story = {
+  render: () => (
+    <Frame>
+      <CardSequencer
+        itemNoun="scenes"
+        items={[]}
+        onReorder={() => {}}
+        emptyLabel="No scenes yet. Add the first one, or pull a spark from the campaign."
+      />
+    </Frame>
+  ),
 };

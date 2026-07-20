@@ -12,18 +12,21 @@
  * Content-agnostic by design: the draft body is a ReactNode (or plain text),
  * because the AI *schemas* it renders (RulingSuggestion, NpcLine, …) are their
  * own contract PRs. The card is the frame; the schema-specific view is passed in.
- * That mirrors InfoPanel taking an InfoPanelData view-model rather than a
- * contracts entity directly.
  *
- * Themed entirely via theme/tokens.css variables. No hardcoded look.
+ * Design: the Questra V1 Prototype sheet, §AcceptTweakRejectCard. An opaque
+ * --qa-ink-raised card (NOT glass — it's an authoring/review surface). A 6px
+ * ember dot is the provenance mark; the eyebrow reads "Suggestion · {kind}".
+ * Reject is an italic, underlined text button set apart from Accept on purpose.
+ * While streaming there is no footer at all. Fallback flips the dot + eyebrow to
+ * gold. Themed entirely via --qa-* tokens.
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 /** What the human did with the draft — the acceptance telemetry Orchestration §4 wants. */
 export type CardOutcome = 'accepted' | 'tweaked' | 'rejected';
 
 export interface AcceptTweakRejectCardProps {
-  /** Short label of what the AI produced ("Ruling suggestion", "NPC line"). Plain language. */
+  /** Short label of what the AI produced ("Ruling", "NPC line", "Recap"). Plain language. */
   title: string;
   /**
    * The draft itself. A string renders as body text; a ReactNode renders as-is
@@ -41,22 +44,37 @@ export interface AcceptTweakRejectCardProps {
   onAccept: () => void;
   /**
    * Tweak: reveals an editable copy of the draft text. Called with the edited
-   * text on confirm. Omit to hide tweak (e.g. non-textual drafts that can't be
-   * edited inline — those offer accept/reject only).
+   * text on confirm. Omit to hide tweak (e.g. non-textual drafts).
    */
   onTweak?: (edited: string) => void;
   /** The raw editable text seed for tweak mode (usually the draft's source text). */
   tweakSeed?: string;
   /** Reject the draft; nothing is applied. */
   onReject: () => void;
-  /**
-   * Fires on every terminal outcome for telemetry (Orchestration §4: the card
-   * logs accept/tweak/reject — the quality metric for every prompt).
-   */
+  /** Fires on every terminal outcome for telemetry (Orchestration §4). */
   onOutcome?: (outcome: CardOutcome) => void;
   acceptLabel?: string;
   rejectLabel?: string;
 }
+
+const card: CSSProperties = {
+  width: 330,
+  padding: 16,
+  borderRadius: 'var(--qa-radius-md)',
+  background: 'var(--qa-ink-raised)',
+  border: '1px solid var(--qa-hairline)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 12,
+};
+
+const eyebrow: CSSProperties = {
+  fontFamily: 'var(--qa-font-mono)',
+  fontSize: 8.5,
+  letterSpacing: 'var(--qa-track-label)',
+  textTransform: 'uppercase',
+  color: 'var(--qa-vellum-dim)',
+};
 
 export function AcceptTweakRejectCard({
   title,
@@ -75,13 +93,8 @@ export function AcceptTweakRejectCard({
   const [text, setText] = useState(tweakSeed);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    setText(tweakSeed);
-  }, [tweakSeed]);
-
-  useEffect(() => {
-    if (tweaking) textareaRef.current?.focus();
-  }, [tweaking]);
+  useEffect(() => { setText(tweakSeed); }, [tweakSeed]);
+  useEffect(() => { if (tweaking) textareaRef.current?.focus(); }, [tweaking]);
 
   const showFallback = fallback !== undefined && !streaming;
   const canTweak = onTweak !== undefined && !showFallback;
@@ -91,168 +104,140 @@ export function AcceptTweakRejectCard({
     onOutcome?.(outcome);
   }
 
-  return (
-    <article
-      aria-busy={streaming}
-      style={{
-        background: 'var(--q-surface)',
-        border: '1px solid var(--q-line)',
-        borderRadius: 'var(--q-radius-lg)',
-        boxShadow: 'var(--q-shadow-panel)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      <header
-        className="flex items-center justify-between gap-3 px-5 py-3"
-        style={{ borderBottom: '1px solid var(--q-line)' }}
-      >
-        <div className="flex items-center gap-2">
-          <SuggestionMark />
-          <span
-            style={{
-              fontFamily: 'var(--q-font-mono)',
-              fontSize: 'var(--q-text-xs)',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              color: 'var(--q-ink-faint)',
-            }}
-          >
-            {showFallback ? 'Fallback' : 'Suggestion'}
-          </span>
-        </div>
-        <h3
-          style={{
-            fontFamily: 'var(--q-font-display)',
-            fontSize: 'var(--q-text-base)',
-            color: 'var(--q-ink)',
-            margin: 0,
-          }}
-        >
-          {title}
-        </h3>
-      </header>
+  const dotColor = showFallback ? 'var(--qa-gold)' : 'var(--qa-ember)';
+  const eyebrowColor = showFallback ? 'var(--qa-gold)' : 'var(--qa-vellum-dim)';
 
-      <div className="px-5 py-4" style={{ color: 'var(--q-ink)', fontSize: 'var(--q-text-base)', lineHeight: 'var(--q-leading-normal)' }}>
-        {streaming ? (
-          <StreamingBody>{draft}</StreamingBody>
-        ) : showFallback ? (
-          fallback
-        ) : tweaking ? (
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={5}
-            className="w-full"
-            style={{
-              width: '100%',
-              background: 'var(--q-surface-raised)',
-              border: '1px solid var(--q-line)',
-              borderRadius: 'var(--q-radius)',
-              color: 'var(--q-ink)',
-              fontFamily: 'var(--q-font-body)',
-              fontSize: 'var(--q-text-base)',
-              lineHeight: 'var(--q-leading-normal)',
-              padding: 'var(--q-space-3)',
-              resize: 'vertical',
-            }}
-          />
-        ) : typeof draft === 'string' ? (
-          <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{draft}</p>
-        ) : (
-          draft
-        )}
+  return (
+    <article aria-busy={streaming} style={card}>
+      {/* provenance eyebrow: [dot] SUGGESTION · {title} */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span
+          // pulses while streaming; the qa- class lets base.css still it under reduced-motion
+          className={streaming ? 'qa-atr-dot' : undefined}
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: dotColor,
+            ...(streaming ? { animation: 'qa-dot 1.2s infinite' } : {}),
+          }}
+        />
+        <span style={{ ...eyebrow, color: eyebrowColor }}>
+          {showFallback ? 'Fallback' : 'Suggestion'} · {title}
+        </span>
       </div>
 
+      {/* body */}
+      {streaming ? (
+        <StreamingBody>{draft}</StreamingBody>
+      ) : showFallback ? (
+        fallback
+      ) : tweaking ? (
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={4}
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            resize: 'vertical',
+            fontFamily: 'var(--qa-font-body)',
+            fontSize: 14,
+            lineHeight: 1.55,
+            color: 'var(--qa-vellum)',
+            background: 'var(--qa-vellum-ghost)',
+            border: '1px solid var(--qa-hairline)',
+            borderRadius: 'var(--qa-radius-sm)',
+            padding: '10px 12px',
+            outline: 'none',
+            boxShadow: 'var(--qa-focus-ring)',
+          }}
+        />
+      ) : typeof draft === 'string' ? (
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'var(--qa-vellum)', whiteSpace: 'pre-wrap' }}>
+          {draft}
+        </p>
+      ) : (
+        draft
+      )}
+
+      {/* footer — suppressed entirely while streaming */}
       {!streaming && (
-        <footer
-          className="flex items-center gap-2 px-5 py-3"
-          style={{ borderTop: '1px solid var(--q-line)', background: 'var(--q-surface-raised)' }}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            borderTop: '1px solid var(--qa-hairline-soft)',
+            paddingTop: 12,
+          }}
         >
           {tweaking ? (
             <>
-              <PrimaryButton
-                onClick={() => {
-                  fire('tweaked', () => onTweak!(text));
-                  setTweaking(false);
-                }}
-              >
+              <PrimaryButton onClick={() => { fire('tweaked', () => onTweak!(text)); setTweaking(false); }}>
                 Save changes
               </PrimaryButton>
-              <GhostButton onClick={() => setTweaking(false)}>Cancel</GhostButton>
+              <RejectButton onClick={() => setTweaking(false)}>Cancel</RejectButton>
             </>
           ) : (
             <>
               <PrimaryButton onClick={() => fire('accepted', onAccept)}>{acceptLabel}</PrimaryButton>
-              {canTweak && <GhostButton onClick={() => setTweaking(true)}>Tweak</GhostButton>}
-              <div style={{ flex: 1 }} />
-              <GhostButton tone="danger" onClick={() => fire('rejected', onReject)}>
-                {rejectLabel}
-              </GhostButton>
+              {canTweak && <TweakButton onClick={() => setTweaking(true)}>Tweak</TweakButton>}
+              <span style={{ flex: 1 }} />
+              <RejectButton onClick={() => fire('rejected', onReject)}>{rejectLabel}</RejectButton>
             </>
           )}
-        </footer>
+        </div>
       )}
-    </article>
-  );
-}
 
-/** The quiet mark that says "an assistant made this" — never a warning, just provenance. */
-function SuggestionMark() {
-  return (
-    <span
-      aria-hidden
-      style={{
-        width: 6,
-        height: 6,
-        borderRadius: '999px',
-        background: 'var(--q-accent)',
-        display: 'inline-block',
-      }}
-    />
+      <style>{`
+        /* qa-caret is not (yet) a theme keyframe; qa-dot is. Define the caret
+           locally, the way ComposeRollSheet owns qa-die-spin. */
+        @keyframes qa-caret { 0%,49% { opacity: 1 } 50%,100% { opacity: 0 } }
+        @media (prefers-reduced-motion: reduce) {
+          .qa-atr-dot, .qa-atr-caret { animation: none !important }
+        }
+      `}</style>
+    </article>
   );
 }
 
 function StreamingBody({ children }: { children: ReactNode }) {
   return (
-    <div style={{ position: 'relative' }}>
-      {typeof children === 'string' ? <span style={{ whiteSpace: 'pre-wrap' }}>{children}</span> : children}
+    <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'var(--qa-vellum)' }}>
+      {typeof children === 'string' ? children : children}
       <span
         aria-label="Still writing…"
+        className="qa-atr-caret"
         style={{
           display: 'inline-block',
-          width: '0.5em',
-          height: '1em',
-          marginLeft: 2,
-          background: 'var(--q-accent-soft)',
+          width: 7,
+          height: 14,
+          background: 'var(--qa-vellum)',
           verticalAlign: 'text-bottom',
-          animation: 'q-caret 1s steps(1) infinite',
+          marginLeft: 2,
+          animation: 'qa-caret 1s steps(1) infinite',
         }}
       />
-      <style>{`
-        @keyframes q-caret { 50% { opacity: 0 } }
-        @media (prefers-reduced-motion: reduce) { [aria-label="Still writing…"] { animation: none } }
-      `}</style>
-    </div>
+    </p>
   );
 }
 
+/** The ember primary — Accept / Save changes / Use Medium. Display serif. */
 function PrimaryButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       style={{
-        background: 'var(--q-accent)',
-        color: '#fff',
+        fontFamily: 'var(--qa-font-display)',
+        fontSize: 13,
         border: 'none',
-        borderRadius: 'var(--q-radius)',
-        padding: 'var(--q-space-2) var(--q-space-4)',
-        fontSize: 'var(--q-text-sm)',
-        fontWeight: 600,
+        borderRadius: 'var(--qa-radius-sm)',
+        padding: '8px 16px',
+        background: 'linear-gradient(180deg,var(--qa-ember),var(--qa-ember-deep))',
+        color: 'var(--qa-vellum-bright)',
         cursor: 'pointer',
-        transition: 'background var(--q-dur-fast) var(--q-ease)',
       }}
     >
       {children}
@@ -260,27 +245,42 @@ function PrimaryButton({ children, onClick }: { children: ReactNode; onClick: ()
   );
 }
 
-function GhostButton({
-  children,
-  onClick,
-  tone,
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  tone?: 'danger';
-}) {
+/** Tweak — a quiet ghost-filled secondary. */
+function TweakButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       style={{
-        background: 'transparent',
-        color: tone === 'danger' ? 'var(--q-danger)' : 'var(--q-ink-soft)',
-        border: '1px solid var(--q-line)',
-        borderRadius: 'var(--q-radius)',
-        padding: 'var(--q-space-2) var(--q-space-4)',
-        fontSize: 'var(--q-text-sm)',
+        fontFamily: 'var(--qa-font-body)',
+        fontSize: 13,
+        border: '1px solid var(--qa-hairline)',
+        borderRadius: 'var(--qa-radius-sm)',
+        padding: '8px 16px',
+        background: 'var(--qa-vellum-ghost)',
+        color: 'var(--qa-vellum)',
         cursor: 'pointer',
-        transition: 'color var(--q-dur-fast) var(--q-ease), border-color var(--q-dur-fast) var(--q-ease)',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Reject / Cancel / Dismiss — an italic underlined text button, set apart. */
+function RejectButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        fontFamily: 'var(--qa-font-body)',
+        fontStyle: 'italic',
+        fontSize: 12.5,
+        border: 'none',
+        borderBottom: '1px solid var(--qa-hairline)',
+        background: 'none',
+        padding: '2px 4px',
+        color: 'var(--qa-vellum-dim)',
+        cursor: 'pointer',
       }}
     >
       {children}

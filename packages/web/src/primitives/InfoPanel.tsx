@@ -1,7 +1,7 @@
 /**
  * InfoPanel — THE primitive. Character Wizard §4: "one component, used
  * everywhere." Reused by: wizard, compendium, session planner, level-up,
- * homebrew builder, community library.
+ * homebrew builder, community library, and every tap-"?" in play.
  *
  * Three jobs (all from the spec):
  *   1. INFORMS via three layers — plain sentence / derivation / full SRD text.
@@ -13,10 +13,14 @@
  *   3. RENDERS HOMEBREW IDENTICALLY — a homebrew entity opens in this exact
  *      panel; the source flag is the only difference, shown as a quiet badge.
  *
- * Themed entirely via CSS variables (theme/tokens.css). No hardcoded look.
- * Design token set drops into tokens.css and this re-themes with no edits here.
+ * Design: the Questra V1 Prototype sheet, §InfoPanel. A floating glass card
+ * (--qa-glass-raised, heavy blur, shadow-menu), kicker over title, layer
+ * toggles as uppercase-mono rows with ▸/▾ chevrons, derivation as a label +
+ * big-mono-number list with faint sub-parts, and the ember Choose button. Adds
+ * the loading (candle-breath skeleton) and not-found states from the sheet.
+ * Themed entirely via --qa-* tokens.
  */
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 /** Layer 2 line: a computed value with its provenance ("15 = 11 base + 2 Dex + 2 shield"). */
 export interface DerivationLine {
@@ -55,7 +59,30 @@ export interface InfoPanelProps {
   chooseLabel?: string;
   /** Which layers to expand by default. Beginners want L1; veterans open L3. */
   defaultExpanded?: ('derivation' | 'rules')[];
+  /** The lookup is still resolving — show the candle-breath skeleton. */
+  loading?: boolean;
 }
+
+const kickerStyle: CSSProperties = {
+  fontFamily: 'var(--qa-font-mono)',
+  fontSize: 8.5,
+  letterSpacing: 'var(--qa-track-label)',
+  textTransform: 'uppercase',
+  color: 'var(--qa-glass-dim)',
+};
+
+const cardShell: CSSProperties = {
+  width: 300,
+  borderRadius: 'var(--qa-radius-lg)',
+  background: 'var(--qa-glass-raised)',
+  border: '1px solid var(--qa-glass-border)',
+  backdropFilter: 'blur(var(--qa-blur-heavy))',
+  WebkitBackdropFilter: 'blur(var(--qa-blur-heavy))',
+  boxShadow: 'var(--qa-shadow-menu)',
+  display: 'flex',
+  flexDirection: 'column',
+  color: 'var(--qa-glass-text)',
+};
 
 export function InfoPanel({
   open,
@@ -64,6 +91,7 @@ export function InfoPanel({
   onChoose,
   chooseLabel = 'Choose',
   defaultExpanded = [],
+  loading = false,
 }: InfoPanelProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -85,14 +113,13 @@ export function InfoPanel({
     setShowRules(defaultExpanded.includes('rules'));
   }, [data?.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!open || !data) return null;
+  if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end"
-      style={{ background: 'var(--q-overlay)' }}
+      className="flex fixed inset-0 z-50 justify-center items-center"
+      style={{ background: 'color-mix(in srgb, var(--qa-ink) 55%, transparent)' }}
       onClick={onClose}
-      aria-hidden={false}
     >
       <div
         ref={panelRef}
@@ -101,143 +128,226 @@ export function InfoPanel({
         aria-labelledby={titleId}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="h-full w-full max-w-md overflow-y-auto outline-none"
-        style={{
-          background: 'var(--q-surface)',
-          boxShadow: 'var(--q-shadow-pop)',
-          borderLeft: '1px solid var(--q-line)',
-          animation: 'q-slide-in var(--q-dur) var(--q-ease)',
-        }}
+        style={{ ...cardShell, outline: 'none', animation: 'qa-info-rise var(--qa-dur) var(--qa-ease)' }}
       >
-        {/* header */}
-        <header
-          className="sticky top-0 flex items-start justify-between gap-3 px-6 py-4"
-          style={{ background: 'var(--q-surface)', borderBottom: '1px solid var(--q-line)' }}
-        >
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 id={titleId} style={{ fontFamily: 'var(--q-font-display)', fontSize: 'var(--q-text-2xl)', lineHeight: 'var(--q-leading-tight)', color: 'var(--q-ink)' }}>
-                {data.name}
-              </h2>
-              {data.source === 'homebrew' && <HomebrewBadge />}
+        {loading ? (
+          <LoadingSkeleton />
+        ) : !data ? (
+          <NotFound onClose={onClose} />
+        ) : (
+          <>
+            {/* header — kicker over title, homebrew badge inline */}
+            <div style={{ padding: '16px 16px 0', display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={kickerStyle}>{data.kind}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span
+                  id={titleId}
+                  style={{
+                    fontFamily: 'var(--qa-font-display)',
+                    fontSize: 'var(--qa-text-xl)',
+                    color: 'var(--qa-glass-text)',
+                  }}
+                >
+                  {data.name}
+                </span>
+                {data.source === 'homebrew' && <HomebrewBadge />}
+              </span>
             </div>
-            <p style={{ fontSize: 'var(--q-text-sm)', color: 'var(--q-ink-faint)', marginTop: 'var(--q-space-1)' }}>
-              {data.kind}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="shrink-0 rounded"
-            style={{ color: 'var(--q-ink-faint)', fontSize: 'var(--q-text-xl)', lineHeight: 1, padding: 'var(--q-space-1)' }}
-          >
-            ✕
-          </button>
-        </header>
 
-        <div className="px-6 py-5" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--q-space-5)' }}>
-          {/* Layer 1 — always visible */}
-          <p style={{ fontSize: 'var(--q-text-lg)', lineHeight: 'var(--q-leading-normal)', color: 'var(--q-ink)' }}>
-            {data.summary}
-          </p>
+            {/* Layer 1 — always visible */}
+            <div style={{ padding: '12px 16px', fontSize: 15, lineHeight: 1.5, color: 'var(--qa-glass-text)' }}>
+              {data.summary}
+            </div>
 
-          {/* Layer 2 — derivation, collapsible */}
-          {data.derivation && data.derivation.length > 0 && (
-            <Section
-              title="Where the numbers come from"
-              open={showDerivation}
-              onToggle={() => setShowDerivation((v) => !v)}
-            >
-              <ul style={{ display: 'flex', flexDirection: 'column', gap: 'var(--q-space-2)' }}>
-                {data.derivation.map((line, i) => (
-                  <li key={i} style={{ fontSize: 'var(--q-text-sm)' }}>
-                    <div className="flex justify-between">
-                      <span style={{ color: 'var(--q-ink-soft)' }}>{line.label}</span>
-                      <span style={{ color: 'var(--q-ink)', fontFamily: 'var(--q-font-mono)' }}>{line.value}</span>
-                    </div>
-                    {line.parts && (
-                      <div style={{ marginTop: 'var(--q-space-1)', paddingLeft: 'var(--q-space-3)', color: 'var(--q-ink-faint)', fontSize: 'var(--q-text-xs)', fontFamily: 'var(--q-font-mono)' }}>
-                        {line.parts.map((p, j) => (
-                          <span key={j}>{j > 0 ? ' + ' : ''}{p.value} {p.label}</span>
-                        ))}
+            {/* Layer 2 — derivation, collapsible */}
+            {data.derivation && data.derivation.length > 0 && (
+              <>
+                <Toggle
+                  label="Where the numbers come from"
+                  open={showDerivation}
+                  onToggle={() => setShowDerivation((v) => !v)}
+                  active={showDerivation}
+                />
+                {showDerivation && (
+                  <dl style={{ margin: '0 16px', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 12 }}>
+                    {data.derivation.map((line, i) => (
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <dt style={{ fontSize: 12.5, color: 'var(--qa-glass-dim)' }}>{line.label}</dt>
+                          <dd style={{ margin: 0, fontFamily: 'var(--qa-font-mono)', fontSize: 12.5, color: 'var(--qa-glass-text)' }}>
+                            {line.value}
+                          </dd>
+                        </div>
+                        {line.parts && (
+                          <span style={{ fontFamily: 'var(--qa-font-mono)', fontSize: 9.5, color: 'var(--qa-vellum-faint)' }}>
+                            {line.parts.map((p, j) => `${j > 0 ? ' + ' : ''}${p.value} ${p.label}`).join('')}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
+                    ))}
+                  </dl>
+                )}
+              </>
+            )}
 
-          {/* Layer 3 — full rules text, collapsible */}
-          {data.rulesText && (
-            <Section title="Full rules text" open={showRules} onToggle={() => setShowRules((v) => !v)}>
-              <p style={{ fontSize: 'var(--q-text-sm)', lineHeight: 'var(--q-leading-normal)', color: 'var(--q-ink-soft)', whiteSpace: 'pre-wrap' }}>
-                {data.rulesText}
-              </p>
-            </Section>
-          )}
+            {/* Layer 3 — full rules text, collapsible */}
+            {data.rulesText && (
+              <>
+                <Toggle
+                  label="Full rules text"
+                  open={showRules}
+                  onToggle={() => setShowRules((v) => !v)}
+                  active={showRules}
+                />
+                {showRules && (
+                  <div
+                    style={{
+                      margin: '0 16px 16px',
+                      padding: '10px 12px',
+                      borderRadius: 'var(--qa-radius-sm)',
+                      background: 'var(--qa-vellum-ghost)',
+                      fontSize: 12,
+                      lineHeight: 1.55,
+                      color: 'var(--qa-glass-dim)',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {data.rulesText}
+                  </div>
+                )}
+              </>
+            )}
 
-          {data.extra}
-        </div>
+            {data.extra}
 
-        {/* Job #2 — Choose lives INSIDE the panel */}
-        {onChoose && (
-          <footer
-            className="sticky bottom-0 px-6 py-4"
-            style={{ background: 'var(--q-surface)', borderTop: '1px solid var(--q-line)' }}
-          >
-            <button
-              onClick={onChoose}
-              className="w-full rounded font-medium"
-              style={{
-                background: 'var(--q-accent)', color: '#fff',
-                padding: 'var(--q-space-3) var(--q-space-4)',
-                fontSize: 'var(--q-text-base)', borderRadius: 'var(--q-radius)',
-                transition: 'background var(--q-dur-fast) var(--q-ease)',
-              }}
-            >
-              {chooseLabel}
-            </button>
-          </footer>
+            {/* Job #2 — Choose lives INSIDE the panel */}
+            {onChoose && (
+              <div style={{ padding: '12px 16px', borderTop: '1px solid var(--qa-glass-border)' }}>
+                <button
+                  onClick={onChoose}
+                  style={{
+                    width: '100%',
+                    fontFamily: 'var(--qa-font-display)',
+                    fontSize: 15,
+                    letterSpacing: '.5px',
+                    border: 'none',
+                    borderRadius: 'var(--qa-radius-sm)',
+                    padding: 12,
+                    background: 'linear-gradient(180deg,var(--qa-ember),var(--qa-ember-deep))',
+                    color: 'var(--qa-vellum-bright)',
+                    boxShadow: 'var(--qa-glow-ember)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {chooseLabel === 'Choose' ? `Choose ${data.name}` : chooseLabel}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       <style>{`
-        @keyframes q-slide-in { from { transform: translateX(16px); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
+        @keyframes qa-info-rise { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
         @media (prefers-reduced-motion: reduce) { [role="dialog"] { animation: none !important } }
       `}</style>
     </div>
   );
 }
 
-function Section({ title, open, onToggle, children }: { title: string; open: boolean; onToggle: () => void; children: ReactNode }) {
+/** A layer toggle — uppercase mono row with a chevron, top-bordered. */
+function Toggle({
+  label,
+  open,
+  onToggle,
+  active,
+}: {
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+  active: boolean;
+}) {
   return (
-    <div>
-      <button
-        onClick={onToggle}
-        className="flex w-full items-center justify-between"
-        aria-expanded={open}
-        style={{ fontSize: 'var(--q-text-sm)', fontWeight: 600, color: 'var(--q-ink-soft)', padding: 'var(--q-space-1) 0' }}
-      >
-        <span>{title}</span>
-        <span style={{ color: 'var(--q-ink-faint)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform var(--q-dur-fast)' }}>›</span>
-      </button>
-      {open && <div style={{ marginTop: 'var(--q-space-3)' }}>{children}</div>}
-    </div>
+    <button
+      onClick={onToggle}
+      aria-expanded={open}
+      style={{
+        margin: '0 16px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        background: 'none',
+        border: 'none',
+        borderTop: '1px solid var(--qa-glass-border)',
+        padding: '10px 0',
+        fontFamily: 'var(--qa-font-mono)',
+        fontSize: 10,
+        letterSpacing: 'var(--qa-track-label)',
+        textTransform: 'uppercase',
+        // an open section reads in full-strength ink, a closed one dims
+        color: active ? 'var(--qa-glass-text)' : 'var(--qa-glass-dim)',
+        cursor: 'pointer',
+      }}
+    >
+      {label} <span aria-hidden>{open ? '▾' : '▸'}</span>
+    </button>
   );
 }
 
 function HomebrewBadge() {
-  // "Custom content never looks second-class" — a quiet tint, not a warning.
+  // "Custom content never looks second-class" — a quiet gold tint, not a warning.
   return (
     <span
       style={{
-        fontSize: 'var(--q-text-xs)', fontWeight: 600, letterSpacing: '0.03em',
-        color: 'var(--q-secret)', background: 'color-mix(in srgb, var(--q-secret) 12%, transparent)',
-        padding: '2px 8px', borderRadius: '999px', textTransform: 'uppercase',
+        fontFamily: 'var(--qa-font-mono)',
+        fontSize: 8.5,
+        letterSpacing: 'var(--qa-track-label)',
+        textTransform: 'uppercase',
+        padding: '2px 7px',
+        borderRadius: 'var(--qa-radius-xs)',
+        color: 'var(--qa-gold)',
+        border: '1px solid color-mix(in srgb, var(--qa-gold) 50%, transparent)',
       }}
     >
       Homebrew
     </span>
+  );
+}
+
+/** The candle-breath skeleton while a lookup resolves. */
+function LoadingSkeleton() {
+  const bar = (w: string | number, h: number): CSSProperties => ({
+    width: w,
+    height: h,
+    borderRadius: 2,
+    background: 'var(--qa-vellum-ghost)',
+  });
+  return (
+    // qa- class so the base.css reduced-motion guard stops the breath
+    <div className="qa-info-loading" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, animation: 'qa-candle 3.2s infinite' }}>
+      <span style={bar(80, 8)} />
+      <span style={bar(150, 16)} />
+      <span style={bar('100%', 8)} />
+      <span style={bar('70%', 8)} />
+    </div>
+  );
+}
+
+function NotFound({ onClose }: { onClose: () => void }) {
+  return (
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{ fontFamily: 'var(--qa-font-display)', fontSize: 17, color: 'var(--qa-glass-text)' }}>
+        Nothing to show
+      </span>
+      <span style={{ fontSize: 12.5, fontStyle: 'italic', color: 'var(--qa-glass-dim)' }}>
+        We couldn't find that entry.{' '}
+        <button
+          onClick={onClose}
+          style={{ background: 'none', border: 'none', padding: 0, color: 'var(--qa-ember-bright)', cursor: 'pointer', font: 'inherit', fontStyle: 'italic' }}
+        >
+          Close this
+        </button>{' '}
+        and try the search.
+      </span>
+    </div>
   );
 }

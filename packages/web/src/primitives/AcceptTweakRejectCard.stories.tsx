@@ -1,12 +1,12 @@
 /**
- * AcceptTweakRejectCard stories — the universal AI card in each of its states:
- * streaming, a tweakable text draft, a rich (schema-shaped) draft, and the
- * non-AI fallback (ADR: AI always has a non-AI fallback).
+ * AcceptTweakRejectCard stories — the universal AI card in each of its states,
+ * restyled to the Questra V1 Prototype sheet: a tweakable text draft, a rich
+ * (schema-shaped) draft, streaming (no footer), and the non-AI fallback (a gold
+ * dot + the difficulty ladder).
  *
  * The creative-text story seeds its draft from a REAL contracts fixture
  * (Fireball's plain sentence), proving the card renders content that will, in
- * production, arrive from an AI schema derived from the same rules data — with
- * no backend.
+ * production, arrive from an AI schema derived from the same rules data.
  */
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
@@ -15,6 +15,7 @@ import { AcceptTweakRejectCard, type CardOutcome } from './AcceptTweakRejectCard
 
 import fireball from '@questra/contracts/src/fixtures/fireball.json';
 
+import '@questra/theme/styles.css';
 import '../theme/index.css';
 
 const meta: Meta<typeof AcceptTweakRejectCard> = {
@@ -25,20 +26,20 @@ export default meta;
 type Story = StoryObj<typeof AcceptTweakRejectCard>;
 
 function Frame({ children }: { children: React.ReactNode }) {
-  return <div style={{ maxWidth: 520, padding: 24, background: 'var(--q-bg)' }}>{children}</div>;
+  return <div style={{ maxWidth: 520, padding: 24, background: 'var(--qa-ink)' }}>{children}</div>;
 }
 
-/** A creative-text draft seeded from the Fireball fixture's plain line — tweakable and rejectable. */
+/** A creative-text draft seeded from the Fireball fixture's plain line — all three motions. */
 export const TextDraft: Story = {
   render: () => {
     const spell = RulesEntitySchema.parse(fireball);
-    const seed = `The air ignites — ${spell.plain.toLowerCase()} A ribbon of flame unspools from your fingertips.`;
+    const seed = `A bright streak flashes to a point, then blooms with a low roar — ${spell.plain.toLowerCase()}`;
     return (
       <Frame>
         <Resolvable>
           {(resolve, outcome) => (
             <AcceptTweakRejectCard
-              title="Read-aloud for Fireball"
+              title="Read-aloud"
               draft={seed}
               tweakSeed={seed}
               onAccept={() => resolve('accepted')}
@@ -53,22 +54,22 @@ export const TextDraft: Story = {
   },
 };
 
-/** A rich, schema-shaped draft (a ruling: check + DC + consequence). No inline tweak — accept or reject. */
+/** A rich, schema-shaped draft (a ruling: check + DC + consequence). No inline tweak. */
 export const RichDraft: Story = {
   render: () => (
     <Frame>
       <Resolvable>
         {(resolve, outcome) => (
           <AcceptTweakRejectCard
-            title="Ruling suggestion"
+            title="Ruling"
             draft={
               <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', margin: 0 }}>
-                <dt style={{ color: 'var(--q-ink-faint)' }}>Check</dt>
-                <dd style={{ margin: 0, color: 'var(--q-ink)' }}>Dexterity (Acrobatics)</dd>
-                <dt style={{ color: 'var(--q-ink-faint)' }}>DC</dt>
-                <dd style={{ margin: 0, color: 'var(--q-ink)', fontFamily: 'var(--q-font-mono)' }}>14</dd>
-                <dt style={{ color: 'var(--q-ink-faint)' }}>On a fail</dt>
-                <dd style={{ margin: 0, color: 'var(--q-ink)' }}>The rope slips; you fall prone at the chasm's edge.</dd>
+                <dt style={{ color: 'var(--qa-vellum-faint)' }}>Check</dt>
+                <dd style={{ margin: 0, color: 'var(--qa-vellum)' }}>Dexterity (Acrobatics)</dd>
+                <dt style={{ color: 'var(--qa-vellum-faint)' }}>DC</dt>
+                <dd style={{ margin: 0, color: 'var(--qa-vellum)', fontFamily: 'var(--qa-font-mono)' }}>14</dd>
+                <dt style={{ color: 'var(--qa-vellum-faint)' }}>On a fail</dt>
+                <dd style={{ margin: 0, color: 'var(--qa-vellum)' }}>The rope slips; you fall prone at the chasm's edge.</dd>
               </dl>
             }
             onAccept={() => resolve('accepted')}
@@ -81,14 +82,14 @@ export const RichDraft: Story = {
   ),
 };
 
-/** Streaming — the draft is still arriving; no action buttons until it settles. */
+/** Streaming — the draft is still arriving; no footer, the provenance dot pulses. */
 export const Streaming: Story = {
   render: () => (
     <Frame>
       <AcceptTweakRejectCard
-        title="Recap draft"
+        title="Recap"
         streaming
-        draft="Last session, the party descended into the sunless vault and"
+        draft="Last time, the party followed the paymaster's ledger into the almshouse cellars"
         onAccept={() => {}}
         onReject={() => {}}
       />
@@ -96,17 +97,41 @@ export const Streaming: Story = {
   ),
 };
 
-/** Fallback — the model failed or was skipped; the human still has a non-AI path. */
+/** Fallback — the model failed or was skipped; a gold dot, and the human still has a path. */
 export const Fallback: Story = {
   render: () => (
     <Frame>
       <AcceptTweakRejectCard
-        title="Ruling suggestion"
+        title="Set a difficulty"
         draft=""
         fallback={
-          <p style={{ margin: 0, color: 'var(--q-ink-soft)' }}>
-            Couldn't reach the assistant. Pick a difficulty from the ladder: <strong>Easy 10 · Medium 14 · Hard 18</strong>.
-          </p>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[
+              { label: 'EASY', dc: 10, on: false },
+              { label: 'MEDIUM', dc: 14, on: true },
+              { label: 'HARD', dc: 18, on: false },
+            ].map((r) => (
+              <span
+                key={r.label}
+                style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  padding: '10px 0',
+                  borderRadius: 'var(--qa-radius-sm)',
+                  border: r.on
+                    ? '1px solid color-mix(in srgb, var(--qa-ember) 55%, transparent)'
+                    : '1px solid var(--qa-hairline)',
+                  fontFamily: 'var(--qa-font-mono)',
+                  fontSize: 10,
+                  color: 'var(--qa-vellum-dim)',
+                }}
+              >
+                {r.label}
+                <br />
+                <span style={{ fontSize: 15, color: 'var(--qa-vellum)' }}>{r.dc}</span>
+              </span>
+            ))}
+          </div>
         }
         onAccept={() => {}}
         onReject={() => {}}
@@ -126,7 +151,7 @@ function Resolvable({
   const [done, setDone] = useState<{ outcome: CardOutcome; edited?: string } | null>(null);
   if (done) {
     return (
-      <p style={{ color: 'var(--q-ink-soft)', fontSize: 'var(--q-text-sm)' }}>
+      <p style={{ color: 'var(--qa-vellum-dim)', fontSize: 13 }}>
         Outcome logged: <strong>{done.outcome}</strong>
         {done.edited !== undefined && done.edited !== '' ? ` — "${done.edited}"` : ''}
       </p>
