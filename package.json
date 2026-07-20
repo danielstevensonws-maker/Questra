@@ -6,7 +6,7 @@
     "build:contracts": "npm run build -w @questra/contracts",
     "build:engine": "npm run build:contracts && npm run build -w @questra/engine",
     "check": "npm run check -w @questra/contracts",
-    "precheck:all": "npm run build:contracts && npm run build -w @questra/engine",
+    "precheck:all": "npm run build:contracts && npm run build -w @questra/theme && npm run build -w @questra/ui && npm run build -w @questra/engine && npm run build -w @questra/ai",
     "check:all": "npm run check -w @questra/contracts && npm run check -w @questra/theme && npm run check -w @questra/ui && npm run check -w @questra/engine && npm run check -w @questra/server && npm run check -w @questra/ai && npm run check -w @questra/web",
     "predev": "npm run build:contracts",
     "dev": "npm run dev -w @questra/web",
