@@ -237,9 +237,19 @@ export class SyncCore {
       return;
     }
 
-    const firstSeq = result.events[0]!.seq;
+    // Seq 0 is reserved for "empty log" on the wire (welcome snapshotSeq, reconnect
+    // lastSeq), so an event stamped seq 0 is dropped on replay. If a resolver's
+    // first event collides with the log tail (or with 0 on a fresh log), re-stamp
+    // the cascade contiguously from tail+1. A resolver that already seqs past the
+    // tail (e.g. the wire-golden trace) is left byte-for-byte untouched.
+    const tail = s.log.length > 0 ? s.log[s.log.length - 1]!.seq : 0;
+    const events = result.events[0]!.seq > tail
+      ? result.events
+      : result.events.map((e, i) => ({ ...e, seq: tail + 1 + i }));
+
+    const firstSeq = events[0]!.seq;
     s.idempotency.set(envelope.idempotencyKey, firstSeq);
-    for (const e of result.events) {
+    for (const e of events) {
       s.log.push(e);
       this.fanOut(s, e);
       if (e.body.t === 'reaction_prompted') this.armPrompt(sid, e.body.promptId);
@@ -247,7 +257,7 @@ export class SyncCore {
     // durable write-through (ADR-0015), serialized per session so rows land in
     // seq order; the in-memory mirror + fan-out already happened, so the socket
     // path is not blocked on the DB.
-    this.persist(s, sid, result.events, envelope.idempotencyKey, firstSeq);
+    this.persist(s, sid, events, envelope.idempotencyKey, firstSeq);
     conn.send({ m: 'intent_ack', idempotencyKey: envelope.idempotencyKey, accepted: true, firstSeq });
   }
 

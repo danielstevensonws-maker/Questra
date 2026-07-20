@@ -116,6 +116,8 @@ export class SyncClient {
   /** Send an intent envelope. The server validates, rules on legality, and emits.
    *  `intent` is validated by ClientMsgSchema in `send()`; a bad shape throws there. */
   sendIntent(idempotencyKey: string, intent: unknown): void {
+    // eslint-disable-next-line no-console
+    console.debug('[sync] sending intent', intent, 'socket=', this.ws?.readyState);
     // cast at the boundary: the schema parse in send() is the real gate.
     this.send({ m: 'intent', envelope: { idempotencyKey, intent } } as ClientMsg);
   }
@@ -165,6 +167,8 @@ export class SyncClient {
         return;
       }
       case 'event': {
+        // eslint-disable-next-line no-console
+        console.debug('[sync] event', msg.event.seq, msg.event.body.t);
         const log = [...this.state.log, msg.event];
         this.patch({
           log,
@@ -180,10 +184,19 @@ export class SyncClient {
         this.patch({ status, error: msg.code });
         return;
       }
-      // presence / acks / pong: not needed to render the slice's hub; ignore for now.
-      case 'presence':
       case 'intent_ack':
+        // eslint-disable-next-line no-console
+        console.debug('[sync] intent accepted', msg.idempotencyKey, '→ seq', msg.firstSeq);
+        return;
       case 'intent_rejected':
+        // a rejection is the server's greying string — surface it so a tap that does
+        // nothing has a visible reason instead of silence.
+        // eslint-disable-next-line no-console
+        console.warn('[sync] intent rejected:', msg.reason);
+        this.patch({ error: `rejected: ${msg.reason}` });
+        return;
+      // presence / pong: not needed to render the slice's hub; ignore for now.
+      case 'presence':
       case 'pong':
         return;
     }
