@@ -141,6 +141,24 @@ export const ActionsGreyed: Story = {
   ),
 };
 
+/**
+ * Economy spent — the Action dot goes hollow once used, and the Reaction row
+ * stays visible even with no live reaction tile (its dot still reads
+ * available). The empty economy tells the player it exists.
+ */
+export const ActionsSpent: Story = {
+  render: () => (
+    <Section width={344}>
+      <ActionBar
+        tiles={toActionTiles(sheet, torvald, state, 'npc-goblin-1', { activeTurnEnforced: true })}
+        onUse={(id) => console.log('use', id)}
+        onExplain={(id) => console.log('explain', id)}
+        spent={{ action: true }}
+      />
+    </Section>
+  ),
+};
+
 export const DeathSaves: Story = {
   render: () => {
     const [vm, setVm] = useState<DeathSaveVM>({ successes: 1, failures: 2, phase: 'dying' });
