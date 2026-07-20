@@ -12,7 +12,8 @@
     "dev": "tsx src/main.ts",
     "migrate": "node scripts/migrate.mjs",
     "migrate:up": "npm run migrate up",
-    "migrate:down": "npm run migrate down"
+    "migrate:down": "npm run migrate down",
+    "seed:slice": "node scripts/seed-slice.mjs"
   },
   "dependencies": {
     "@questra/contracts": "*",
