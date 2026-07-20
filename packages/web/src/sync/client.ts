@@ -53,40 +53,64 @@ export class SyncClient {
   private opts: SyncClientOptions;
   /** the server's snapshot base; events fold on top of it. */
   private base: ProjectionState = EMPTY_PROJECTION;
+  /** reconnect bookkeeping. */
+  private retries = 0;
+  private closedByUs = false;
+  /** set when the server rejects our token — a drop after this must NOT retry
+   *  (a bad/expired token won't fix itself). Survives the `close` status patch. */
+  private authFailed = false;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(opts: SyncClientOptions) {
     this.opts = opts;
   }
 
-  /** Open the socket and send `hello`. Idempotent-ish: call once per client. */
+  /** Open the socket and send `hello`. Call once; drops auto-reconnect after. */
   connect(): void {
+    this.closedByUs = false;
+    this.open();
+  }
+
+  /** Reconnect resuming from lastSeq (the server replays the gap). Public for tests. */
+  reconnect(): void {
+    this.open();
+  }
+
+  /**
+   * Open a socket and `hello`. A first connect sends no lastSeq (fresh snapshot);
+   * a reconnect sends lastSeq so the server replays only the gap. On an unexpected
+   * close it retries with backoff — UNLESS the drop was an auth failure (a bad or
+   * expired token won't fix itself) or we closed on purpose.
+   */
+  private open(): void {
     const WS = this.opts.WebSocketImpl ?? WebSocket;
     const ws = new WS(this.opts.url);
     this.ws = ws;
     this.patch({ status: 'connecting' });
 
     ws.addEventListener('open', () => {
-      this.send({ m: 'hello', playSessionId: this.opts.playSessionId, token: this.opts.token });
+      this.retries = 0;
+      const hello: ClientMsg = this.state.lastSeq > 0
+        ? { m: 'hello', playSessionId: this.opts.playSessionId, token: this.opts.token, lastSeq: this.state.lastSeq }
+        : { m: 'hello', playSessionId: this.opts.playSessionId, token: this.opts.token };
+      this.send(hello);
       this.patch({ status: 'open' });
     });
     ws.addEventListener('message', (ev: MessageEvent) => this.onMessage(ev));
-    ws.addEventListener('close', () => this.patch({ status: 'closed' }));
+    ws.addEventListener('close', () => {
+      // keep auth_failed visible on drop (don't mask the real reason with 'closed').
+      if (!this.authFailed) this.patch({ status: 'closed' });
+      this.scheduleReconnect();
+    });
     ws.addEventListener('error', () => this.patch({ status: 'error' }));
   }
 
-  /** Reconnect after a drop, resuming from lastSeq (the server replays the gap). */
-  reconnect(): void {
-    const WS = this.opts.WebSocketImpl ?? WebSocket;
-    const ws = new WS(this.opts.url);
-    this.ws = ws;
-    this.patch({ status: 'connecting' });
-    ws.addEventListener('open', () => {
-      this.send({ m: 'hello', playSessionId: this.opts.playSessionId, token: this.opts.token, lastSeq: this.state.lastSeq });
-      this.patch({ status: 'open' });
-    });
-    ws.addEventListener('message', (ev: MessageEvent) => this.onMessage(ev));
-    ws.addEventListener('close', () => this.patch({ status: 'closed' }));
-    ws.addEventListener('error', () => this.patch({ status: 'error' }));
+  /** Retry with capped exponential backoff, unless we closed on purpose or auth failed. */
+  private scheduleReconnect(): void {
+    if (this.closedByUs || this.authFailed) return;
+    const delay = Math.min(1000 * 2 ** this.retries, 10_000); // 1s → 2s → 4s → … → 10s cap
+    this.retries += 1;
+    this.reconnectTimer = setTimeout(() => this.open(), delay);
   }
 
   /** Send an intent envelope. The server validates, rules on legality, and emits.
@@ -97,6 +121,8 @@ export class SyncClient {
   }
 
   disconnect(): void {
+    this.closedByUs = true; // suppress the auto-reconnect on this close
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
     this.ws?.close();
     this.ws = null;
   }
@@ -149,7 +175,8 @@ export class SyncClient {
         return;
       }
       case 'error': {
-        const status: ConnStatus = msg.code === 'auth' || msg.code === 'not_member' ? 'auth_failed' : this.state.status;
+        if (msg.code === 'auth' || msg.code === 'not_member') this.authFailed = true;
+        const status: ConnStatus = this.authFailed ? 'auth_failed' : this.state.status;
         this.patch({ status, error: msg.code });
         return;
       }

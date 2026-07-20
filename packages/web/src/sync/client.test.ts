@@ -91,6 +91,32 @@ describe('SyncClient', () => {
     expect(getLast().status).toBe('auth_failed');
     expect(getLast().error).toBe('auth');
   });
+
+  it('does NOT auto-reconnect after an auth failure (a bad token will not fix itself)', () => {
+    vi.useFakeTimers();
+    const { client, fake, getLast } = setup();
+    fake.open();
+    fake.server({ m: 'error', code: 'auth' }); // token rejected
+    fake.close(); // socket drops
+    vi.advanceTimersByTime(30_000); // well past any backoff
+    // still auth_failed, and no new socket was opened (would flip to 'connecting')
+    expect(getLast().status).toBe('auth_failed');
+    client.disconnect();
+    vi.useRealTimers();
+  });
+
+  it('auto-reconnects after an unexpected close (resuming from lastSeq)', () => {
+    vi.useFakeTimers();
+    const { client, fake, getLast } = setup();
+    fake.open();
+    fake.server({ m: 'welcome', viewer: { role: 'player' }, snapshotSeq: 41, snapshot: SNAPSHOT() });
+    fake.close(); // unexpected drop
+    expect(getLast().status).toBe('closed');
+    vi.advanceTimersByTime(1000); // first backoff tick
+    expect(getLast().status).toBe('connecting'); // it tried again on its own
+    client.disconnect();
+    vi.useRealTimers();
+  });
 });
 
 describe('rollMadeToVM (ADR-0008 — dice reveal the server roll)', () => {

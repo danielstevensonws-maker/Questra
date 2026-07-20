@@ -122,11 +122,12 @@ export function PlayerView({
 /** A glass status panel shown until the projection has the player's combatant. */
 function ConnectingPanel({ status, error }: { status: string; error?: string | undefined }): ReactElement {
   const message =
-    error === 'auth' ? 'That sign-in link is not valid for this table.'
+    error === 'auth' ? 'This table link has expired or is not valid. Ask for a fresh link to rejoin.'
     : error === 'not_member' ? 'You are not seated at this table yet.'
     : status === 'connecting' ? 'Joining the table…'
     : status === 'open' ? 'Connected — waiting for the table…'
     : status === 'closed' ? 'The connection dropped. Reconnecting…'
+    : status === 'error' ? 'Trouble reaching the table. Retrying…'
     : 'Connecting…';
   return (
     <Panel style={{ width: 344, padding: '16px 18px' }}>
