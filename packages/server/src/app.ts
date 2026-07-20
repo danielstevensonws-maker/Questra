@@ -63,6 +63,10 @@ export function createApp(config: ServerConfig): App {
   const core = new SyncCore({
     resolveToken: makeResolveToken(repo, tokens),
     resolveIntent: makeSliceResolver(),
+    // seed the yard so a joining player's welcome snapshot has combatants to render
+    // (matches web/src/screens/sliceConfig — Torvald + one goblin). The log folds
+    // on top; a persisted session keeps its own state past the seed.
+    initialCombatants: () => sliceCombatants(),
     store: eventStore,
   });
 
@@ -85,6 +89,27 @@ export function createApp(config: ServerConfig): App {
   };
 }
 
+// -------------------------------------------------------------- slice content
+/**
+ * The yard's combatants — the projection a joining player's `welcome` snapshot
+ * folds from. Ids match web/src/screens/sliceConfig (pc-torvald + npc-goblin-1) so
+ * the client's hub finds its own creature and the map lines its tokens up.
+ */
+function sliceCombatants(): Combatant[] {
+  return [
+    {
+      id: 'pc-torvald', name: 'Torvald',
+      abilities: { str: 16, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
+      profBonus: 2, maxHp: 12, hp: 12, tempHp: 0, ac: 18, conditions: [], isPlayer: true,
+    },
+    {
+      id: 'npc-goblin-1', name: 'the goblin',
+      abilities: { str: 8, dex: 15, con: 10, int: 10, wis: 8, cha: 8 },
+      profBonus: 2, maxHp: 10, hp: 10, tempHp: 0, ac: 15, conditions: [], isPlayer: false,
+    },
+  ];
+}
+
 // -------------------------------------------------------------- slice resolver
 /**
  * The dev-env's intent resolver: the vertical-slice attack path (mirrors the
@@ -94,8 +119,9 @@ export function createApp(config: ServerConfig): App {
  */
 function makeSliceResolver(): IntentResolver {
   const rules: RulesData = buildRulesData(CONDITIONS.map((c) => RulesEntitySchema.parse(c)));
-  // a deterministic-enough rng for a dev server (not a golden; real rolls in play)
-  const rng = () => 0.5;
+  // Rng = (sides) => an integer face in [1, sides]. Real dice for the dev server;
+  // the golden tests script their own rng, so Math.random never touches a test.
+  const rng = (sides: number): number => Math.floor(Math.random() * sides) + 1;
   let n = 0;
   return (envelope, state) => {
     const intent = envelope.intent as { kind?: string; attackerId?: string; targetId?: string; actionName?: string };
@@ -112,7 +138,7 @@ function makeSliceResolver(): IntentResolver {
         actionName: intent.actionName ?? 'Attack', damageDice: '1d8 + 3', damageType: 'slashing',
         coverDegree: 'none',
       },
-      state, rules, () => rng(),
+      state, rules, rng,
       {
         seq: base,
         timestamps: [`t-${n}-a`, `t-${n}-b`, `t-${n}-c`],
