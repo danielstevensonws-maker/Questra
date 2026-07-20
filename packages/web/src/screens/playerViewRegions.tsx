@@ -1,14 +1,13 @@
 /**
- * Player View regions (design request §1 layout). Each is a stage-positioned glass
- * surface over the full-bleed map. Coordinates are absolute px on the 1728×1080
- * stage. All colour via --qa-* tokens (ghost theme). These are composed by
- * PlayerView; the data comes from live sync state.
+ * Player View chrome that has no existing primitive of its own: the scene header
+ * and the party rail (design request §1 regions). Everything else on the screen —
+ * identity, vitals, action bar, dice log — is the real PlayerHub primitive,
+ * composed by PlayerView (never reinvented here; CLAUDE.md: screens compose
+ * primitives). All colour via --qa-* tokens (ghost theme).
  */
-import type { CSSProperties, ReactElement, ReactNode } from 'react';
-import { Panel, HPBar, Avatar, Chip } from '@questra/ui';
+import type { CSSProperties, ReactElement } from 'react';
+import { Panel, HPBar, Avatar } from '@questra/ui';
 import { Region } from './Stage.js';
-import type { VitalsVM, ActionTileVM } from '../primitives/sheetToPlayerHub.js';
-import type { DiceLogEntry } from '../primitives/DiceLog.js';
 
 const mono: CSSProperties = { fontFamily: 'var(--qa-font-mono)' };
 const serif: CSSProperties = { fontFamily: 'var(--qa-font-body)' };
@@ -22,8 +21,8 @@ export interface SceneVM {
   title: string;
   subtitle?: string;
   round: number;
-  turnName?: string;   // whose turn ("Wren's turn")
-  timer?: string;      // "01:42:20"
+  turnName?: string;
+  timer?: string;
 }
 
 export function SceneHeader({ scene }: { scene: SceneVM }): ReactElement {
@@ -31,7 +30,7 @@ export function SceneHeader({ scene }: { scene: SceneVM }): ReactElement {
     <Region style={{ top: 14, left: '50%', transform: 'translateX(-50%)' }} aria-label="scene">
       <Panel style={{ padding: '8px 22px', flexDirection: 'row', alignItems: 'center', gap: 22 }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ ...serif, fontFamily: 'var(--qa-font-display)', fontSize: 'var(--qa-text-lg)', color: 'var(--qa-glass-text)', lineHeight: 1.1 }}>
+          <div style={{ fontFamily: 'var(--qa-font-display)', fontSize: 'var(--qa-text-lg)', color: 'var(--qa-glass-text)', lineHeight: 1.1 }}>
             {scene.title}
           </div>
           {scene.subtitle && <div style={label}>{scene.subtitle}</div>}
@@ -53,7 +52,7 @@ export function SceneHeader({ scene }: { scene: SceneVM }): ReactElement {
 export interface PartyMemberVM {
   id: string;
   name: string;
-  klass: string;   // "Fighter · Lv 3"
+  klass: string;
   hp: number;
   maxHp: number;
   classColor?: string;
@@ -62,11 +61,11 @@ export interface PartyMemberVM {
 
 export function PartyRail({ members }: { members: PartyMemberVM[] }): ReactElement {
   return (
-    <Region style={{ top: 72, left: 20, width: 232 }} aria-label="party">
-      <Panel label={`PARTY · ${members.length}`} collapsible style={{ gap: 0 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <Region style={{ top: 72, left: 20, width: 236 }} aria-label="party">
+      <Panel label={`PARTY · ${members.length}`} collapsible>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {members.map((m) => (
-            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
+            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Avatar initial={m.name.charAt(0)} shape="square" size={34} {...(m.classColor ? { color: m.classColor } : {})} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -84,149 +83,22 @@ export function PartyRail({ members }: { members: PartyMemberVM[] }): ReactEleme
   );
 }
 
-// ---------------------------------------------------------------- identity + vitals
-export function IdentityVitals({
-  identity, vitals,
-}: {
-  identity: { name: string; level: number; className?: string; classColor?: string };
-  vitals: VitalsVM;
-}): ReactElement {
+// ---------------------------------------------------------------- terrain
+/** An inline SVG ground for the yard so the map isn't a black grid (a generated
+ *  terrain image fills this ref in the real app via the Session Planner, Brief 09a). */
+export function yardTerrain(): string {
   return (
-    <Region style={{ bottom: 20, left: 20, width: 300 }} aria-label="identity">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <Panel style={{ padding: '10px 13px', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Avatar initial={identity.name.charAt(0)} shape="square" size={44} {...(identity.classColor ? { color: identity.classColor } : {})} />
-          <div>
-            <div style={{ ...serif, fontFamily: 'var(--qa-font-display)', fontSize: 'var(--qa-text-xl)', color: 'var(--qa-glass-text)', lineHeight: 1.05 }}>
-              {identity.name}
-            </div>
-            <div style={label}>{identity.className ? `${identity.className} · ` : ''}Level {identity.level}</div>
-          </div>
-        </Panel>
-        <Panel label="VITALS" style={{ gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ ...label }}>HP</span>
-            <div style={{ flex: 1 }}><HPBar value={vitals.hp.current} max={vitals.hp.max} height={7} /></div>
-            <span style={{ ...mono, fontSize: 13, color: 'var(--qa-glass-text)' }}>{vitals.hp.current} / {vitals.hp.max}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Chip outline>AC {vitals.ac.value}</Chip>
-            {vitals.bloodied && <Chip tone="danger">Bloodied</Chip>}
-            {vitals.conditions.map((c) => <Chip key={c.id} tone="steel">{c.name}</Chip>)}
-          </div>
-        </Panel>
-      </div>
-    </Region>
-  );
-}
-
-// ---------------------------------------------------------------- action bar
-export function ActionBarRegion({
-  tiles, targetName, moveLeft, yourTurn, onUse,
-}: {
-  tiles: ActionTileVM[];
-  targetName?: string;
-  moveLeft?: string;
-  yourTurn: boolean;
-  onUse: (id: string) => void;
-}): ReactElement {
-  const rows: Array<'action' | 'bonus' | 'reaction'> = ['action', 'bonus', 'reaction'];
-  return (
-    <Region style={{ bottom: 20, left: '50%', transform: 'translateX(-50%)', width: 760 }} aria-label="actions">
-      <Panel style={{ gap: 10 }}>
-        {/* top strip: turn badge · target · move */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
-          <Chip tone={yourTurn ? 'accent' : 'default'}>{yourTurn ? 'YOUR TURN' : 'WAITING…'}</Chip>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={label}>Target</span>
-            <Chip tone="accent">{targetName ?? '—'}</Chip>
-          </div>
-          <span style={{ ...label }}>{moveLeft ?? ''}</span>
-        </div>
-        {/* the three economy rows */}
-        {rows.map((row) => {
-          const rowTiles = tiles.filter((t) => t.economy === row);
-          return (
-            <div key={row} style={{ display: 'flex', alignItems: 'stretch', gap: 10 }}>
-              <span style={{ ...label, width: 66, alignSelf: 'center' }}>{row}</span>
-              <div style={{ display: 'flex', gap: 10, flex: 1 }}>
-                {rowTiles.length === 0
-                  ? <span style={{ ...serif, fontSize: 12, fontStyle: 'italic', color: 'var(--qa-glass-dim)', alignSelf: 'center' }}>Nothing here this turn.</span>
-                  : rowTiles.map((t) => <ActionTile key={t.id} tile={t} onUse={onUse} />)}
-              </div>
-            </div>
-          );
-        })}
-      </Panel>
-    </Region>
-  );
-}
-
-function ActionTile({ tile, onUse }: { tile: ActionTileVM; onUse: (id: string) => void }): ReactElement {
-  const greyed = tile.greyReason !== null;
-  return (
-    <button
-      type="button"
-      disabled={greyed}
-      onClick={() => onUse(tile.id)}
-      title={tile.greyReason ?? tile.name}
-      style={{
-        flex: 1, textAlign: 'left', cursor: greyed ? 'default' : 'pointer',
-        opacity: greyed ? 0.5 : 1, padding: '8px 11px', borderRadius: 'var(--qa-radius-sm)',
-        background: 'var(--qa-glass-chip)', border: '1px solid var(--qa-glass-border)',
-        color: 'var(--qa-glass-text)',
-      }}
-    >
-      <div style={{ ...serif, fontSize: 'var(--qa-text-sm)', marginBottom: 3 }}>{tile.name}</div>
-      <div style={{ display: 'flex', gap: 8, ...mono, fontSize: 10, color: 'var(--qa-glass-dim)' }}>
-        {tile.toHit !== undefined && <span>+{tile.toHit}</span>}
-        {tile.damage && <span>{tile.damage} {tile.damageType}</span>}
-        {tile.resourceTag && <span>{tile.resourceTag}</span>}
-      </div>
-    </button>
-  );
-}
-
-// ---------------------------------------------------------------- log + chat
-export function LogChat({ entries, children }: { entries: DiceLogEntry[]; children?: ReactNode }): ReactElement {
-  return (
-    <Region style={{ bottom: 20, right: 20, width: 344, height: 520 }} aria-label="log">
-      <Panel label="TABLE · DICE LOG" collapsible style={{ height: '100%' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 10 }}>
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {entries.length === 0
-              ? <span style={{ ...serif, fontSize: 12, fontStyle: 'italic', color: 'var(--qa-glass-dim)' }}>Rolls and story will gather here once the session starts.</span>
-              : entries.map((e) => <LogEntry key={e.id} entry={e} />)}
-          </div>
-          {children}
-        </div>
-      </Panel>
-    </Region>
-  );
-}
-
-function LogEntry({ entry }: { entry: DiceLogEntry }): ReactElement {
-  if (entry.tone === 'roll') {
-    return (
-      <div style={{ borderLeft: '2px solid var(--qa-ember)', paddingLeft: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <span style={{ ...serif, fontSize: 'var(--qa-text-sm)', color: 'var(--qa-glass-text)' }}>{entry.text}</span>
-          {entry.total !== undefined && <span style={{ ...mono, fontSize: 16, color: 'var(--qa-ember)' }}>{entry.total}</span>}
-        </div>
-        {entry.breakdown && entry.breakdown.length > 0 && (
-          <div style={{ ...mono, fontSize: 10, color: 'var(--qa-glass-dim)', marginTop: 2 }}>
-            {entry.breakdown.map((b, i) => (
-              <span key={i}>{i > 0 ? ' · ' : ''}{b.label} {b.value >= 0 ? '+' : ''}{b.value}</span>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-  // narration — the storytelling voice (IM Fell / display serif)
-  return (
-    <div style={{ ...serif, fontFamily: 'var(--qa-font-display)', fontSize: 'var(--qa-text-sm)', color: 'var(--qa-glass-text)', fontStyle: 'italic', lineHeight: 1.35 }}>
-      {entry.text}
-    </div>
+    'data:image/svg+xml;utf8,' +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="672">` +
+      `<defs><radialGradient id="g" cx="42%" cy="34%">` +
+      `<stop offset="0%" stop-color="#4a3f27"/><stop offset="55%" stop-color="#2b2214"/>` +
+      `<stop offset="100%" stop-color="#15100a"/></radialGradient></defs>` +
+      `<rect width="960" height="672" fill="url(#g)"/>` +
+      `<path d="M0 430 Q460 340 960 470" stroke="#5c4c2e" stroke-width="46" fill="none" opacity="0.55"/>` +
+      `<path d="M120 0 Q220 300 90 672" stroke="#3c3016" stroke-width="30" fill="none" opacity="0.4"/>` +
+      `<circle cx="700" cy="230" r="120" fill="#2f2717" opacity="0.35"/>` +
+      `</svg>`,
+    )
   );
 }

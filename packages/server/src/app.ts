@@ -96,12 +96,16 @@ export function createApp(config: ServerConfig): App {
  * the client's hub finds its own creature and the map lines its tokens up.
  */
 function sliceCombatants(): Combatant[] {
+  const pc = (id: string, name: string, hp: number, maxHp: number, ac: number): Combatant => ({
+    id, name, abilities: { str: 16, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
+    profBonus: 2, maxHp, hp, tempHp: 0, ac, conditions: [], isPlayer: true,
+  });
   return [
-    {
-      id: 'pc-torvald', name: 'Torvald',
-      abilities: { str: 16, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
-      profBonus: 2, maxHp: 12, hp: 12, tempHp: 0, ac: 18, conditions: [], isPlayer: true,
-    },
+    // the party (matches web/src/screens/sliceConfig's rail) — the slice's PC is Torvald
+    pc('pc-torvald', 'Torvald', 12, 12, 18),
+    pc('pc-wren', 'Wren', 22, 27, 14),
+    pc('pc-mira', 'Mira', 18, 24, 16),
+    pc('pc-ozren', 'Ozren', 9, 20, 12),
     {
       id: 'npc-goblin-1', name: 'the goblin',
       abilities: { str: 8, dex: 15, con: 10, int: 10, wis: 8, cha: 8 },

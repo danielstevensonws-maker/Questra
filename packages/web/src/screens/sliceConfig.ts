@@ -25,10 +25,13 @@ export const SLICE_SCENE = {
   subtitle: 'Outskirts · Dusk',
 };
 
-/** The party rail. The slice seeds only Torvald server-side; HP overlays from live
- *  projection, so members without a live combatant simply read empty until seeded. */
+/** The party rail (matches the server-seeded party in app.ts sliceCombatants).
+ *  HP overlays from live projection; you are Torvald. */
 export const SLICE_PARTY = [
   { id: 'pc-torvald', name: 'Torvald', klass: 'Fighter · Lv 3', classColor: 'var(--qa-class-fighter)' },
+  { id: 'pc-wren', name: 'Wren', klass: 'Rogue · Lv 3', classColor: 'var(--qa-class-rogue)' },
+  { id: 'pc-mira', name: 'Mira', klass: 'Cleric · Lv 3', classColor: 'var(--qa-class-cleric)' },
+  { id: 'pc-ozren', name: 'Ozren', klass: 'Wizard · Lv 3', classColor: 'var(--qa-class-wizard)' },
 ];
 
 export const SLICE_ROOM: Room = {
@@ -40,6 +43,9 @@ export const SLICE_ROOM: Room = {
   assets: [],
   tokens: [
     { id: 't-torvald', creatureRef: 'pc-torvald', cell: { x: 3, y: 3 }, size: 'medium', hidden: false, staged: false },
-    { id: 't-goblin', creatureRef: 'npc-goblin-1', cell: { x: 5, y: 2 }, size: 'small', hidden: false, staged: false },
+    { id: 't-wren', creatureRef: 'pc-wren', cell: { x: 4, y: 3 }, size: 'small', hidden: false, staged: false },
+    { id: 't-mira', creatureRef: 'pc-mira', cell: { x: 3, y: 4 }, size: 'medium', hidden: false, staged: false },
+    { id: 't-ozren', creatureRef: 'pc-ozren', cell: { x: 2, y: 4 }, size: 'medium', hidden: false, staged: false },
+    { id: 't-goblin', creatureRef: 'npc-goblin-1', cell: { x: 6, y: 2 }, size: 'small', hidden: false, staged: false },
   ],
 };
