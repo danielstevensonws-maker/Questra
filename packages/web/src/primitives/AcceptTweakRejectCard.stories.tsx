@@ -21,12 +21,17 @@ import '../theme/index.css';
 const meta: Meta<typeof AcceptTweakRejectCard> = {
   title: 'Primitives/AcceptTweakRejectCard',
   component: AcceptTweakRejectCard,
+  // full-bleed the story so the card sits on the sheet's flat deep ground and
+  // the Storybook body background never bleeds a warm gradient around it
+  parameters: { layout: 'fullscreen' },
 };
 export default meta;
 type Story = StoryObj<typeof AcceptTweakRejectCard>;
 
 function Frame({ children }: { children: React.ReactNode }) {
-  return <div style={{ maxWidth: 520, padding: 24, background: 'var(--qa-ink)' }}>{children}</div>;
+  return (
+    <div style={{ minHeight: '100vh', padding: 32, background: 'var(--qa-ink-deep)' }}>{children}</div>
+  );
 }
 
 /** A creative-text draft seeded from the Fireball fixture's plain line — all three motions. */
