@@ -1,0 +1,28 @@
+/**
+ * The web app's stylesheet entry.
+ *
+ * The design tokens live in @questra/theme and are transcribed from Claude
+ * Design (ADR-0014). This file imports them and adds only what is genuinely
+ * app-level: the slide-in keyframes primitives share.
+ *
+ * Do NOT redefine a --qa-* value here. Changing the design means re-syncing
+ * @questra/theme, never patching it downstream.
+ */
+
+@import '@questra/theme/styles.css';
+@import 'tailwindcss';
+
+/* Shared motion. Primitives reference these by name so the choreography stays
+   consistent; the durations and easing come from the token set. */
+@keyframes q-slide-in {
+  from { transform: translateX(2rem); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes q-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Reduced motion is handled globally in @questra/theme's styles.css, which
+   neutralises animation and transition durations for everything. */

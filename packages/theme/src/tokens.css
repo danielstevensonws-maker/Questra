@@ -1,0 +1,47 @@
+/**
+ * ============================================================================
+ *  QUESTRA DESIGN TOKENS — THE SOURCE OF TRUTH FOR THE LOOK
+ * ============================================================================
+ *
+ *  ADR-0014: Claude Design authors the look; this file is its transcription.
+ *  The values below are the FINAL Claude Design token set, transcribed
+ *  verbatim. Do not reconcile them against older documented values — where an
+ *  earlier draft disagrees (ease curve, hud-inset, danger colour), THIS FILE
+ *  WINS. Changing the design means re-syncing this file from the Design
+ *  project, never hand-editing a value here to match something else.
+ *
+ *  RULES
+ *   - Variable NAMES are stable. Components read `--qa-*`; renaming one is a
+ *     breaking change across every primitive.
+ *   - Components never hardcode a colour, size, font, or duration. If a value
+ *     is missing, raise it — do not invent a token.
+ *
+ *  THEME SWITCHING
+ *   Base tokens live on [data-qa-theme] and are theme-independent. Per-theme
+ *   values live on [data-qa-theme="<name>"]. v1 ships GHOST ONLY; slate and
+ *   ivory drop in later as pure value additions with zero component edits.
+ *   That is the whole point of the pattern — every primitive must read through
+ *   it, never hardcode ghost.
+ */
+
+[data-qa-theme]{
+  --qa-accent:#C05B41; --qa-accent-ink:#FBEEE6;
+  --qa-accent-soft:rgba(192,91,65,.22); --qa-accent-line:rgba(192,91,65,.55);
+  --qa-danger:#C8453A;
+  --qa-success:#6F9463;
+  --qa-gold:#C79A47;
+  --qa-map-hi:#2A2115; --qa-map-mid:#1B1610; --qa-map-lo:#12100A;
+  --qa-font-display:'IM Fell English',serif;
+  --qa-font-body:'EB Garamond',serif;
+  --qa-font-mono:'IBM Plex Mono',monospace;
+  --qa-s1:4px; --qa-s4:16px; --qa-s8:64px; --qa-hud-inset:24px;
+  --qa-radius:6px; --qa-radius-lg:10px; --qa-hairline:1px;
+  --qa-dur:220ms; --qa-dice-settle:840ms;
+  --qa-ease:cubic-bezier(.2,.7,.2,1);
+}
+[data-qa-theme="ghost"]{
+  --qa-glass:rgba(19,16,9,.55); --qa-glass-solid:rgba(28,24,15,.94);
+  --qa-glass-border:rgba(230,220,196,.14); --qa-glass-blur:14px;
+  --qa-chip:rgba(230,220,196,.08);
+  --qa-ink:#E6DCC4; --qa-ink-dim:rgba(230,220,196,.62); --qa-ink-faint:rgba(230,220,196,.34);
+}

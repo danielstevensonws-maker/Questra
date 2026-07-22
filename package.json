@@ -1,19 +1,19 @@
 {
   "name": "questra",
   "private": true,
-  "_workspaces_todo": "M0: narrowed to packages/contracts only because an empty, env-locked packages/web dir crashed `npm install` (dir with no package.json → null-name). RESTORE to [\"packages/*\"] at the start of 0.2 once packages/web is deleted — owner prefers packages/* so no future package silently drops out of check:all.",
-  "workspaces": ["packages/contracts"],
+  "workspaces": ["packages/*"],
+  "_scripts_note": "check:all covers the packages that EXIST. As each later package lands (engine, server, ai), the session that creates it adds its check here — nothing may silently drop out of the gate.",
   "scripts": {
     "build:contracts": "npm run build -w @questra/contracts",
-    "build:engine": "npm run build:contracts && npm run build -w @questra/engine",
     "check": "npm run check -w @questra/contracts",
-    "precheck:all": "npm run build:contracts && npm run build -w @questra/theme && npm run build -w @questra/ui && npm run build -w @questra/engine && npm run build -w @questra/ai",
-    "check:all": "npm run check -w @questra/contracts && npm run check -w @questra/theme && npm run check -w @questra/ui && npm run check -w @questra/engine && npm run check -w @questra/server && npm run check -w @questra/ai && npm run check -w @questra/web",
+    "precheck:all": "npm run build:contracts && npm run build -w @questra/ui",
+    "check:all": "npm run check -w @questra/contracts && npm run check -w @questra/theme && npm run check -w @questra/ui && npm run check -w @questra/web",
     "predev": "npm run build:contracts",
     "dev": "npm run dev -w @questra/web",
     "prestorybook": "npm run build:contracts",
     "storybook": "npm run storybook -w @questra/web",
-    "prebuild": "npm run build:engine",
+    "build-storybook": "npm run build:contracts && npm run build-storybook -w @questra/web",
+    "prebuild": "npm run build:contracts",
     "build": "npm run build -w @questra/web"
   }
 }
