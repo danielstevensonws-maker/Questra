@@ -1,0 +1,2 @@
+# ADR-0001 — Server-authoritative, event-sourced Engine
+Accepted. All play-state mutations happen server-side as append-only events (contracts event union). Clients send intents, receive filtered events; projections are folds. Bought: undo, replay, recap generation, sync recovery, dice trust, one truth. Rejected: client-authoritative or CRDT state (secrecy + rules authority incompatible). Prep surfaces are ordinary CRUD (no gold-plating).
