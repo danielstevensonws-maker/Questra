@@ -1,2 +1,0 @@
-# ADR-0013 — Briefs written ahead of build must be revalidated at milestone start
-Accepted. All 13 briefs exist up front (owner decision, overriding just-in-time cadence). Mitigation: the first task of every milestone is a revalidation pass of its brief against current contracts and fixtures; contract PRs the brief anticipated are re-confirmed, drifted assumptions amended in the brief before any feature code.

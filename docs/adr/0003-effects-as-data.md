@@ -1,2 +1,0 @@
-# ADR-0003 — Effects as data; no rules if-statements outside the dataset
-Accepted. All mechanical effects encode as the effect-hook vocabulary; the pipeline applies hooks without knowing rule names. The hook union defines routine (resolvable) vs novel (escalate to Ruling) vs engine_native (exhaustively listed exceptions like Extra Attack). Rejected: per-rule branching (combinatorial bug farm, homebrew-hostile).

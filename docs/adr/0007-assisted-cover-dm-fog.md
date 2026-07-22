@@ -1,2 +1,0 @@
-# ADR-0007 — v1: assisted-manual cover; DM-revealed fog; no computed LOS
-Accepted. Cover = one-tap declared degree with engine suggestions from blocking assets; fog = DM-painted cell mask; light = area tags. Interfaces are shaped so v2 geometric auto-cover and wall-aware LOS slot in behind them without UI rebuilds. Rationale: the DM is the engine until automation earns it; LOS is the deepest VTT engineering pit.

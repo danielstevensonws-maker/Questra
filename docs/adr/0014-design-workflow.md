@@ -1,2 +1,0 @@
-# ADR-0014 — Claude Design authors the look; Claude Code authors the code
-Accepted. Claude Design produces the visual direction, key-surface mockups, and the token set (color/type/spacing) which is transcribed into the repo theme. Claude Code implements all production UI inside the repo against contracts and primitives, matching the mockups. Design prototype code is never merged. Conflicts between mockup and brief structure: structure wins, raise the conflict. Design prototypes may be shared via Vercel import for playtesting.
