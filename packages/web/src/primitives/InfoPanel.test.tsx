@@ -9,7 +9,8 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { RulesEntitySchema } from '@questra/contracts';
-import { InfoPanel } from './InfoPanel.js';
+import { useState } from 'react';
+import { InfoPanel, ExplainButton } from './InfoPanel.js';
 import { entityToInfoPanel, kindLabel } from './entityToInfoPanel.js';
 
 import prone from '@questra/contracts/src/fixtures/prone.json';
@@ -131,6 +132,49 @@ describe('InfoPanel — the two entry paths', () => {
   it('read mode without showChoose is pure reference — no footer', () => {
     render(<InfoPanel data={proneVm} open onClose={() => {}} openMode="read" showChoose={false} />);
     expect(screen.queryByRole('button', { name: /Choose|Prepare/ })).toBeNull();
+  });
+});
+
+describe('ExplainButton — the Path 1 ? affordance', () => {
+  it('is a labelled button that fires onClick', () => {
+    const onClick = vi.fn();
+    render(<ExplainButton label="Explain Armor Class" onClick={onClick} />);
+    const btn = screen.getByRole('button', { name: 'Explain Armor Class' });
+    fireEvent.click(btn);
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it('opens the panel in explain mode end-to-end — click ? → derivation shown', () => {
+    function Harnessed() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <ExplainButton label="Explain Armor Class" onClick={() => setOpen(true)} />
+          <InfoPanel
+            data={{
+              name: 'Armor Class',
+              kind: 'Defense',
+              summary: 'How hard you are to hit.',
+              derivation: [{ label: 'Chain mail', value: '16' }],
+            }}
+            open={open}
+            onClose={() => setOpen(false)}
+            openMode="explain"
+          />
+        </>
+      );
+    }
+    render(<Harnessed />);
+
+    // Closed to start — no dialog.
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    // Tap the ? — the panel opens, leading with the derivation expanded.
+    fireEvent.click(screen.getByRole('button', { name: 'Explain Armor Class' }));
+    expect(screen.getByRole('dialog')).toBeDefined();
+    const l2 = screen.getByRole('button', { name: /Where the numbers come from/ });
+    expect(l2.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('16')).toBeDefined();
   });
 });
 

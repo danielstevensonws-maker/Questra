@@ -206,16 +206,36 @@ export const Path2_ReadThenPick: Story = {
 };
 
 /**
- * The ? affordance itself (Path 1 trigger). Hover / focus / press it to see its
- * states — it must read as "more here" without competing with the number.
+ * The ? affordance as it actually works (Path 1, end to end). The `?` sits on a
+ * number; clicking it opens the panel in "explain" mode, leading with the
+ * derivation for that number. Hover / focus / press the `?` to see its states,
+ * then click to open. This is the real Player-View interaction: tap the ? on a
+ * number, get "where this number comes from".
  */
+const AC_DATA: InfoPanelData = {
+  name: 'Armor Class',
+  kind: 'Defense',
+  summary: 'How hard you are to hit — an attack roll must meet or beat it to land.',
+  derivation: [
+    { label: 'Chain mail', value: '16', parts: 'base AC · no DEX added' },
+    { label: 'Shield', value: '+2' },
+    { label: 'Armor Class', value: '18' },
+  ],
+  rulesText: "Heavy armor like chain mail sets a fixed base and ignores your Dexterity. A shield adds 2 while it's on your arm.",
+};
+
 export const ExplainAffordance: Story = {
-  render: () => (
-    <Ground>
-      <div style={{ position: 'absolute', top: 40, left: 40, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-        <span style={{ fontFamily: 'var(--qa-font-mono)', fontSize: 28, color: 'var(--qa-ink)', lineHeight: 1 }}>18</span>
-        <ExplainButton label="Explain Armor Class" onClick={() => {}} />
-      </div>
-    </Ground>
-  ),
+  render: function ExplainAffordanceStory() {
+    const [open, setOpen] = useState(false);
+    return (
+      <Ground>
+        {/* A number on the HUD, with its ? — tap it to explain the value. */}
+        <div style={{ position: 'absolute', top: 40, left: 40, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+          <span style={{ fontFamily: 'var(--qa-font-mono)', fontSize: 28, color: 'var(--qa-ink)', lineHeight: 1 }}>18</span>
+          <ExplainButton label="Explain Armor Class" onClick={() => setOpen(true)} />
+        </div>
+        <InfoPanel data={AC_DATA} open={open} onClose={() => setOpen(false)} openMode="explain" />
+      </Ground>
+    );
+  },
 };
