@@ -43,10 +43,13 @@
   --qa-gold-soft:rgba(199,154,71,.20);
   --qa-map-hi:#2A2115; --qa-map-mid:#1B1610; --qa-map-lo:#12100A;
   --qa-map-grid:rgba(230,220,196,.05);
-  --qa-font-display:'IM Fell English',serif; /* the story */
-  --qa-font-body:'EB Garamond',serif;        /* prose     */
+  --qa-font-display:'IM Fell English',Georgia,serif; /* the story */
+  --qa-font-body:'EB Garamond',Georgia,serif;        /* prose     */
   --qa-font-mono:'IBM Plex Mono',ui-monospace,monospace;  /* data */
   --qa-tracking-caps:.16em;
+  /* type scale (px): whisper caps → the story heading */
+  --qa-text-whisper:10px; --qa-text-label:12px; --qa-text-body:16px;
+  --qa-text-lg:20px; --qa-text-title:28px; --qa-text-display:40px;
   --qa-s1:4px; --qa-s2:8px; --qa-s3:12px; --qa-s4:16px; --qa-s5:24px; --qa-s6:32px;
   --qa-s7:48px; --qa-s8:64px; --qa-hud-inset:24px;
   --qa-radius-sm:3px; --qa-radius:6px; --qa-radius-lg:10px; --qa-radius-round:999px;

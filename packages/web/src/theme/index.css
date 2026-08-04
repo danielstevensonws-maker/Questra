@@ -13,13 +13,14 @@
 @import 'tailwindcss';
 
 /* Shared motion. Primitives reference these by name so the choreography stays
-   consistent; the durations and easing come from the token set. */
-@keyframes q-slide-in {
-  from { transform: translateX(2rem); opacity: 0; }
+   consistent; the durations and easing come from the token set.
+   Names match the Claude Design handoff (qa-panel-in / qa-scrim-in). */
+@keyframes qa-panel-in {
+  from { transform: translateX(28px); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
 }
 
-@keyframes q-fade-in {
+@keyframes qa-scrim-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }

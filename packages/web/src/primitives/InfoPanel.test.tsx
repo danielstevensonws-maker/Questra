@@ -1,8 +1,10 @@
 /**
- * InfoPanel + its contracts adapter.
+ * InfoPanel + its contracts adapter, rebuilt to the Claude Design handoff.
  *
- * The adapter tests parse REAL fixtures through RulesEntitySchema, so they
- * fail if the panel's view of an entity ever drifts from the spine.
+ * The adapter tests parse REAL fixtures through RulesEntitySchema, so they fail
+ * if the panel's view of an entity ever drifts from the spine. The panel tests
+ * cover the one interaction rule: the two entry paths differ ONLY in the
+ * default-expanded layer and whether the Choose footer shows.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
@@ -44,9 +46,9 @@ describe('entityToInfoPanel — the contracts seam', () => {
   });
 });
 
-describe('InfoPanel — the three layers', () => {
-  const proneVm = entityToInfoPanel(RulesEntitySchema.parse(prone));
+const proneVm = entityToInfoPanel(RulesEntitySchema.parse(prone));
 
+describe('InfoPanel — the three layers', () => {
   it('layer 1 is always visible', () => {
     render(<InfoPanel data={proneVm} open onClose={() => {}} />);
     expect(screen.getByText(/You're on the ground/)).toBeDefined();
@@ -70,37 +72,65 @@ describe('InfoPanel — the three layers', () => {
     expect(screen.queryByRole('button', { name: /Where the numbers come from/ })).toBeNull();
   });
 
-  it('renders derivation lines with their breakdown parts', () => {
+  it('renders a derivation line with its label, mono value, and parts', () => {
     render(
       <InfoPanel
         data={{
           ...proneVm,
-          derivation: [{ label: 'Hit points', value: 12, parts: ['10 hit die (max)', '2 CON mod'] }],
+          derivation: [{ label: 'Save DC', value: '15', parts: '8 + 4 INT mod + 3 prof' }],
         }}
         open
         onClose={() => {}}
-        defaultExpanded={{ derivation: true }}
+        openMode="explain"
       />,
     );
-    expect(screen.getByText('Hit points')).toBeDefined();
-    expect(screen.getByText('12')).toBeDefined();
-    expect(screen.getByText('10 hit die (max) + 2 CON mod')).toBeDefined();
+    // "explain" leads with L2, so it starts expanded.
+    expect(screen.getByText('Save DC')).toBeDefined();
+    expect(screen.getByText('15')).toBeDefined();
+    expect(screen.getByText('8 + 4 INT mod + 3 prof')).toBeDefined();
   });
 });
 
-describe('InfoPanel — selecting', () => {
-  const vm = entityToInfoPanel(RulesEntitySchema.parse(fireball));
+describe('InfoPanel — the two entry paths', () => {
+  const withDerivation = {
+    ...proneVm,
+    derivation: [{ label: 'Armor Class', value: '18' }],
+  };
 
-  it('hides the footer entirely without onChoose (pure reference)', () => {
-    render(<InfoPanel data={vm} open onClose={() => {}} />);
+  it('"explain" leads with L2 expanded (Path 1 — the ? on a number)', () => {
+    render(<InfoPanel data={withDerivation} open onClose={() => {}} openMode="explain" />);
+    const l2 = screen.getByRole('button', { name: /Where the numbers come from/ });
+    expect(l2.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('18')).toBeDefined();
+  });
+
+  it('"read" leads with L2 collapsed (Path 2 — the entity card)', () => {
+    render(<InfoPanel data={withDerivation} open onClose={() => {}} openMode="read" />);
+    const l2 = screen.getByRole('button', { name: /Where the numbers come from/ });
+    expect(l2.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText('18')).toBeNull();
+  });
+
+  it('the Choose footer is ABSENT in explain mode even when showChoose is true', () => {
+    render(
+      <InfoPanel data={withDerivation} open onClose={() => {}} openMode="explain" showChoose onChoose={() => {}} />,
+    );
     expect(screen.queryByRole('button', { name: 'Choose' })).toBeNull();
   });
 
-  it('offers Choose inside the panel when the caller can select', () => {
+  it('the Choose footer shows in read mode with showChoose', () => {
     const onChoose = vi.fn();
-    render(<InfoPanel data={vm} open onClose={() => {}} onChoose={onChoose} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Choose' }));
+    render(
+      <InfoPanel data={proneVm} open onClose={() => {}} openMode="read" showChoose onChoose={onChoose} chooseLabel="Prepare Fireball" />,
+    );
+    const choose = screen.getByRole('button', { name: 'Prepare Fireball' });
+    fireEvent.click(choose);
     expect(onChoose).toHaveBeenCalledOnce();
+  });
+
+  it('read mode without showChoose is pure reference — no footer', () => {
+    render(<InfoPanel data={proneVm} open onClose={() => {}} openMode="read" showChoose={false} />);
+    expect(screen.queryByRole('button', { name: /Choose|Prepare/ })).toBeNull();
   });
 });
 
@@ -108,7 +138,7 @@ describe('InfoPanel — homebrew is never second-class', () => {
   it('renders the identical panel plus a quiet badge', () => {
     render(
       <InfoPanel
-        data={{ name: 'Spellblade', kind: 'Class', summary: 'A duelist.', homebrew: true }}
+        data={{ name: 'Spellblade', kind: 'Class — Average complexity', summary: 'A duelist.', homebrew: true }}
         open
         onClose={() => {}}
       />,
@@ -130,13 +160,22 @@ describe('InfoPanel — dialog behaviour', () => {
     render(<InfoPanel data={{ name: 'Prone', kind: 'Condition', summary: 'On the ground.' }} open onClose={() => {}} />);
     const dialog = screen.getByRole('dialog');
     expect(dialog.getAttribute('aria-modal')).toBe('true');
-    expect(dialog.getAttribute('aria-labelledby')).toBeTruthy();
+    expect(dialog.getAttribute('aria-label')).toBe('Prone');
   });
 
   it('closes on Escape', () => {
     const onClose = vi.fn();
     render(<InfoPanel data={{ name: 'X', kind: 'Y', summary: 'Z' }} open onClose={onClose} />);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('closes on scrim click', () => {
+    const onClose = vi.fn();
+    const { container } = render(<InfoPanel data={{ name: 'X', kind: 'Y', summary: 'Z' }} open onClose={onClose} />);
+    const scrim = container.querySelector('.qa-infopanel-scrim');
+    expect(scrim).not.toBeNull();
+    fireEvent.click(scrim!);
     expect(onClose).toHaveBeenCalledOnce();
   });
 });

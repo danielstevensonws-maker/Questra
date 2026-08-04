@@ -102,10 +102,19 @@ describe('base tokens — theme-independent', () => {
   });
 
   it('the three typefaces — prose is a serif, data is mono', () => {
-    expect(base('--qa-font-display')).toBe("'IM Fell English',serif");
-    expect(base('--qa-font-body')).toBe("'EB Garamond',serif");
+    expect(base('--qa-font-display')).toBe("'IM Fell English',Georgia,serif");
+    expect(base('--qa-font-body')).toBe("'EB Garamond',Georgia,serif");
     expect(base('--qa-font-mono')).toBe("'IBM Plex Mono',ui-monospace,monospace");
     expect(base('--qa-tracking-caps')).toBe('.16em');
+  });
+
+  it('the type scale — whisper caps up to the display heading', () => {
+    expect(base('--qa-text-whisper')).toBe('10px');
+    expect(base('--qa-text-label')).toBe('12px');
+    expect(base('--qa-text-body')).toBe('16px');
+    expect(base('--qa-text-lg')).toBe('20px');
+    expect(base('--qa-text-title')).toBe('28px');
+    expect(base('--qa-text-display')).toBe('40px');
   });
 
   it('the spacing scale is complete — no gaps for a component to guess at', () => {

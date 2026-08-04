@@ -14,13 +14,17 @@
  */
 import type { RulesEntity } from '@questra/contracts';
 
-/** One line of "where the numbers come from". */
+/**
+ * One line of "where the numbers come from" (info-layer 2).
+ * Shape matches the Claude Design handoff: `value` and `parts` are both
+ * pre-formatted strings the caller composes — rendered in mono, it's data.
+ */
 export interface DerivationLine {
   label: string;
-  /** Rendered in mono — it's data, not prose. */
-  value: string | number;
-  /** Optional breakdown, e.g. `10 hit die (max)` + `2 CON mod`. */
-  parts?: readonly string[];
+  /** The headline value, in mono — e.g. `8d6 fire`, `15`, `+5 to hit`. */
+  value: string;
+  /** Optional one-line breakdown under the value, e.g. `8 + 4 INT mod + 3 prof`. */
+  parts?: string;
 }
 
 /** The thin shape InfoPanel renders. Anything can produce one. */
