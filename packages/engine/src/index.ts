@@ -8,14 +8,40 @@
  * d20 pipeline arrive in M2 (Brief 02).
  */
 export * from './ingest/conditions.js';
+export * from './ingest/spells.js';
+export * from './ingest/monsters.js';
+export * from './ingest/classes.js';
+export * from './ingest/namedEntities.js';
+export * from './ingest/items.js';
+export * from './ingest/tables.js';
 export * from './ingest/pipeline.js';
 export * from './data/conditions.js';
 export * from './data/slice.js';
+export * from './data/spells.js';
+export * from './data/monsters.js';
+export * from './data/classes.js';
+export * from './data/named.js';
+export * from './data/items.js';
+export * from './data/tables.js';
 export * from './data/loader.js';
 
 import { CONDITIONS } from './data/conditions.js';
-import { SLICE_ENTITIES } from './data/slice.js';
+import { GOBLIN_WARRIOR, FIREBALL } from './data/slice.js';
+import { CLASSES } from './data/classes.js';
+import { draftSpells } from './data/spells.js';
+import { draftMonsters } from './data/monsters.js';
+import { draftNamed } from './data/named.js';
+import { draftItems } from './data/items.js';
 import type { RulesEntity } from '@questra/contracts';
 
-/** The full M1.1 verified dataset: 15 conditions + the 3 slice entities. */
-export const DATASET: RulesEntity[] = [...CONDITIONS, ...SLICE_ENTITIES];
+/**
+ * The verified dataset: 15 conditions + the slice monster/spell + the 12 full
+ * classes. (The Fighter comes from the full class dataset — the fixture's 1–5
+ * excerpt is superseded, so it is not added separately here.) Safe in real sessions.
+ */
+export const VERIFIED_DATASET: RulesEntity[] = [...CONDITIONS, GOBLIN_WARRIOR, FIREBALL, ...CLASSES];
+
+/** The full dataset including drafts (verified core + draft spells/monsters/species/backgrounds/feats/items). Drafts are dev-only via the loader. */
+export function fullDataset(): RulesEntity[] {
+  return [...VERIFIED_DATASET, ...draftSpells(), ...draftMonsters(), ...draftNamed(), ...draftItems()];
+}

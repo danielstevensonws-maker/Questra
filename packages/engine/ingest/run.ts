@@ -17,7 +17,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ingestConditions } from '../src/ingest/pipeline.js';
+import { ingestConditions, ingestSpells, ingestMonsters, ingestClasses, ingestNamed, ingestItems, ingestTables } from '../src/ingest/pipeline.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = here + '../../../';
@@ -37,7 +37,47 @@ if (!existsSync(rawPath) || process.argv.includes('--reextract')) {
 }
 
 const raw = readFileSync(rawPath, 'utf8');
-const drafts = ingestConditions(raw);
-const out = extractedDir + 'condition-drafts.json';
-writeFileSync(out, JSON.stringify(drafts, null, 2) + '\n');
-console.log(`Wrote ${drafts.length} condition draft(s) → ${out}`);
+
+// Condition draft skeletons (review artifact for the QA pass).
+const condDrafts = ingestConditions(raw);
+const condOut = extractedDir + 'condition-drafts.json';
+writeFileSync(condOut, JSON.stringify(condDrafts, null, 2) + '\n');
+console.log(`Wrote ${condDrafts.length} condition draft(s) → ${condOut}`);
+
+// Spell draft entities → committed data the dataset imports (no runtime fs).
+const dataDir = here + '../src/data/';
+const spellDrafts = ingestSpells(raw);
+const spellOut = dataDir + 'spells.draft.json';
+writeFileSync(spellOut, JSON.stringify(spellDrafts, null, 2) + '\n');
+console.log(`Wrote ${spellDrafts.length} spell draft(s) → ${spellOut}`);
+
+// Monster draft entities.
+const monsterDrafts = ingestMonsters(raw);
+const monsterOut = dataDir + 'monsters.draft.json';
+writeFileSync(monsterOut, JSON.stringify(monsterDrafts, null, 2) + '\n');
+console.log(`Wrote ${monsterDrafts.length} monster draft(s) → ${monsterOut}`);
+
+// Class level tables → committed data the verified class dataset combines with core traits.
+const classTables = ingestClasses(raw);
+const classOut = dataDir + 'classes.levels.json';
+const levelsById = Object.fromEntries(classTables.map((c) => [c.classId, c.levels]));
+writeFileSync(classOut, JSON.stringify(levelsById, null, 2) + '\n');
+console.log(`Wrote ${classTables.length} class level table(s) → ${classOut}`);
+
+// Species / backgrounds / feats draft entities (loose meta).
+const namedDrafts = ingestNamed(raw);
+const namedOut = dataDir + 'named.draft.json';
+writeFileSync(namedOut, JSON.stringify(namedDrafts, null, 2) + '\n');
+console.log(`Wrote ${namedDrafts.length} named draft(s) (species/background/feat) → ${namedOut}`);
+
+// Item draft entities (weapons/armor/gear with prices).
+const itemDrafts = ingestItems(raw);
+const itemOut = dataDir + 'items.draft.json';
+writeFileSync(itemOut, JSON.stringify(itemDrafts, null, 2) + '\n');
+console.log(`Wrote ${itemDrafts.length} item draft(s) → ${itemOut}`);
+
+// Reference tables (XP advancement + encounter XP budget) — not entities.
+const tables = ingestTables(raw);
+const tablesOut = dataDir + 'tables.json';
+writeFileSync(tablesOut, JSON.stringify(tables, null, 2) + '\n');
+console.log(`Wrote reference tables (advancement ${tables.advancement.length}, budget ${tables.encounterBudget.length}) → ${tablesOut}`);

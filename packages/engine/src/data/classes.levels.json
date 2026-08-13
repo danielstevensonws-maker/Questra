@@ -1,0 +1,1512 @@
+{
+  "class.barbarian": {
+    "1": {
+      "profBonus": 2,
+      "features": [
+        "feature.barbarian.rage",
+        "feature.barbarian.unarmored-defense",
+        "feature.barbarian.weapon-mastery"
+      ]
+    },
+    "2": {
+      "profBonus": 2,
+      "features": [
+        "feature.barbarian.danger-sense",
+        "feature.barbarian.reckless-attack"
+      ]
+    },
+    "3": {
+      "profBonus": 2,
+      "features": [
+        "choice.barbarian.subclass",
+        "feature.barbarian.primal-knowledge"
+      ]
+    },
+    "4": {
+      "profBonus": 2,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "5": {
+      "profBonus": 3,
+      "features": [
+        "feature.barbarian.extra-attack",
+        "feature.barbarian.fast-movement"
+      ]
+    },
+    "6": {
+      "profBonus": 3,
+      "features": [
+        "feature.barbarian.subclass-feature"
+      ]
+    },
+    "7": {
+      "profBonus": 3,
+      "features": [
+        "feature.barbarian.feral-instinct",
+        "feature.barbarian.instinctive-pounce"
+      ]
+    },
+    "8": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "9": {
+      "profBonus": 4,
+      "features": [
+        "feature.barbarian.brutal-strike"
+      ]
+    },
+    "10": {
+      "profBonus": 4,
+      "features": [
+        "feature.barbarian.subclass-feature"
+      ]
+    },
+    "11": {
+      "profBonus": 4,
+      "features": [
+        "feature.barbarian.relentless-rage"
+      ]
+    },
+    "12": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "13": {
+      "profBonus": 5,
+      "features": [
+        "feature.barbarian.improved-brutal-strike"
+      ]
+    },
+    "14": {
+      "profBonus": 5,
+      "features": [
+        "feature.barbarian.subclass-feature"
+      ]
+    },
+    "15": {
+      "profBonus": 5,
+      "features": [
+        "feature.barbarian.persistent-rage"
+      ]
+    },
+    "16": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "17": {
+      "profBonus": 6,
+      "features": [
+        "feature.barbarian.improved-brutal-strike"
+      ]
+    },
+    "18": {
+      "profBonus": 6,
+      "features": [
+        "feature.barbarian.indomitable-might"
+      ]
+    },
+    "19": {
+      "profBonus": 6,
+      "features": [
+        "feature.barbarian.epic-boon"
+      ]
+    },
+    "20": {
+      "profBonus": 6,
+      "features": [
+        "feature.barbarian.primal-champion"
+      ]
+    }
+  },
+  "class.bard": {
+    "1": {
+      "profBonus": 2,
+      "features": [
+        "feature.bard.bardic-inspiration",
+        "feature.bard.spellcasting"
+      ]
+    },
+    "2": {
+      "profBonus": 2,
+      "features": [
+        "feature.bard.expertise",
+        "feature.bard.jack-of-all-trades"
+      ]
+    },
+    "3": {
+      "profBonus": 2,
+      "features": [
+        "choice.bard.subclass"
+      ]
+    },
+    "4": {
+      "profBonus": 2,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "5": {
+      "profBonus": 3,
+      "features": [
+        "feature.bard.font-of-inspiration"
+      ]
+    },
+    "6": {
+      "profBonus": 3,
+      "features": [
+        "feature.bard.subclass-feature"
+      ]
+    },
+    "7": {
+      "profBonus": 3,
+      "features": [
+        "feature.bard.countercharm"
+      ]
+    },
+    "8": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "9": {
+      "profBonus": 4,
+      "features": [
+        "feature.bard.expertise"
+      ]
+    },
+    "10": {
+      "profBonus": 4,
+      "features": [
+        "feature.bard.magical-secrets"
+      ]
+    },
+    "11": {
+      "profBonus": 4,
+      "features": [
+        "feature.bard.spell-progression"
+      ]
+    },
+    "12": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "13": {
+      "profBonus": 5,
+      "features": [
+        "feature.bard.spell-progression"
+      ]
+    },
+    "14": {
+      "profBonus": 5,
+      "features": [
+        "feature.bard.subclass-feature"
+      ]
+    },
+    "15": {
+      "profBonus": 5,
+      "features": [
+        "feature.bard.spell-progression"
+      ]
+    },
+    "16": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "17": {
+      "profBonus": 6,
+      "features": [
+        "feature.bard.spell-progression"
+      ]
+    },
+    "18": {
+      "profBonus": 6,
+      "features": [
+        "feature.bard.superior-inspiration"
+      ]
+    },
+    "19": {
+      "profBonus": 6,
+      "features": [
+        "feature.bard.epic-boon"
+      ]
+    },
+    "20": {
+      "profBonus": 6,
+      "features": [
+        "feature.bard.words-of-creation"
+      ]
+    }
+  },
+  "class.cleric": {
+    "1": {
+      "profBonus": 2,
+      "features": [
+        "feature.cleric.spellcasting",
+        "feature.cleric.divine-order"
+      ]
+    },
+    "2": {
+      "profBonus": 2,
+      "features": [
+        "feature.cleric.channel-divinity"
+      ]
+    },
+    "3": {
+      "profBonus": 2,
+      "features": [
+        "choice.cleric.subclass"
+      ]
+    },
+    "4": {
+      "profBonus": 2,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "5": {
+      "profBonus": 3,
+      "features": [
+        "feature.cleric.sear-undead"
+      ]
+    },
+    "6": {
+      "profBonus": 3,
+      "features": [
+        "feature.cleric.subclass-feature"
+      ]
+    },
+    "7": {
+      "profBonus": 3,
+      "features": [
+        "feature.cleric.blessed-strikes"
+      ]
+    },
+    "8": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "9": {
+      "profBonus": 4,
+      "features": [
+        "feature.cleric.spell-progression"
+      ]
+    },
+    "10": {
+      "profBonus": 4,
+      "features": [
+        "feature.cleric.divine-intervention"
+      ]
+    },
+    "11": {
+      "profBonus": 4,
+      "features": [
+        "feature.cleric.spell-progression"
+      ]
+    },
+    "12": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "13": {
+      "profBonus": 5,
+      "features": [
+        "feature.cleric.spell-progression"
+      ]
+    },
+    "14": {
+      "profBonus": 5,
+      "features": [
+        "feature.cleric.improved-blessed-strikes"
+      ]
+    },
+    "15": {
+      "profBonus": 5,
+      "features": [
+        "feature.cleric.spell-progression"
+      ]
+    },
+    "16": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "17": {
+      "profBonus": 6,
+      "features": [
+        "feature.cleric.subclass-feature"
+      ]
+    },
+    "18": {
+      "profBonus": 6,
+      "features": [
+        "feature.cleric.spell-progression"
+      ]
+    },
+    "19": {
+      "profBonus": 6,
+      "features": [
+        "feature.cleric.epic-boon"
+      ]
+    },
+    "20": {
+      "profBonus": 6,
+      "features": [
+        "feature.cleric.greater-divine-intervention"
+      ]
+    }
+  },
+  "class.druid": {
+    "1": {
+      "profBonus": 2,
+      "features": [
+        "feature.druid.spellcasting",
+        "feature.druid.druidic",
+        "feature.druid.primal-order"
+      ]
+    },
+    "2": {
+      "profBonus": 2,
+      "features": [
+        "feature.druid.wild-shape",
+        "feature.druid.wild-companion"
+      ]
+    },
+    "3": {
+      "profBonus": 2,
+      "features": [
+        "choice.druid.subclass"
+      ]
+    },
+    "4": {
+      "profBonus": 2,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "5": {
+      "profBonus": 3,
+      "features": [
+        "feature.druid.wild-resurgence"
+      ]
+    },
+    "6": {
+      "profBonus": 3,
+      "features": [
+        "feature.druid.subclass-feature"
+      ]
+    },
+    "7": {
+      "profBonus": 3,
+      "features": [
+        "feature.druid.elemental-fury"
+      ]
+    },
+    "8": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "9": {
+      "profBonus": 4,
+      "features": [
+        "feature.druid.spell-progression"
+      ]
+    },
+    "10": {
+      "profBonus": 4,
+      "features": [
+        "feature.druid.subclass-feature"
+      ]
+    },
+    "11": {
+      "profBonus": 4,
+      "features": [
+        "feature.druid.spell-progression"
+      ]
+    },
+    "12": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "13": {
+      "profBonus": 5,
+      "features": [
+        "feature.druid.spell-progression"
+      ]
+    },
+    "14": {
+      "profBonus": 5,
+      "features": [
+        "feature.druid.subclass-feature"
+      ]
+    },
+    "15": {
+      "profBonus": 5,
+      "features": [
+        "feature.druid.improved-elemental-fury"
+      ]
+    },
+    "16": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "17": {
+      "profBonus": 6,
+      "features": [
+        "feature.druid.spell-progression"
+      ]
+    },
+    "18": {
+      "profBonus": 6,
+      "features": [
+        "feature.druid.beast-spells"
+      ]
+    },
+    "19": {
+      "profBonus": 6,
+      "features": [
+        "feature.druid.epic-boon"
+      ]
+    },
+    "20": {
+      "profBonus": 6,
+      "features": [
+        "feature.druid.archdruid"
+      ]
+    }
+  },
+  "class.fighter": {
+    "1": {
+      "profBonus": 2,
+      "features": [
+        "feature.fighter.fighting-style",
+        "feature.fighter.second-wind",
+        "feature.fighter.weapon-mastery"
+      ]
+    },
+    "2": {
+      "profBonus": 2,
+      "features": [
+        "feature.fighter.action-surge",
+        "feature.fighter.tactical-mind"
+      ]
+    },
+    "3": {
+      "profBonus": 2,
+      "features": [
+        "choice.fighter.subclass"
+      ]
+    },
+    "4": {
+      "profBonus": 2,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "5": {
+      "profBonus": 3,
+      "features": [
+        "feature.fighter.extra-attack",
+        "feature.fighter.tactical-shift"
+      ]
+    },
+    "6": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "7": {
+      "profBonus": 3,
+      "features": [
+        "feature.fighter.subclass-feature"
+      ]
+    },
+    "8": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "9": {
+      "profBonus": 4,
+      "features": [
+        "feature.fighter.indomitable",
+        "feature.fighter.tactical-master"
+      ]
+    },
+    "10": {
+      "profBonus": 4,
+      "features": [
+        "feature.fighter.subclass-feature"
+      ]
+    },
+    "11": {
+      "profBonus": 4,
+      "features": [
+        "feature.fighter.two-extra-attacks"
+      ]
+    },
+    "12": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "13": {
+      "profBonus": 5,
+      "features": [
+        "feature.fighter.indomitable",
+        "feature.fighter.studied-attacks"
+      ]
+    },
+    "14": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "15": {
+      "profBonus": 5,
+      "features": [
+        "feature.fighter.subclass-feature"
+      ]
+    },
+    "16": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "17": {
+      "profBonus": 6,
+      "features": [
+        "feature.fighter.action-surge",
+        "feature.fighter.indomitable"
+      ]
+    },
+    "18": {
+      "profBonus": 6,
+      "features": [
+        "feature.fighter.subclass-feature"
+      ]
+    },
+    "19": {
+      "profBonus": 6,
+      "features": [
+        "feature.fighter.epic-boon"
+      ]
+    },
+    "20": {
+      "profBonus": 6,
+      "features": [
+        "feature.fighter.three-extra-attacks"
+      ]
+    }
+  },
+  "class.monk": {
+    "1": {
+      "profBonus": 2,
+      "features": [
+        "feature.monk.martial-arts",
+        "feature.monk.unarmored-defense"
+      ]
+    },
+    "2": {
+      "profBonus": 2,
+      "features": [
+        "feature.monk.monk-s-focus",
+        "feature.monk.unarmored-movement",
+        "feature.monk.uncanny-metabolism"
+      ]
+    },
+    "3": {
+      "profBonus": 2,
+      "features": [
+        "feature.monk.deflect-attacks",
+        "choice.monk.subclass"
+      ]
+    },
+    "4": {
+      "profBonus": 2,
+      "features": [
+        "choice.asi-or-feat",
+        "feature.monk.slow-fall"
+      ]
+    },
+    "5": {
+      "profBonus": 3,
+      "features": [
+        "feature.monk.extra-attack",
+        "feature.monk.stunning-strike"
+      ]
+    },
+    "6": {
+      "profBonus": 3,
+      "features": [
+        "feature.monk.empowered-strikes",
+        "feature.monk.subclass-feature"
+      ]
+    },
+    "7": {
+      "profBonus": 3,
+      "features": [
+        "feature.monk.evasion"
+      ]
+    },
+    "8": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "9": {
+      "profBonus": 4,
+      "features": [
+        "feature.monk.acrobatic-movement"
+      ]
+    },
+    "10": {
+      "profBonus": 4,
+      "features": [
+        "feature.monk.heightened-focus",
+        "feature.monk.self-restoration"
+      ]
+    },
+    "11": {
+      "profBonus": 4,
+      "features": [
+        "feature.monk.subclass-feature"
+      ]
+    },
+    "12": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "13": {
+      "profBonus": 5,
+      "features": [
+        "feature.monk.deflect-energy"
+      ]
+    },
+    "14": {
+      "profBonus": 5,
+      "features": [
+        "feature.monk.disciplined-survivor"
+      ]
+    },
+    "15": {
+      "profBonus": 5,
+      "features": [
+        "feature.monk.perfect-focus"
+      ]
+    },
+    "16": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "17": {
+      "profBonus": 6,
+      "features": [
+        "feature.monk.subclass-feature"
+      ]
+    },
+    "18": {
+      "profBonus": 6,
+      "features": [
+        "feature.monk.superior-defense"
+      ]
+    },
+    "19": {
+      "profBonus": 6,
+      "features": [
+        "feature.monk.epic-boon"
+      ]
+    },
+    "20": {
+      "profBonus": 6,
+      "features": [
+        "feature.monk.body-and-mind"
+      ]
+    }
+  },
+  "class.paladin": {
+    "1": {
+      "profBonus": 2,
+      "features": [
+        "feature.paladin.lay-on-hands",
+        "feature.paladin.spellcasting",
+        "feature.paladin.weapon-mastery"
+      ]
+    },
+    "2": {
+      "profBonus": 2,
+      "features": [
+        "feature.paladin.fighting-style",
+        "feature.paladin.paladin-s-smite"
+      ]
+    },
+    "3": {
+      "profBonus": 2,
+      "features": [
+        "feature.paladin.channel-divinity",
+        "choice.paladin.subclass"
+      ]
+    },
+    "4": {
+      "profBonus": 2,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "5": {
+      "profBonus": 3,
+      "features": [
+        "feature.paladin.extra-attack",
+        "feature.paladin.faithful-steed"
+      ]
+    },
+    "6": {
+      "profBonus": 3,
+      "features": [
+        "feature.paladin.aura-of-protection"
+      ]
+    },
+    "7": {
+      "profBonus": 3,
+      "features": [
+        "feature.paladin.subclass-feature"
+      ]
+    },
+    "8": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "9": {
+      "profBonus": 4,
+      "features": [
+        "feature.paladin.abjure-foes"
+      ]
+    },
+    "10": {
+      "profBonus": 4,
+      "features": [
+        "feature.paladin.aura-of-courage"
+      ]
+    },
+    "11": {
+      "profBonus": 4,
+      "features": [
+        "feature.paladin.radiant-strikes"
+      ]
+    },
+    "12": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "13": {
+      "profBonus": 5,
+      "features": [
+        "feature.paladin.spell-progression"
+      ]
+    },
+    "14": {
+      "profBonus": 5,
+      "features": [
+        "feature.paladin.restoring-touch"
+      ]
+    },
+    "15": {
+      "profBonus": 5,
+      "features": [
+        "feature.paladin.subclass-feature"
+      ]
+    },
+    "16": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "17": {
+      "profBonus": 6,
+      "features": [
+        "feature.paladin.spell-progression"
+      ]
+    },
+    "18": {
+      "profBonus": 6,
+      "features": [
+        "feature.paladin.aura-expansion"
+      ]
+    },
+    "19": {
+      "profBonus": 6,
+      "features": [
+        "feature.paladin.epic-boon"
+      ]
+    },
+    "20": {
+      "profBonus": 6,
+      "features": [
+        "feature.paladin.subclass-feature"
+      ]
+    }
+  },
+  "class.ranger": {
+    "1": {
+      "profBonus": 2,
+      "features": [
+        "feature.ranger.spellcasting",
+        "feature.ranger.favored-enemy",
+        "feature.ranger.weapon-mastery"
+      ]
+    },
+    "2": {
+      "profBonus": 2,
+      "features": [
+        "feature.ranger.deft-explorer",
+        "feature.ranger.fighting-style"
+      ]
+    },
+    "3": {
+      "profBonus": 2,
+      "features": [
+        "choice.ranger.subclass"
+      ]
+    },
+    "4": {
+      "profBonus": 2,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "5": {
+      "profBonus": 3,
+      "features": [
+        "feature.ranger.extra-attack"
+      ]
+    },
+    "6": {
+      "profBonus": 3,
+      "features": [
+        "feature.ranger.roving"
+      ]
+    },
+    "7": {
+      "profBonus": 3,
+      "features": [
+        "feature.ranger.subclass-feature"
+      ]
+    },
+    "8": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "9": {
+      "profBonus": 4,
+      "features": [
+        "feature.ranger.expertise"
+      ]
+    },
+    "10": {
+      "profBonus": 4,
+      "features": [
+        "feature.ranger.tireless"
+      ]
+    },
+    "11": {
+      "profBonus": 4,
+      "features": [
+        "feature.ranger.subclass-feature"
+      ]
+    },
+    "12": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "13": {
+      "profBonus": 5,
+      "features": [
+        "feature.ranger.relentless-hunter"
+      ]
+    },
+    "14": {
+      "profBonus": 5,
+      "features": [
+        "feature.ranger.nature-s-veil"
+      ]
+    },
+    "15": {
+      "profBonus": 5,
+      "features": [
+        "feature.ranger.subclass-feature"
+      ]
+    },
+    "16": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "17": {
+      "profBonus": 6,
+      "features": [
+        "feature.ranger.precise-hunter"
+      ]
+    },
+    "18": {
+      "profBonus": 6,
+      "features": [
+        "feature.ranger.feral-senses"
+      ]
+    },
+    "19": {
+      "profBonus": 6,
+      "features": [
+        "feature.ranger.epic-boon"
+      ]
+    },
+    "20": {
+      "profBonus": 6,
+      "features": [
+        "feature.ranger.foe-slayer"
+      ]
+    }
+  },
+  "class.rogue": {
+    "1": {
+      "profBonus": 2,
+      "features": [
+        "feature.rogue.expertise",
+        "feature.rogue.sneak-attack",
+        "feature.rogue.thieves-cant",
+        "feature.rogue.weapon-mastery"
+      ]
+    },
+    "2": {
+      "profBonus": 2,
+      "features": [
+        "feature.rogue.cunning-action"
+      ]
+    },
+    "3": {
+      "profBonus": 2,
+      "features": [
+        "choice.rogue.subclass",
+        "feature.rogue.steady-aim"
+      ]
+    },
+    "4": {
+      "profBonus": 2,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "5": {
+      "profBonus": 3,
+      "features": [
+        "feature.rogue.cunning-strike",
+        "feature.rogue.uncanny-dodge"
+      ]
+    },
+    "6": {
+      "profBonus": 3,
+      "features": [
+        "feature.rogue.expertise"
+      ]
+    },
+    "7": {
+      "profBonus": 3,
+      "features": [
+        "feature.rogue.evasion",
+        "feature.rogue.reliable-talent"
+      ]
+    },
+    "8": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "9": {
+      "profBonus": 4,
+      "features": [
+        "feature.rogue.subclass-feature"
+      ]
+    },
+    "10": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "11": {
+      "profBonus": 4,
+      "features": [
+        "feature.rogue.improved-cunning-strike"
+      ]
+    },
+    "12": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "13": {
+      "profBonus": 5,
+      "features": [
+        "feature.rogue.subclass-feature"
+      ]
+    },
+    "14": {
+      "profBonus": 5,
+      "features": [
+        "feature.rogue.devious-strikes"
+      ]
+    },
+    "15": {
+      "profBonus": 5,
+      "features": [
+        "feature.rogue.slippery-mind"
+      ]
+    },
+    "16": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "17": {
+      "profBonus": 6,
+      "features": [
+        "feature.rogue.subclass-feature"
+      ]
+    },
+    "18": {
+      "profBonus": 6,
+      "features": [
+        "feature.rogue.elusive"
+      ]
+    },
+    "19": {
+      "profBonus": 6,
+      "features": [
+        "feature.rogue.epic-boon"
+      ]
+    },
+    "20": {
+      "profBonus": 6,
+      "features": [
+        "feature.rogue.stroke-of-luck"
+      ]
+    }
+  },
+  "class.sorcerer": {
+    "1": {
+      "profBonus": 2,
+      "features": [
+        "feature.sorcerer.spellcasting",
+        "feature.sorcerer.innate-sorcery"
+      ]
+    },
+    "2": {
+      "profBonus": 2,
+      "features": [
+        "feature.sorcerer.font-of-magic",
+        "feature.sorcerer.metamagic"
+      ]
+    },
+    "3": {
+      "profBonus": 2,
+      "features": [
+        "choice.sorcerer.subclass"
+      ]
+    },
+    "4": {
+      "profBonus": 2,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "5": {
+      "profBonus": 3,
+      "features": [
+        "feature.sorcerer.sorcerous-restoration"
+      ]
+    },
+    "6": {
+      "profBonus": 3,
+      "features": [
+        "feature.sorcerer.subclass-feature"
+      ]
+    },
+    "7": {
+      "profBonus": 3,
+      "features": [
+        "feature.sorcerer.sorcery-incarnate"
+      ]
+    },
+    "8": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "9": {
+      "profBonus": 4,
+      "features": [
+        "feature.sorcerer.spell-progression"
+      ]
+    },
+    "10": {
+      "profBonus": 4,
+      "features": [
+        "feature.sorcerer.metamagic"
+      ]
+    },
+    "11": {
+      "profBonus": 4,
+      "features": [
+        "feature.sorcerer.spell-progression"
+      ]
+    },
+    "12": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "13": {
+      "profBonus": 5,
+      "features": [
+        "feature.sorcerer.spell-progression"
+      ]
+    },
+    "14": {
+      "profBonus": 5,
+      "features": [
+        "feature.sorcerer.subclass-feature"
+      ]
+    },
+    "15": {
+      "profBonus": 5,
+      "features": [
+        "feature.sorcerer.spell-progression"
+      ]
+    },
+    "16": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "17": {
+      "profBonus": 6,
+      "features": [
+        "feature.sorcerer.metamagic"
+      ]
+    },
+    "18": {
+      "profBonus": 6,
+      "features": [
+        "feature.sorcerer.subclass-feature"
+      ]
+    },
+    "19": {
+      "profBonus": 6,
+      "features": [
+        "feature.sorcerer.epic-boon"
+      ]
+    },
+    "20": {
+      "profBonus": 6,
+      "features": [
+        "feature.sorcerer.arcane-apotheosis"
+      ]
+    }
+  },
+  "class.warlock": {
+    "1": {
+      "profBonus": 2,
+      "features": [
+        "feature.warlock.eldritch-invocations",
+        "feature.warlock.pact-magic"
+      ]
+    },
+    "2": {
+      "profBonus": 2,
+      "features": [
+        "feature.warlock.magical-cunning"
+      ]
+    },
+    "3": {
+      "profBonus": 2,
+      "features": [
+        "choice.warlock.subclass"
+      ]
+    },
+    "4": {
+      "profBonus": 2,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "5": {
+      "profBonus": 3,
+      "features": [
+        "feature.warlock.spell-progression"
+      ]
+    },
+    "6": {
+      "profBonus": 3,
+      "features": [
+        "feature.warlock.subclass-feature"
+      ]
+    },
+    "7": {
+      "profBonus": 3,
+      "features": [
+        "feature.warlock.spell-progression"
+      ]
+    },
+    "8": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "9": {
+      "profBonus": 4,
+      "features": [
+        "feature.warlock.contact-patron"
+      ]
+    },
+    "10": {
+      "profBonus": 4,
+      "features": [
+        "feature.warlock.subclass-feature"
+      ]
+    },
+    "11": {
+      "profBonus": 4,
+      "features": [
+        "feature.warlock.mystic-arcanum"
+      ]
+    },
+    "12": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "13": {
+      "profBonus": 5,
+      "features": [
+        "feature.warlock.mystic-arcanum"
+      ]
+    },
+    "14": {
+      "profBonus": 5,
+      "features": [
+        "feature.warlock.subclass-feature"
+      ]
+    },
+    "15": {
+      "profBonus": 5,
+      "features": [
+        "feature.warlock.mystic-arcanum"
+      ]
+    },
+    "16": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "17": {
+      "profBonus": 6,
+      "features": [
+        "feature.warlock.mystic-arcanum"
+      ]
+    },
+    "18": {
+      "profBonus": 6,
+      "features": [
+        "feature.warlock.spell-progression"
+      ]
+    },
+    "19": {
+      "profBonus": 6,
+      "features": [
+        "feature.warlock.epic-boon"
+      ]
+    },
+    "20": {
+      "profBonus": 6,
+      "features": [
+        "feature.warlock.eldritch-master"
+      ]
+    }
+  },
+  "class.wizard": {
+    "1": {
+      "profBonus": 2,
+      "features": [
+        "feature.wizard.spellcasting",
+        "feature.wizard.ritual-adept",
+        "feature.wizard.arcane-recovery"
+      ]
+    },
+    "2": {
+      "profBonus": 2,
+      "features": [
+        "feature.wizard.scholar"
+      ]
+    },
+    "3": {
+      "profBonus": 2,
+      "features": [
+        "choice.wizard.subclass"
+      ]
+    },
+    "4": {
+      "profBonus": 2,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "5": {
+      "profBonus": 3,
+      "features": [
+        "feature.wizard.memorize-spell"
+      ]
+    },
+    "6": {
+      "profBonus": 3,
+      "features": [
+        "feature.wizard.subclass-feature"
+      ]
+    },
+    "7": {
+      "profBonus": 3,
+      "features": [
+        "feature.wizard.spell-progression"
+      ]
+    },
+    "8": {
+      "profBonus": 3,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "9": {
+      "profBonus": 4,
+      "features": [
+        "feature.wizard.spell-progression"
+      ]
+    },
+    "10": {
+      "profBonus": 4,
+      "features": [
+        "feature.wizard.subclass-feature"
+      ]
+    },
+    "11": {
+      "profBonus": 4,
+      "features": [
+        "feature.wizard.spell-progression"
+      ]
+    },
+    "12": {
+      "profBonus": 4,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "13": {
+      "profBonus": 5,
+      "features": [
+        "feature.wizard.spell-progression"
+      ]
+    },
+    "14": {
+      "profBonus": 5,
+      "features": [
+        "feature.wizard.subclass-feature"
+      ]
+    },
+    "15": {
+      "profBonus": 5,
+      "features": [
+        "feature.wizard.spell-progression"
+      ]
+    },
+    "16": {
+      "profBonus": 5,
+      "features": [
+        "choice.asi-or-feat"
+      ]
+    },
+    "17": {
+      "profBonus": 6,
+      "features": [
+        "feature.wizard.spell-progression"
+      ]
+    },
+    "18": {
+      "profBonus": 6,
+      "features": [
+        "feature.wizard.spell-mastery"
+      ]
+    },
+    "19": {
+      "profBonus": 6,
+      "features": [
+        "feature.wizard.epic-boon"
+      ]
+    },
+    "20": {
+      "profBonus": 6,
+      "features": [
+        "feature.wizard.signature-spells"
+      ]
+    }
+  }
+}
