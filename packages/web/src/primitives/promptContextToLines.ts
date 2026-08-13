@@ -22,12 +22,6 @@ const ABILITY_NAMES: Record<Ability, string> = {
   cha: 'Charisma',
 };
 
-const TRIGGER_LABELS: Record<'take_damage' | 'targeted_by_attack' | 'custom', string> = {
-  take_damage: 'Took damage',
-  targeted_by_attack: 'Targeted by an attack',
-  custom: 'Custom trigger',
-};
-
 const KIND_LABELS: Record<PromptContext['kind'], string> = {
   opportunity_attack: 'Opportunity Attack',
   feature: 'Reaction',
@@ -37,7 +31,16 @@ const KIND_LABELS: Record<PromptContext['kind'], string> = {
   lair: 'Lair Action',
 };
 
-/** The plain-language kind label for the card's `kind` prop. */
+/**
+ * The card's `kind` eyebrow label. Kept as the real SRD term (matches
+ * brief-08's own vocabulary and its worked example — "Goblin is fleeing —
+ * take your Opportunity Attack?"), not replaced with an invented synonym:
+ * a beginner learns the real name by seeing it attached to an obvious
+ * situation (CLAUDE.md law 5, "teach by doing"), and Reaction/Legendary
+ * Action/etc. already surface elsewhere in the product (the ActionBar's
+ * rows). The plain-language work happens in the CONTEXT LINES below, which
+ * narrate the situation in ordinary sentences instead of dumping raw fields.
+ */
 export function promptKindLabel(context: PromptContext): string {
   return KIND_LABELS[context.kind];
 }
@@ -46,30 +49,26 @@ function plural(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
 }
 
-/** The context body as pre-summarised plain lines — never the options list (see promptOptionsToVM). */
+/** The context body as ordinary narrated sentences — never a field dump, never the options list (see promptOptionsToVM). */
 export function promptContextToLines(context: PromptContext): string[] {
   switch (context.kind) {
     case 'opportunity_attack':
-      return [
-        `Moving from (${context.pathStep.from.x}, ${context.pathStep.from.y}) to (${context.pathStep.to.x}, ${context.pathStep.to.y}) left a threatened square.`,
-        `Available: ${context.attackOptions.join(', ')}.`,
-      ];
+      return ['An enemy is moving away from you — you can swing at them before they go.'];
     case 'feature': {
-      const lines = [`Trigger: ${TRIGGER_LABELS[context.trigger]}.`];
-      if (context.triggerText !== undefined) lines.push(context.triggerText);
-      return lines;
+      if (context.triggerText !== undefined) return [context.triggerText];
+      return context.trigger === 'take_damage' ? ['You took damage.'] : ['You were targeted by an attack.'];
     }
     case 'readied':
-      return [`Trigger: ${context.triggerText}`, `Prepared response: ${context.response}`];
+      return [context.triggerText, `Your plan: ${context.response}.`];
     case 'legendary_action':
-      return [`${plural(context.poolRemaining, 'legendary action point')} remaining.`];
+      return [`${plural(context.poolRemaining, 'legendary action')} left this round.`];
     case 'legendary_resistance':
       return [
-        `Failed save: ${ABILITY_NAMES[context.save.ability]} DC ${context.save.dc}.`,
-        `${plural(context.usesLeft, 'use')} of legendary resistance left.`,
+        `They failed a ${ABILITY_NAMES[context.save.ability]} save (DC ${context.save.dc}).`,
+        `${plural(context.usesLeft, 'use')} left.`,
       ];
     case 'lair':
-      return context.options.length === 0 ? ['No affordable lair action this round.'] : ['The lair acts at initiative 20.'];
+      return context.options.length === 0 ? ['Nothing for the lair to do this round.'] : ['The lair itself acts now.'];
     default: {
       const unreachable: never = context;
       void unreachable;

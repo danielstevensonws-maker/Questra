@@ -138,7 +138,9 @@ describe('promptKindLabel / promptContextToLines / promptOptionsToVM — the con
       attackOptions: ['Scimitar'],
     });
     expect(promptKindLabel(context)).toBe('Opportunity Attack');
-    expect(promptContextToLines(context).join(' ')).toContain('Scimitar');
+    // Plain narration, not a field dump -- the attack options themselves surface
+    // as the card's `options` buttons (see promptOptionsToVM), not in these lines.
+    expect(promptContextToLines(context).join(' ')).toContain('moving away from you');
   });
 
   it('formats a legendary_action context and adapts its options with cost details', () => {
@@ -147,7 +149,7 @@ describe('promptKindLabel / promptContextToLines / promptOptionsToVM — the con
       poolRemaining: 2,
       options: [{ name: 'Tail Attack', cost: 1 }],
     });
-    expect(promptContextToLines(context)[0]).toContain('2 legendary action points');
+    expect(promptContextToLines(context)[0]).toBe('2 legendary actions left this round.');
     const options = context.kind === 'legendary_action' ? promptOptionsToVM(context.options) : [];
     expect(options).toEqual([{ id: 'Tail Attack', label: 'Tail Attack', detail: '1 point' }]);
   });
@@ -159,8 +161,8 @@ describe('promptKindLabel / promptContextToLines / promptOptionsToVM — the con
       usesLeft: 1,
     });
     const lines = promptContextToLines(context).join(' ');
-    expect(lines).toContain('Constitution DC 18');
-    expect(lines).toContain('1 use of legendary resistance left');
+    expect(lines).toContain('Constitution save (DC 18)');
+    expect(lines).toContain('1 use left');
   });
 
   it('lair options omit the cost detail when a PromptOption has no cost', () => {
