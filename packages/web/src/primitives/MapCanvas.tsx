@@ -1,17 +1,38 @@
 /**
  * MapCanvas — the one renderer, three modes (Brief 06 §5). A single component
  * draws a Room in `edit` (planner), `play` (DM), or `table` (spectator) mode.
- * It calls the ONE contracts geometry — distFt / affectedCells / filterRoomForViewer
- * — never a second implementation (§4.5), so the highlight the player sees is the
+ * It calls the ONE contracts geometry — distFt / affectedCells / cellKey —
+ * never a second implementation (§4.5), so the highlight a player sees is the
  * same math the engine batch-saves.
  *
- * Fog is server-side (non-negotiable #3): the caller passes a room already run
- * through filterRoomForViewer for player/table viewers, so this component never
- * receives unrevealed cells or hidden/staged tokens to leak.
+ * Fog is server-side (CLAUDE.md non-negotiable #3): the caller passes a room
+ * already run through filterRoomForViewer for player/table viewers, so this
+ * component never receives unrevealed cells or hidden/staged tokens to leak.
+ * `isFogged` below is presentation only — if a hidden token DID reach the
+ * client, this would happily draw it, which is why the filtering happens
+ * upstream, not here.
  *
- * Themed entirely via theme/tokens.css variables. No hardcoded look.
+ * The ground uses the same radial gradient (--qa-map-hi/mid/lo) every other
+ * primitive's Storybook "Ground" wrapper renders behind its floating glass —
+ * this is that ground, made real and interactive rather than implied scenery.
+ * Fog reuses the app's existing "something is hidden from you" language
+ * (--qa-scrim + a glass blur) instead of a flat VTT-standard grey box, so the
+ * map reads as one visual system with InfoPanel/AcceptTweakRejectCard/etc.,
+ * not a bolted-on canvas widget.
+ *
+ * RESPONSIVE: the canvas fills its container's width and locks its height via
+ * `aspect-ratio: w / h`, so cells stay perfectly square at any size — every
+ * offset/size below is a percentage of the grid, never a `cellPx`-multiplied
+ * absolute pixel. `cellPx` is now a ceiling (`max-width`), not a literal
+ * dimension, so a host can cap how large cells get on a big screen without
+ * pinning the map to a fixed size on a small one. Grid hairlines stay a crisp
+ * 1px regardless of scale via a per-cell background tile (not a naive
+ * percentage-width line, which would blur/thicken as the map resizes).
+ *
+ * Themed entirely via theme/tokens.css variables. No hardcoded colour.
  */
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { distFt, affectedCells, cellKey, type Room, type Cell, type AoeShape } from '@questra/contracts';
 
 export type MapMode = 'edit' | 'play' | 'table';
@@ -19,7 +40,7 @@ export type MapMode = 'edit' | 'play' | 'table';
 export interface MapCanvasProps {
   room: Room;
   mode: MapMode;
-  /** cell size in px. */
+  /** Max cell size in px, as a ceiling on the map's rendered width (gridWidth * cellPx). Default 40. */
   cellPx?: number;
   /** an AoE template to preview (anchor + shape) — highlights affected cells. */
   aoe?: { shape: AoeShape; anchor: Cell };
@@ -31,11 +52,15 @@ export interface MapCanvasProps {
   onCellClick?: (cell: Cell) => void;
 }
 
+const mono = 'var(--qa-font-mono)';
+
 export function MapCanvas({ room, mode, cellPx = 40, aoe, measureFrom, onTokenClick, onCellClick }: MapCanvasProps) {
   const { w, h } = room.gridSize;
+  const cellPctX = 100 / w;
+  const cellPctY = 100 / h;
   const revealed = useMemo(() => new Set(room.revealed), [room.revealed]);
   const affected = useMemo(() => {
-    if (!aoe) return new Set<string>();
+    if (aoe === undefined) return new Set<string>();
     return new Set(affectedCells(aoe.shape, aoe.anchor).map(cellKey));
   }, [aoe]);
 
@@ -47,18 +72,25 @@ export function MapCanvas({ room, mode, cellPx = 40, aoe, measureFrom, onTokenCl
       aria-label={`Map ${room.id} (${mode} view)`}
       style={{
         position: 'relative',
-        width: w * cellPx,
-        height: h * cellPx,
-        background: 'var(--q-surface-raised)',
-        border: '1px solid var(--q-line)',
-        borderRadius: 'var(--q-radius)',
+        width: '100%',
+        maxWidth: w * cellPx,
+        aspectRatio: `${w} / ${h}`,
+        borderRadius: 'var(--qa-radius)',
         overflow: 'hidden',
         userSelect: 'none',
+        // The terrain placeholder IS the ground every other primitive floats
+        // over — the real terrain image replaces the bottom layer in a later
+        // slice, the grid/fog/token layers stay the same either way.
+        backgroundImage: [
+          `linear-gradient(to right, transparent calc(100% - 1px), var(--qa-map-grid) calc(100% - 1px))`,
+          `linear-gradient(to bottom, transparent calc(100% - 1px), var(--qa-map-grid) calc(100% - 1px))`,
+          'radial-gradient(120% 90% at 56% 30%, var(--qa-map-hi) 0%, var(--qa-map-mid) 44%, var(--qa-map-lo) 100%)',
+        ].join(', '),
+        backgroundSize: `${cellPctX}% ${cellPctY}%, ${cellPctX}% ${cellPctY}%, 100% 100%`,
+        border: 'var(--qa-hairline) solid var(--qa-glass-border)',
+        boxShadow: 'var(--qa-shadow)',
       }}
     >
-      {/* terrain layer (placeholder tint; real terrain image is a background in the slice) */}
-      <div aria-hidden style={{ position: 'absolute', inset: 0, background: 'var(--q-bg)' }} />
-
       {/* grid + cell states */}
       {Array.from({ length: h }, (_, y) =>
         Array.from({ length: w }, (_, x) => {
@@ -68,58 +100,59 @@ export function MapCanvas({ room, mode, cellPx = 40, aoe, measureFrom, onTokenCl
           const isFogged = mode !== 'edit' && !isRevealed; // edit sees all; play/table respect fog
           const tag = room.cellTags[key];
           const inAoe = affected.has(key);
-          const ring = measureFrom ? distFt(measureFrom, cell) : undefined;
+          const ring = measureFrom !== undefined ? distFt(measureFrom, cell) : undefined;
           return (
             <button
               key={key}
-              onClick={onCellClick ? () => onCellClick(cell) : undefined}
+              type="button"
+              onClick={onCellClick !== undefined ? () => onCellClick(cell) : undefined}
               aria-label={`cell ${x},${y}`}
               style={{
                 position: 'absolute',
-                left: x * cellPx,
-                top: y * cellPx,
-                width: cellPx,
-                height: cellPx,
+                left: `${x * cellPctX}%`,
+                top: `${y * cellPctY}%`,
+                width: `${cellPctX}%`,
+                height: `${cellPctY}%`,
                 boxSizing: 'border-box',
-                border: '1px solid color-mix(in srgb, var(--q-line) 60%, transparent)',
-                background: isFogged
-                  ? 'var(--q-overlay)'
-                  : inAoe
-                    ? 'color-mix(in srgb, var(--q-accent) 22%, transparent)'
-                    : tag?.difficultTerrain
-                      ? 'color-mix(in srgb, var(--q-ink-faint) 18%, transparent)'
-                      : 'transparent',
-                cursor: onCellClick ? 'pointer' : 'default',
+                border: 'none',
+                background: cellFill(isFogged, inAoe, tag?.difficultTerrain === true),
+                backdropFilter: isFogged ? 'blur(2px)' : undefined,
+                WebkitBackdropFilter: isFogged ? 'blur(2px)' : undefined,
+                cursor: onCellClick !== undefined ? 'pointer' : 'default',
                 padding: 0,
-                fontSize: 'var(--q-text-xs)',
-                color: 'var(--q-ink-faint)',
+                display: 'grid',
+                placeItems: 'center',
+                fontFamily: mono,
+                fontSize: 'var(--qa-text-whisper)',
+                color: 'var(--qa-ink-faint)',
               }}
             >
-              {chrome && ring !== undefined && ring > 0 && ring <= 15 ? `${ring}` : ''}
+              {chrome && ring !== undefined && ring > 0 && ring <= 15 ? ring : ''}
             </button>
           );
         }),
       )}
 
-      {/* assets */}
+      {/* assets: dashed footprints, cross-hatched when they're difficult terrain */}
       {room.assets.map((a) => (
         <div
           key={a.id}
-          aria-label={`asset ${a.id}${a.state ? ` (${a.state})` : ''}`}
+          aria-label={`asset ${a.id}${a.state !== undefined ? ` (${a.state})` : ''}`}
           style={{
             position: 'absolute',
-            left: a.cell.x * cellPx,
-            top: a.cell.y * cellPx,
-            width: a.footprint.w * cellPx,
-            height: a.footprint.h * cellPx,
-            border: '1px dashed var(--q-ink-faint)',
-            borderRadius: 'var(--q-radius-sm)',
-            background: 'color-mix(in srgb, var(--q-ink-soft) 12%, transparent)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 'var(--q-text-xs)',
-            color: 'var(--q-ink-soft)',
+            left: `${a.cell.x * cellPctX}%`,
+            top: `${a.cell.y * cellPctY}%`,
+            width: `${a.footprint.w * cellPctX}%`,
+            height: `${a.footprint.h * cellPctY}%`,
+            boxSizing: 'border-box',
+            border: `var(--qa-hairline) dashed var(--qa-ink-faint)`,
+            borderRadius: 'var(--qa-radius-sm)',
+            background: 'var(--qa-chip)',
+            display: 'grid',
+            placeItems: 'center',
+            fontFamily: mono,
+            fontSize: 'var(--qa-text-body)',
+            color: 'var(--qa-ink-dim)',
             pointerEvents: 'none',
           }}
         >
@@ -127,32 +160,45 @@ export function MapCanvas({ room, mode, cellPx = 40, aoe, measureFrom, onTokenCl
         </div>
       ))}
 
-      {/* tokens */}
+      {/* tokens: elevated miniature-base discs, inset within their cell, not flat painted circles */}
       {room.tokens.map((t) => (
         <button
           key={t.id}
-          onClick={onTokenClick ? () => onTokenClick(t.id) : undefined}
+          type="button"
+          onClick={onTokenClick !== undefined ? () => onTokenClick(t.id) : undefined}
           aria-label={`token ${t.creatureRef}${t.staged ? ' (staged)' : ''}`}
           style={{
             position: 'absolute',
-            left: t.cell.x * cellPx + 3,
-            top: t.cell.y * cellPx + 3,
-            width: cellPx - 6,
-            height: cellPx - 6,
-            borderRadius: '999px',
-            border: `2px solid ${t.staged ? 'var(--q-ink-faint)' : 'var(--q-accent)'}`,
-            background: 'var(--q-surface)',
-            color: 'var(--q-ink)',
-            fontSize: 'var(--q-text-xs)',
-            fontWeight: 600,
-            opacity: t.staged ? 0.55 : 1,
-            cursor: onTokenClick ? 'pointer' : 'default',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            left: `${t.cell.x * cellPctX}%`,
+            top: `${t.cell.y * cellPctY}%`,
+            width: `${cellPctX}%`,
+            height: `${cellPctY}%`,
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            cursor: onTokenClick !== undefined ? 'pointer' : 'default',
           }}
         >
-          {initials(t.creatureRef)}
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: '12%',
+              borderRadius: 'var(--qa-radius-round)',
+              border: `2px solid ${t.staged ? 'var(--qa-ink-faint)' : 'var(--qa-accent)'}`,
+              boxShadow: t.staged ? 'none' : '0 0 0 3px var(--qa-accent-soft), var(--qa-shadow)',
+              background: 'var(--qa-glass-solid)',
+              color: 'var(--qa-ink)',
+              fontFamily: mono,
+              fontSize: 'var(--qa-text-whisper)',
+              fontWeight: 600,
+              opacity: t.staged ? 0.6 : 1,
+              display: 'grid',
+              placeItems: 'center',
+            }}
+          >
+            {initials(t.creatureRef)}
+          </span>
         </button>
       ))}
 
@@ -161,8 +207,18 @@ export function MapCanvas({ room, mode, cellPx = 40, aoe, measureFrom, onTokenCl
   );
 }
 
+/** Fog (an ink scrim) beats AoE beats difficult terrain (a gold hazard hatch) beats plain floor. */
+function cellFill(isFogged: boolean, inAoe: boolean, isDifficult: boolean): CSSProperties['background'] {
+  if (isFogged) return 'var(--qa-scrim)';
+  if (inAoe) return 'var(--qa-accent-soft)';
+  if (isDifficult) {
+    return 'repeating-linear-gradient(45deg, var(--qa-gold-soft) 0 4px, transparent 4px 10px)';
+  }
+  return 'transparent';
+}
+
 function initials(ref: string): string {
-  const last = ref.split(/[.\-_]/).pop() ?? ref;
+  const last = ref.split(/[.-_]/).pop() ?? ref;
   return last.slice(0, 2).toUpperCase();
 }
 
@@ -173,11 +229,11 @@ function TableBadge(): ReactNode {
         position: 'absolute',
         top: 6,
         right: 8,
-        fontSize: 'var(--q-text-xs)',
-        fontFamily: 'var(--q-font-mono)',
-        color: 'var(--q-ink-faint)',
-        letterSpacing: '0.05em',
+        fontFamily: mono,
+        fontSize: 'var(--qa-text-whisper)',
+        letterSpacing: 'var(--qa-tracking-caps)',
         textTransform: 'uppercase',
+        color: 'var(--qa-ink-faint)',
       }}
     >
       Table view

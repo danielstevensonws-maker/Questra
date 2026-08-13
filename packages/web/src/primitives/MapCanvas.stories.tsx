@@ -1,22 +1,13 @@
 /**
  * MapCanvas stories — the one renderer in its three modes (Brief 06 §5), driven
- * by a small room and the real contracts geometry. The Fog story shows the
- * choke point: the play/table views receive a room already filtered by
- * filterRoomForViewer, so unrevealed cells and hidden/staged tokens never reach
- * the client.
+ * by a small room and the real contracts geometry. EditMode and
+ * TableModeFiltered are the pair to read together: same room, and the only
+ * difference is exactly what filterRoomForViewer removed for a player.
  */
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { ReactNode } from 'react';
 import { filterRoomForViewer, type Room } from '@questra/contracts';
 import { MapCanvas } from './MapCanvas.js';
-
-import '../theme/index.css';
-
-const meta: Meta<typeof MapCanvas> = {
-  title: 'Primitives/MapCanvas',
-  component: MapCanvas,
-};
-export default meta;
-type Story = StoryObj<typeof MapCanvas>;
 
 const room: Room = {
   id: 'vault',
@@ -25,7 +16,15 @@ const room: Room = {
   cellTags: { '5,4': { difficultTerrain: true }, '6,4': { difficultTerrain: true } },
   revealed: ['0,0', '1,0', '2,0', '0,1', '1,1', '2,1', '3,1', '2,2', '3,2'],
   assets: [
-    { id: 'tomb', imageRef: 'asset/tomb', cell: { x: 3, y: 2 }, footprint: { w: 1, h: 1 }, flags: { blocking: true, movable: false, interactive: true, difficultTerrain: false }, state: 'closed', prepNote: 'opens on a DC 15 STR check' },
+    {
+      id: 'tomb',
+      imageRef: 'asset/tomb',
+      cell: { x: 3, y: 2 },
+      footprint: { w: 1, h: 1 },
+      flags: { blocking: true, movable: false, interactive: true, difficultTerrain: false },
+      state: 'closed',
+      prepNote: 'opens on a DC 15 STR check',
+    },
   ],
   tokens: [
     { id: 't-torvald', creatureRef: 'pc-torvald', cell: { x: 1, y: 1 }, size: 'medium', hidden: false, staged: false },
@@ -34,9 +33,17 @@ const room: Room = {
   ],
 };
 
-function Frame({ children }: { children: React.ReactNode }) {
-  return <div style={{ padding: 24, background: 'var(--q-bg)', display: 'inline-block' }}>{children}</div>;
+/** MapCanvas fills 100% of its container's width, so the story needs to give it a definite one to demonstrate the responsive fit. */
+function Frame({ children }: { children: ReactNode }) {
+  return <div style={{ padding: 24, width: 480, background: 'var(--qa-glass-solid)' }}>{children}</div>;
 }
+
+const meta: Meta<typeof MapCanvas> = {
+  title: 'Primitives/MapCanvas',
+  component: MapCanvas,
+};
+export default meta;
+type Story = StoryObj<typeof MapCanvas>;
 
 /** Edit (planner): sees the whole room incl. the fogged area, the hidden ambush token, and prep notes. */
 export const EditMode: Story = {
@@ -56,7 +63,7 @@ export const PlayModeWithRange: Story = {
   ),
 };
 
-/** Play (DM): a 20-ft-radius sphere AoE preview anchored on the goblin — the affectedCells highlight. */
+/** Play (DM): a 15-ft-radius sphere AoE preview anchored on the goblin — the affectedCells highlight. */
 export const AoePreview: Story = {
   render: () => (
     <Frame>
