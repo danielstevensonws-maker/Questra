@@ -23,23 +23,21 @@ const ABILITY_NAMES: Record<Ability, string> = {
 };
 
 const KIND_LABELS: Record<PromptContext['kind'], string> = {
-  opportunity_attack: 'Opportunity Attack',
+  opportunity_attack: 'Free Attack',
   feature: 'Reaction',
-  readied: 'Readied Action',
-  legendary_action: 'Legendary Action',
-  legendary_resistance: 'Legendary Resistance',
-  lair: 'Lair Action',
+  readied: 'Prepared Move',
+  legendary_action: 'Boss Move',
+  legendary_resistance: 'Shrugs It Off',
+  lair: 'Room Attack',
 };
 
 /**
- * The card's `kind` eyebrow label. Kept as the real SRD term (matches
- * brief-08's own vocabulary and its worked example — "Goblin is fleeing —
- * take your Opportunity Attack?"), not replaced with an invented synonym:
- * a beginner learns the real name by seeing it attached to an obvious
- * situation (CLAUDE.md law 5, "teach by doing"), and Reaction/Legendary
- * Action/etc. already surface elsewhere in the product (the ActionBar's
- * rows). The plain-language work happens in the CONTEXT LINES below, which
- * narrate the situation in ordinary sentences instead of dumping raw fields.
+ * The card's `kind` eyebrow label — plain gaming words, not the SRD's own
+ * term. ("Opportunity Attack", "Legendary Action", etc. are real D&D
+ * vocabulary; brief-08 even uses them in its own worked example. Owner call:
+ * favour words any gamer already knows — "Boss Move", "Free Attack" — over
+ * the rulebook name, even if it means diverging from the brief's prose.)
+ * The SRD kind (`context.kind`) stays the internal identifier either way.
  */
 export function promptKindLabel(context: PromptContext): string {
   return KIND_LABELS[context.kind];
@@ -61,14 +59,14 @@ export function promptContextToLines(context: PromptContext): string[] {
     case 'readied':
       return [context.triggerText, `Your plan: ${context.response}.`];
     case 'legendary_action':
-      return [`${plural(context.poolRemaining, 'legendary action')} left this round.`];
+      return [`${plural(context.poolRemaining, 'boss move')} left this round.`];
     case 'legendary_resistance':
       return [
-        `They failed a ${ABILITY_NAMES[context.save.ability]} save (DC ${context.save.dc}).`,
+        `They failed a ${ABILITY_NAMES[context.save.ability]} roll (needed ${context.save.dc} or higher).`,
         `${plural(context.usesLeft, 'use')} left.`,
       ];
     case 'lair':
-      return context.options.length === 0 ? ['Nothing for the lair to do this round.'] : ['The lair itself acts now.'];
+      return context.options.length === 0 ? ['Nothing happens this round.'] : ['The room attacks now.'];
     default: {
       const unreachable: never = context;
       void unreachable;

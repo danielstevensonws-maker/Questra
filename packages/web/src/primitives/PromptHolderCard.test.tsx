@@ -137,7 +137,7 @@ describe('promptKindLabel / promptContextToLines / promptOptionsToVM — the con
       pathStep: { from: { x: 1, y: 1 }, to: { x: 2, y: 1 } },
       attackOptions: ['Scimitar'],
     });
-    expect(promptKindLabel(context)).toBe('Opportunity Attack');
+    expect(promptKindLabel(context)).toBe('Free Attack');
     // Plain narration, not a field dump -- the attack options themselves surface
     // as the card's `options` buttons (see promptOptionsToVM), not in these lines.
     expect(promptContextToLines(context).join(' ')).toContain('moving away from you');
@@ -149,7 +149,7 @@ describe('promptKindLabel / promptContextToLines / promptOptionsToVM — the con
       poolRemaining: 2,
       options: [{ name: 'Tail Attack', cost: 1 }],
     });
-    expect(promptContextToLines(context)[0]).toBe('2 legendary actions left this round.');
+    expect(promptContextToLines(context)[0]).toBe('2 boss moves left this round.');
     const options = context.kind === 'legendary_action' ? promptOptionsToVM(context.options) : [];
     expect(options).toEqual([{ id: 'Tail Attack', label: 'Tail Attack', detail: '1 point' }]);
   });
@@ -161,7 +161,7 @@ describe('promptKindLabel / promptContextToLines / promptOptionsToVM — the con
       usesLeft: 1,
     });
     const lines = promptContextToLines(context).join(' ');
-    expect(lines).toContain('Constitution save (DC 18)');
+    expect(lines).toContain('Constitution roll (needed 18 or higher)');
     expect(lines).toContain('1 use left');
   });
 

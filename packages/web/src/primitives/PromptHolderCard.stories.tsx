@@ -174,7 +174,7 @@ export const DmAnswersRuling: Story = {
         kind="Ruling"
         holder="Torvald"
         asDm
-        context={['Suggested check: Dexterity (Acrobatics).', 'Suggested DC: 14.']}
+        context={['Suggested roll: Dexterity (Acrobatics).', 'Suggested target: 14 or higher.']}
         timeoutSec={600}
         onTake={() => {}}
         onDecline={() => {}}
