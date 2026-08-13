@@ -25,5 +25,16 @@
   to   { opacity: 1; }
 }
 
+/* AcceptTweakRejectCard: entrance + the streaming caret. */
+@keyframes qa-card-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
+@keyframes qa-blink {
+  0%, 49%  { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
 /* Reduced motion is handled globally in @questra/theme's styles.css, which
    neutralises animation and transition durations for everything. */
