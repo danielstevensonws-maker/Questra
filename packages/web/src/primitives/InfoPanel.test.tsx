@@ -10,8 +10,9 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { RulesEntitySchema } from '@questra/contracts';
 import { useState } from 'react';
-import { InfoPanel, ExplainButton } from './InfoPanel.js';
+import { InfoPanel, ExplainButton, fromExplain } from './InfoPanel.js';
 import { entityToInfoPanel, kindLabel } from './entityToInfoPanel.js';
+import type { ExplainVM } from '../design/index.js';
 
 import prone from '@questra/contracts/src/fixtures/prone.json';
 import fireball from '@questra/contracts/src/fixtures/fireball.json';
@@ -19,6 +20,53 @@ import goblin from '@questra/contracts/src/fixtures/goblin-warrior.json';
 import fighter from '@questra/contracts/src/fixtures/fighter.json';
 
 afterEach(cleanup);
+
+/**
+ * The seam that let this panel absorb the play screen's separate explain
+ * sheet. Both entry paths now render ONE component, so these assert that an
+ * `ExplainVM` — the design layer's shape for an interrogable number — arrives
+ * intact, and that the panel then behaves the same as it does for an entity.
+ */
+describe('fromExplain — the play screen path', () => {
+  const ac: ExplainVM = {
+    id: 'ac',
+    kicker: 'Your character',
+    title: 'Armor Class',
+    value: '18',
+    rows: [{ label: 'Chain Mail', value: '16' }, { label: 'Shield', value: '2' }],
+    rule: 'An attack has to roll this number or higher to hit you.',
+    flavour: 'Heavy, hot, and worth every pound of it.',
+  };
+
+  it('maps every field onto the panel shape, losing nothing', () => {
+    const vm = fromExplain(ac);
+    expect(vm.name).toBe('Armor Class');
+    expect(vm.kind).toBe('Your character');
+    expect(vm.value).toBe('18');
+    expect(vm.summary).toBe(ac.rule);
+    expect(vm.flavour).toBe(ac.flavour);
+    expect(vm.derivation).toEqual([{ label: 'Chain Mail', value: '16' }, { label: 'Shield', value: '2' }]);
+  });
+
+  it('omits flavour rather than passing undefined through', () => {
+    const { flavour, ...bare } = ac;
+    expect('flavour' in fromExplain(bare as ExplainVM)).toBe(false);
+  });
+
+  it('renders the number, its rows, and a summing line in explain mode', () => {
+    render(<InfoPanel data={fromExplain(ac)} open openMode="explain" onClose={() => {}} />);
+    expect(screen.getByText('Chain Mail')).toBeDefined();
+    expect(screen.getByText('16')).toBeDefined();
+    // The headline value AND the sum row both read 18 — the panel states the
+    // answer once at the top and again as the total of its own working.
+    expect(screen.getAllByText('18')).toHaveLength(2);
+  });
+
+  it('never shows a Choose footer on the explain path, even if asked', () => {
+    render(<InfoPanel data={fromExplain(ac)} open openMode="explain" showChoose onChoose={() => {}} onClose={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Choose' })).toBeNull();
+  });
+});
 
 describe('entityToInfoPanel — the contracts seam', () => {
   it('maps a condition: plain → summary, srd_text → rulesText', () => {
@@ -214,12 +262,17 @@ describe('InfoPanel — dialog behaviour', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  /**
+   * Queried by its accessible name rather than by class. The scrim is now the
+   * design layer's shared one, so the old private class no longer exists — and
+   * asserting on the role is the better test anyway: it holds whatever the
+   * chrome is made of, and it fails if the scrim ever stops being reachable to
+   * a keyboard, which is the property actually worth protecting.
+   */
   it('closes on scrim click', () => {
     const onClose = vi.fn();
-    const { container } = render(<InfoPanel data={{ name: 'X', kind: 'Y', summary: 'Z' }} open onClose={onClose} />);
-    const scrim = container.querySelector('.qa-infopanel-scrim');
-    expect(scrim).not.toBeNull();
-    fireEvent.click(scrim!);
+    render(<InfoPanel data={{ name: 'X', kind: 'Y', summary: 'Z' }} open onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: /close this and go back/i }));
     expect(onClose).toHaveBeenCalledOnce();
   });
 });

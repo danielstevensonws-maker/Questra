@@ -34,10 +34,19 @@ export interface InfoPanelData {
   kind: string;
   /** Info-layer 1: one sentence, always visible. */
   summary: string;
+  /**
+   * The headline figure, when the subject IS a number — an Armor Class, a save
+   * DC, a damage-per-round estimate. Absent for entities, which have no single
+   * value; that absence is what makes the same panel serve both a tapped
+   * readout and a compendium page without branching.
+   */
+  value?: string;
   /** Info-layer 2: supplied by the caller, not the entity. */
   derivation?: readonly DerivationLine[];
   /** Info-layer 3: the verbatim rules text. */
   rulesText?: string;
+  /** One line of colour. Never carries information. */
+  flavour?: string;
   /** Homebrew gets a quiet tint, never a warning. */
   homebrew?: boolean;
 }

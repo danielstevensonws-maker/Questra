@@ -14,7 +14,7 @@
 import { useState, type ReactElement } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { NearEdge } from './NearEdge.js';
-import { ExplainSheet } from './Overlays.js';
+import { InfoPanel, fromExplain } from '../InfoPanel.js';
 import { Stage } from './stage.js';
 import { toHero, toTiles, type DyingVM, type ExplainVM } from './viewModel.js';
 import { IDENTITY, RESULT, TARGETS, sheet, torvald, wrensTurn, yourTurn } from './fixtures.js';
@@ -59,7 +59,7 @@ export const YourTurn: Story = {
           {...act}
           {...WIRING}
         />
-        <div className="qa2-over">{explain !== null && <ExplainSheet explain={explain} onClose={() => setExplain(null)} />}</div>
+        <div className="qa2-over">{explain !== null && <InfoPanel data={fromExplain(explain)} openMode="explain" onClose={() => setExplain(null)} />}</div>
       </Stage>
     );
   },

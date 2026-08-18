@@ -61,8 +61,9 @@ import { RoundSpine } from './RoundSpine.js';
 import { SceneRail } from './SceneRail.js';
 import { ScreenStyles } from './ScreenStyles.js';
 import { TableGround, type GroundTokenVM } from './TableGround.js';
+import { InfoPanel, fromExplain } from '../InfoPanel.js';
 import {
-  ComposeSheet, ExplainSheet, Folio, PauseOverlay, Scrim, TableMenu,
+  ComposeSheet, Folio, PauseOverlay, Scrim, TableMenu,
   type FeatureLineVM, type FolioProps, type FolioTab, type InventoryLineVM, type MenuAction, type RollStance,
 } from './Overlays.js';
 import type {
@@ -251,10 +252,18 @@ export function PlayerViewV2({
         onOpenFolio={(tab) => setOverlay({ kind: 'folio', tab: tab ?? 'stats' })}
       />
 
-      {overlay.kind !== 'none' && <Scrim onClose={close} />}
+      {/* InfoPanel is a self-contained dialog and brings its own scrim, so the
+          screen must not stack a second one behind it — two would darken the
+          map twice. Every other overlay is a bare sheet and needs this one. */}
+      {overlay.kind !== 'none' && overlay.kind !== 'explain' && <Scrim onClose={close} />}
 
       <div className="qa2-over">
-        {overlay.kind === 'explain' && <ExplainSheet explain={overlay.explain} onClose={close} />}
+        {/* The same panel the compendium opens — centred here rather than
+            docked, because explaining happens mid-play and must not cover the
+            panel whose number was just tapped. */}
+        {overlay.kind === 'explain' && (
+          <InfoPanel data={fromExplain(overlay.explain)} openMode="explain" onClose={close} />
+        )}
 
         {overlay.kind === 'compose' && (
           <ComposeSheet

@@ -7,7 +7,8 @@
  */
 import { useState, type ReactElement } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { ComposeSheet, ExplainSheet, Folio, PauseOverlay, Scrim, TableMenu } from './Overlays.js';
+import { ComposeSheet, Folio, PauseOverlay, Scrim, TableMenu } from './Overlays.js';
+import { InfoPanel, fromExplain } from '../InfoPanel.js';
 import { RoundSpine } from './RoundSpine.js';
 import { Stage } from './stage.js';
 import { toHero } from './viewModel.js';
@@ -25,14 +26,18 @@ function Behind(): ReactElement {
   return <RoundSpine round={3} cast={castOrder('pc-torvald')} open onToggle={noop} />;
 }
 
-/** Armor Class, opened from its readout. These rows are the real fixture's derivation. */
+/**
+ * Armor Class, opened from its readout. These rows are the real fixture's
+ * derivation. No `Scrim` here, unlike the sheets below — InfoPanel is a
+ * self-contained dialog that brings its own, and stacking a second would
+ * darken the map twice.
+ */
 export const HowANumberWorks: Story = {
   render: () => (
     <Stage>
       <Behind />
-      <Scrim onClose={noop} />
       <div className="qa2-over">
-        <ExplainSheet explain={HERO.ac} onClose={noop} />
+        <InfoPanel data={fromExplain(HERO.ac)} openMode="explain" onClose={noop} />
       </div>
     </Stage>
   ),
@@ -45,13 +50,47 @@ export const WhatAConditionDoes: Story = {
     return (
       <Stage>
         <Behind />
-        <Scrim onClose={noop} />
         <div className="qa2-over">
-          <ExplainSheet explain={prone.conditions[0]!.explain} onClose={noop} />
+          <InfoPanel data={fromExplain(prone.conditions[0]!.explain)} openMode="explain" onClose={noop} />
         </div>
       </Stage>
     );
   },
+};
+
+/**
+ * The SAME panel, entered the other way — an entity rather than a number.
+ * Leads with the summary instead of the derivation, docks to the side instead
+ * of centring, and can carry a Choose footer. That this is one component and
+ * not two is the whole point of the consolidation.
+ */
+export const ReadingAnEntity: Story = {
+  render: () => (
+    <Stage>
+      <Behind />
+      <div className="qa2-over">
+        <InfoPanel
+          openMode="read"
+          showChoose
+          onChoose={(d) => console.log('chose', d.name)}
+          onClose={noop}
+          data={{
+            name: 'Guiding Bolt',
+            kind: 'Spell — Level 1 Evocation',
+            summary: 'A bolt of light you roll to hit with. On a hit it is 4d6 radiant, and the next attack against that target has advantage.',
+            derivation: [
+              { label: 'Spell attack', value: '+5', parts: 'Proficiency +2, WIS +3' },
+              { label: 'Damage', value: '4d6 radiant' },
+              { label: 'Range', value: '120 ft' },
+            ],
+            rulesText:
+              'A flash of light streaks toward a creature of your choice within range. Make a ranged spell attack against the target. On a hit, the target takes 4d6 Radiant damage, and the next attack roll made against this target before the end of your next turn has Advantage.',
+            flavour: 'Worth saying out loud, so somebody actually uses the advantage.',
+          }}
+        />
+      </div>
+    </Stage>
+  ),
 };
 
 /**

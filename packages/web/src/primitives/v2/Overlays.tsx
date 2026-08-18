@@ -8,8 +8,9 @@
  * player who taps a number to ask a question should not lose the table while
  * they read the answer.
  *
- * ExplainSheet   — how a number was reached (§5: nothing here is a number you
- *                  cannot interrogate).
+ * Explaining a number is NOT here — InfoPanel absorbed it, so the play
+ * screen and the compendium show one sheet rather than two. See
+ * primitives/InfoPanel.tsx.
  * ComposeSheet   — advantage, a situational adjustment, and the live formula,
  *                  in the moment before a roll is committed.
  * Folio          — your character sheet, rising from the near edge because that
@@ -58,47 +59,6 @@ function Sheet({
 /** The click-anywhere-else dismiss. A button so keyboards can reach it too. */
 export function Scrim({ onClose }: { onClose: () => void }): ReactElement {
   return <button type="button" className="qa2-scrim" onClick={onClose} aria-label="Close this and go back to the table" />;
-}
-
-// ---- how a number was reached ---------------------------------------------
-
-export function ExplainSheet({ explain, onClose }: { explain: ExplainVM; onClose: () => void }): ReactElement {
-  return (
-    <Sheet
-      label={`How ${explain.title} is worked out`}
-      kicker={explain.kicker}
-      title={explain.title}
-      onClose={onClose}
-      // Centred over the map. With the HUD reduced to floating panels there is
-      // no frame edge to anchor to any more, and a sheet pinned to the bottom
-      // would land on top of the very panel you tapped the number in.
-      style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 'min(440px, calc(100% - var(--qa-s6)))', maxHeight: '76%' }}
-    >
-      <div className="qa2-sheet-body">
-        <span style={{ ...rollTotal, alignSelf: 'flex-start' }}>{explain.value}</span>
-
-        {explain.rows.length > 0 && (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--qa-s2)' }}>
-            {explain.rows.map((r) => (
-              <li key={r.label} className="qa2-rowline">
-                <span style={{ ...prose, color: 'var(--qa-ink)' }}>{r.label}</span>
-                <span style={statMeta}>{r.value}</span>
-              </li>
-            ))}
-            <li className="qa2-rowline is-sum">
-              <span style={{ ...prose, color: 'var(--qa-ink)' }}>{explain.title}</span>
-              <span style={statValue}>{explain.value}</span>
-            </li>
-          </ul>
-        )}
-
-        <p style={{ ...narration, margin: 0 }}>{explain.rule}</p>
-        {explain.flavour !== undefined && (
-          <p style={{ ...quote, margin: 0, color: 'var(--qa-ink-dim)' }}>{explain.flavour}</p>
-        )}
-      </div>
-    </Sheet>
-  );
 }
 
 // ---- the moment before a roll ---------------------------------------------

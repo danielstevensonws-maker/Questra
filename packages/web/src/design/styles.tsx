@@ -303,7 +303,11 @@ const CSS = `
   animation: qa2-rise var(--qa-dur) var(--qa-ease-out);
 }
 .qa2-sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--qa-s3); padding: var(--qa-s4); border-bottom: var(--qa-hairline) solid var(--qa-glass-border); }
-.qa2-sheet-body { padding: var(--qa-s4); overflow-y: auto; display: flex; flex-direction: column; gap: var(--qa-s3); scrollbar-width: thin; }
+/* flex:1 so a sheet with a fixed height (a side-docked panel, the folio) pins
+   its footer to the bottom instead of letting it float up under the content.
+   min-height:0 is what actually lets it scroll — without it a flex child
+   refuses to shrink below its content and the overflow never engages. */
+.qa2-sheet-body { flex: 1 1 auto; min-height: 0; padding: var(--qa-s4); overflow-y: auto; display: flex; flex-direction: column; gap: var(--qa-s3); scrollbar-width: thin; }
 .qa2-rowline { display: flex; align-items: baseline; justify-content: space-between; gap: var(--qa-s3); padding-bottom: var(--qa-s1); border-bottom: var(--qa-hairline) solid var(--qa-glass-border); }
 .qa2-rowline.is-sum { border-bottom: none; border-top: var(--qa-hairline) solid var(--qa-ink-faint); padding-top: var(--qa-s2); }
 
