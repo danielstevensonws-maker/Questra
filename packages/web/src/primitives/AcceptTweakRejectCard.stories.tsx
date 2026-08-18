@@ -16,24 +16,21 @@ import { DIFFICULTY_LADDER, RulingSuggestionSchema } from '@questra/contracts';
 import { AcceptTweakRejectCard } from './AcceptTweakRejectCard.js';
 import type { CardOutcome, CardState } from './AcceptTweakRejectCard.js';
 import { difficultyLadderToFallbackOptions, rulingSuggestionToRows } from './aiOutputToCard.js';
+import { MapCanvas } from './MapCanvas.js';
+import { ROOM, present } from './v2/fixtures.js';
 
 import fireball from '@questra/contracts/src/fixtures/fireball.json';
 
-/** The candlelit map ground the glass card floats over — same ground InfoPanel uses. */
+/**
+ * The ground the card floats over — the REAL map, not a gradient that looks
+ * like one. A glass card judged against flat paint is judged wrong, and the
+ * repo already owns the renderer, so there is no reason to draw a stand-in.
+ */
 function Ground({ children }: { children: ReactNode }) {
   return (
-    <div
-      style={{
-        position: 'relative',
-        minHeight: 620,
-        display: 'grid',
-        placeItems: 'center',
-        padding: 48,
-        overflow: 'hidden',
-        background: 'radial-gradient(120% 90% at 56% 30%, var(--qa-map-hi) 0%, var(--qa-map-mid) 44%, var(--qa-map-lo) 100%)',
-      }}
-    >
-      {children}
+    <div style={{ position: 'relative', minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 48, overflow: 'hidden' }}>
+      <MapCanvas room={ROOM} mode="play" fit="fill" present={present('pc-torvald')} />
+      <span style={{ position: 'relative', zIndex: 1, display: 'grid', placeItems: 'center', width: '100%' }}>{children}</span>
     </div>
   );
 }
@@ -79,11 +76,43 @@ export const DraftText: Story = {
   ),
 };
 
-/** Structured draft — a ruling as label/value rows. No Tweak (not free-text editable). */
+/**
+ * Structured draft — a ruling as label/value rows. Tweak is offered here too:
+ * the rows are not free-text editable, but the ruling is still the table's to
+ * argue with, and the host answers Tweak by opening the ladder (see Fallback).
+ */
 export const DraftStructured: Story = {
   render: () => (
     <Ground>
-      <AcceptTweakRejectCard state="draft" kind="structured" rows={RULING} />
+      <AcceptTweakRejectCard state="draft" kind="structured" rows={RULING} onTweak={() => {}} tweakLabel="Change it" />
+    </Ground>
+  ),
+};
+
+/**
+ * The same card, docked in the journal's stream. This is what the play
+ * screen's rail renders for a suggestion — one AI presentation, two
+ * placements, rather than the second look-alike the rail used to draw.
+ */
+export const Inline: Story = {
+  render: () => (
+    <Ground>
+      {/* Inside a rail, because that is the only place inline is ever used —
+          it has no glass of its own, so judging it directly against the map
+          would be judging a material it never sits on. */}
+      <span className="qa2-panel" style={{ width: 336 }}>
+        <AcceptTweakRejectCard
+          placement="inline"
+          state="draft"
+          kind="structured"
+          rows={RULING}
+          quoted="I want to swing on the well-rope and drop on the lookout."
+          acceptLabel="Ask for the roll"
+          tweakLabel="Change it"
+          rejectLabel="No roll needed"
+          onTweak={() => {}}
+        />
+      </span>
     </Ground>
   ),
 };
@@ -106,16 +135,15 @@ export const TweakMode: Story = {
   ),
 };
 
-/** The model failed — degrade to the real difficulty ladder. Buttons relabelled. */
+/**
+ * The model failed — degrade to the real difficulty ladder. Every rung is
+ * pickable, and Accept renames itself to whichever one is armed, so the button
+ * can never promise a difficulty other than the one it will apply.
+ */
 export const Fallback: Story = {
   render: () => (
     <Ground>
-      <AcceptTweakRejectCard
-        state="fallback"
-        fallbackOptions={FALLBACK_OPTIONS}
-        acceptLabel="Use Moderate (13)"
-        rejectLabel="Dismiss"
-      />
+      <AcceptTweakRejectCard state="fallback" fallbackOptions={FALLBACK_OPTIONS} rejectLabel="Dismiss" />
     </Ground>
   ),
 };

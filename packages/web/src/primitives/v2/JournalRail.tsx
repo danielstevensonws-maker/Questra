@@ -24,8 +24,8 @@
  * wants the map back gets the map back without losing the notification.
  */
 import { useState, type FormEvent, type ReactElement } from 'react';
-import { Button } from '@questra/ui';
-import { Eyebrow, Glyph, narration, prose, quote, statMeta, statValue } from '../../design/index.js';
+import { AcceptTweakRejectCard } from '../AcceptTweakRejectCard.js';
+import { Eyebrow, Glyph, narration, prose, statMeta, statValue } from '../../design/index.js';
 import type { LogEntryVM } from './viewModel.js';
 
 const REACTIONS = ['👏', '🔥', '😂', '😮', '✨', '❤️'] as const;
@@ -138,21 +138,33 @@ export function JournalRail({ entries, notes, open, onToggle, pendingCount = 0, 
 function Entry({ entry }: { entry: LogEntryVM }): ReactElement {
   const [openRoll, setOpenRoll] = useState(false);
 
+  // A proposal renders as THE AI card, inline. The rail used to draw its own
+  // quote-plus-buttons block, which meant the product had two ways of showing
+  // an assistant's output and only one of them carried the accept/tweak/reject
+  // guarantee. Same card, same three motions, docked in the stream.
   if (entry.tone === 'suggestion' && entry.suggestion !== undefined) {
+    const s = entry.suggestion;
     return (
       <div className="qa2-entry">
         <Eyebrow>{entry.actor}</Eyebrow>
-        <div className="qa2-suggestion">
-          <p style={{ ...quote, margin: 0 }}>&ldquo;{entry.text}&rdquo;</p>
-          <p style={{ ...prose, margin: 0, color: 'var(--qa-ink)' }}>{entry.suggestion.detail}</p>
-          <div style={{ display: 'flex', gap: 'var(--qa-s2)', flexWrap: 'wrap' }}>
-            {entry.suggestion.actions.map((a, i) => (
-              <Button key={a.label} variant={i === 0 ? 'primary' : 'quiet'} onClick={a.onClick} style={{ fontSize: 'var(--qa-text-label)', padding: 'var(--qa-s1) var(--qa-s3)' }}>
-                {a.label}
-              </Button>
-            ))}
-          </div>
-        </div>
+        <AcceptTweakRejectCard
+          placement="inline"
+          state={s.outcome !== undefined ? 'resolved' : 'draft'}
+          kind={s.rows !== undefined ? 'structured' : 'text'}
+          eyebrow="Suggestion"
+          source={s.rows !== undefined ? 'DM Ruling' : 'DM Narration'}
+          quoted={entry.text}
+          {...(s.detail !== undefined ? { text: s.detail } : {})}
+          {...(s.rows !== undefined ? { rows: s.rows } : {})}
+          {...(s.outcome !== undefined ? { outcome: s.outcome } : {})}
+          {...(s.acceptLabel !== undefined ? { acceptLabel: s.acceptLabel } : {})}
+          {...(s.tweakLabel !== undefined ? { tweakLabel: s.tweakLabel } : {})}
+          {...(s.rejectLabel !== undefined ? { rejectLabel: s.rejectLabel } : {})}
+          {...(s.onAccept !== undefined ? { onAccept: s.onAccept } : {})}
+          {...(s.onTweak !== undefined ? { onTweak: s.onTweak } : {})}
+          {...(s.onReject !== undefined ? { onReject: s.onReject } : {})}
+          {...(s.onUndo !== undefined ? { onUndo: s.onUndo } : {})}
+        />
       </div>
     );
   }

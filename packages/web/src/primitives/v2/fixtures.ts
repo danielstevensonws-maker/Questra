@@ -225,13 +225,23 @@ export const ENTRIES: LogEntryVM[] = [
   {
     id: '5', tone: 'suggestion', actor: 'Ruling suggestion',
     text: 'I want to swing on the well-rope and drop on the lookout.',
+    // A ruling, so it arrives as ROWS rather than a paragraph — the three
+    // things a player has to weigh are what to roll, what to beat, and what
+    // happens if they miss, and a sentence makes you find all three.
     suggestion: {
-      detail: 'This looks like Dexterity (Acrobatics) against difficulty 13. On a miss, Wren lands flat in the goblin’s square.',
-      actions: [
-        { label: 'Ask for the roll', onClick: noop('ask for the roll') },
-        { label: 'Change it', onClick: noop('change it') },
-        { label: 'No roll needed', onClick: noop('no roll') },
+      rows: [
+        { label: 'Roll', value: 'Dexterity (Acrobatics)' },
+        { label: 'Beat', value: '13', variant: 'number' },
+        { label: 'On a miss', value: 'Wren lands flat in the goblin’s square.', variant: 'note' },
       ],
+      // The motions are renamed for the table, never redefined: Accept asks
+      // for the roll, Tweak changes it, Reject says no roll is needed.
+      acceptLabel: 'Ask for the roll',
+      tweakLabel: 'Change it',
+      rejectLabel: 'No roll needed',
+      onAccept: noop('ask for the roll'),
+      onTweak: noop('change it'),
+      onReject: noop('no roll'),
     },
   },
   { id: '6', tone: 'narration', actor: 'DM', text: 'Torvald — you are up. The lookout has one eye on you and one on the barn door.' },

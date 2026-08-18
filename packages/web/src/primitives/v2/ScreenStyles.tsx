@@ -463,15 +463,6 @@ const CSS = `
 .qa2-rollrow:hover { border-color: var(--qa-accent-line); }
 .qa2-breakdown { list-style: none; margin: 0; padding: var(--qa-s2) var(--qa-s3) 0; display: flex; flex-direction: column; gap: 2px; }
 .qa2-breakdown li { display: flex; justify-content: space-between; gap: var(--qa-s3); }
-.qa2-suggestion {
-  padding: var(--qa-s3);
-  border: var(--qa-hairline) solid var(--qa-accent-line);
-  border-radius: var(--qa-radius);
-  background: var(--qa-accent-soft);
-  display: flex;
-  flex-direction: column;
-  gap: var(--qa-s2);
-}
 .qa2-react { display: flex; gap: var(--qa-s1); padding: 0 var(--qa-s4) var(--qa-s2); flex: none; }
 .qa2-reactbtn {
   width: 26px;

@@ -364,6 +364,122 @@ const CSS = `
 .qa2-step > button { width: 28px; height: 26px; border: none; background: transparent; color: var(--qa-ink-dim); cursor: pointer; font-family: var(--qa-font-mono); }
 .qa2-step > button:hover { color: var(--qa-accent); }
 
+/* ---- the assistant's card --------------------------------------------------
+   ONE surface for anything a model wrote (Orchestration §4). Two placements,
+   because the same proposal arrives in two situations and must read as the
+   same object in both:
+
+   float  — it interrupted you. A glass card over the map, its own shadow.
+   inline — it is one item in the journal's stream. No shadow, no glass of its
+            own, and an accent rule down the left edge so it reads as a card
+            inside the rail rather than a second rail.
+
+   The accent dot is the one thing that never varies: it is how you know a
+   machine wrote this and not the person sitting next to you. */
+.qa2-ai { display: flex; flex-direction: column; overflow: hidden; }
+/* The glass is spelled out rather than composed from qa2-panel: a panel owns
+   its own padding and gap, and this card pads its head, body and footer
+   separately so the footer band can reach the edges. Same tokens, so the two
+   surfaces still read as one material. */
+.qa2-ai.is-float {
+  width: 560px;
+  max-width: 100%;
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-radius: var(--qa-radius-lg);
+  background: var(--qa-glass);
+  backdrop-filter: blur(var(--qa-glass-blur));
+  -webkit-backdrop-filter: blur(var(--qa-glass-blur));
+  box-shadow: var(--qa-shadow-pop);
+  animation: qa2-rise var(--qa-dur) var(--qa-ease);
+}
+.qa2-ai.is-inline {
+  width: 100%;
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-left: 2px solid var(--qa-accent-line);
+  border-radius: var(--qa-radius);
+  background: var(--qa-chip);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+.qa2-ai-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--qa-s3);
+  padding: var(--qa-s3) var(--qa-s4) var(--qa-s2);
+}
+.qa2-ai-who { display: flex; align-items: center; gap: var(--qa-s2); }
+.qa2-ai-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: var(--qa-radius-round);
+  background: var(--qa-accent);
+  box-shadow: 0 0 8px var(--qa-accent-glow);
+}
+.qa2-ai-body { display: flex; flex-direction: column; gap: var(--qa-s3); padding: 0 var(--qa-s4) var(--qa-s4); }
+.qa2-ai-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--qa-s2);
+  flex-wrap: wrap;
+  padding: var(--qa-s3) var(--qa-s4);
+  border-top: var(--qa-hairline) solid var(--qa-glass-border);
+}
+.qa2-ai.is-float .qa2-ai-foot { background: var(--qa-glass-solid); }
+/* In a rail there is no room to push Reject to the far edge. The button
+   sizing is passed as a style prop rather than set here: Button writes its
+   padding inline, and an inline style beats a class every time. */
+.qa2-ai.is-inline .qa2-ai-foot { gap: var(--qa-s1); }
+/* A label and its value share a line — unless the value is a whole sentence,
+   which never survives being squeezed into the right half of a narrow rail.
+   Consequences stack under their label and read left to right like prose. */
+.qa2-ai .qa2-rowline > :first-child { flex: none; white-space: nowrap; }
+.qa2-ai .qa2-rowline.is-note { flex-direction: column; align-items: flex-start; gap: 2px; }
+/* Blinks while the model is still writing, so a half-finished sentence does
+   not read as a finished one. */
+.qa2-ai-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  vertical-align: -2px;
+  margin-left: 2px;
+  background: var(--qa-accent);
+  animation: qa2-blink var(--qa-dice-settle) steps(1) infinite;
+}
+/* The ladder, when there is no model to ask. Every rung is pickable — the
+   whole point of the fallback is that YOU set the difficulty, so offering
+   three tiles and only applying the recommended one was a menu that lied. */
+.qa2-ai-opts { display: flex; gap: var(--qa-s2); }
+.qa2-ai-opt {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  padding: var(--qa-s3);
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-radius: var(--qa-radius);
+  background: var(--qa-chip);
+  cursor: pointer;
+  transition: border-color var(--qa-dur-fast) var(--qa-ease), background var(--qa-dur-fast) var(--qa-ease);
+}
+.qa2-ai-opt:hover { border-color: var(--qa-accent-line); }
+.qa2-ai-opt.is-picked { background: var(--qa-accent-soft); border-color: var(--qa-accent-line); }
+.qa2-ai-done { display: flex; align-items: center; gap: var(--qa-s3); }
+.qa2-ai-seal { width: 8px; height: 8px; flex: none; border-radius: var(--qa-radius-round); background: var(--qa-ink-faint); }
+.qa2-ai-seal.is-applied { background: var(--qa-success); }
+.qa2-ai-undo {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--qa-ink-faint);
+  cursor: pointer;
+  transition: color var(--qa-dur) var(--qa-ease);
+}
+.qa2-ai-undo:hover { color: var(--qa-ink); }
+
 /* ---- the map ---------------------------------------------------------------
    One renderer serves the planner, the DM screen and the play screen, so its
    chrome lives here rather than beside any one of them. Two fits:
@@ -504,6 +620,7 @@ const CSS = `
 @keyframes qa2-land { from { transform: scale(1.14); opacity: 0.4; } to { transform: none; opacity: 1; } }
 @keyframes qa2-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes qa2-breathe { from { box-shadow: 0 0 0 3px var(--qa-accent-soft); } to { box-shadow: 0 0 0 7px var(--qa-accent-soft); } }
+@keyframes qa2-blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
 
 /*
  * The still equivalents. Because every rule above describes the FINISHED state

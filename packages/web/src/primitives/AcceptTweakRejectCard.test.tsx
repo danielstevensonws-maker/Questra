@@ -85,17 +85,27 @@ describe('AcceptTweakRejectCard — draft (text)', () => {
 });
 
 describe('AcceptTweakRejectCard — draft (structured)', () => {
-  it('renders rows and never offers Tweak, even if onTweak is supplied', () => {
-    render(
-      <AcceptTweakRejectCard
-        state="draft"
-        kind="structured"
-        rows={[{ label: 'DC', value: '14', variant: 'number' }]}
-        onTweak={() => {}}
-      />,
-    );
+  it('renders the ruling rows', () => {
+    render(<AcceptTweakRejectCard state="draft" kind="structured" rows={[{ label: 'DC', value: '14', variant: 'number' }]} />);
     expect(screen.getByText('DC')).toBeDefined();
     expect(screen.getByText('14')).toBeDefined();
+  });
+
+  /**
+   * A ruling's rows are not free-text editable, and the tweak MODE stays
+   * prose-only for that reason. But "not editable as text" is not "not
+   * arguable": law 1 puts the ruling with the table, so a structured card
+   * offers Tweak too and the host answers it by opening the ladder.
+   */
+  it('offers Tweak on a ruling — the host decides what changing it means', () => {
+    const onTweak = vi.fn();
+    render(<AcceptTweakRejectCard state="draft" kind="structured" rows={[{ label: 'DC', value: '14' }]} onTweak={onTweak} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Tweak' }));
+    expect(onTweak).toHaveBeenCalledOnce();
+  });
+
+  it('still offers nothing when the host cannot honour it', () => {
+    render(<AcceptTweakRejectCard state="draft" kind="structured" rows={[{ label: 'DC', value: '14' }]} />);
     expect(screen.queryByRole('button', { name: 'Tweak' })).toBeNull();
   });
 });
@@ -157,6 +167,48 @@ describe('AcceptTweakRejectCard — fallback (the non-AI path)', () => {
   it('never offers Tweak — a fallback ladder pick is not free-text editable', () => {
     render(<AcceptTweakRejectCard state="fallback" fallbackOptions={[]} />);
     expect(screen.queryByRole('button', { name: 'Tweak' })).toBeNull();
+  });
+
+  /**
+   * The ladder's whole purpose is "set the difficulty YOURSELF". It used to
+   * render three tiles that looked pickable, arm the recommended one, and
+   * apply that no matter which tile you pressed — a menu that lied. Every rung
+   * is a real choice now.
+   */
+  it('applies the rung you picked, not the one it recommended', () => {
+    const onAccept = vi.fn();
+    render(
+      <AcceptTweakRejectCard
+        state="fallback"
+        fallbackOptions={[
+          { name: 'Easy', value: '10' },
+          { name: 'Moderate', value: '13', recommended: true },
+          { name: 'Hard', value: '18' },
+        ]}
+        onAccept={onAccept}
+      />,
+    );
+    expect(screen.getByRole('radio', { name: /Moderate/ }).getAttribute('aria-checked')).toBe('true');
+
+    fireEvent.click(screen.getByRole('radio', { name: /Hard/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use Hard (18)' }));
+    expect(onAccept).toHaveBeenCalledWith({ name: 'Hard', value: '18' });
+  });
+
+  it('Accept renames itself to whatever is armed — it cannot promise the wrong number', () => {
+    render(
+      <AcceptTweakRejectCard
+        state="fallback"
+        fallbackOptions={[
+          { name: 'Easy', value: '10' },
+          { name: 'Moderate', value: '13', recommended: true },
+        ]}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Use Moderate (13)' })).toBeDefined();
+    fireEvent.click(screen.getByRole('radio', { name: /Easy/ }));
+    expect(screen.getByRole('button', { name: 'Use Easy (10)' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Use Moderate (13)' })).toBeNull();
   });
 });
 

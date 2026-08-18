@@ -56,6 +56,8 @@ const HUD_FILES = [
   'primitives/v2/ScreenStyles.tsx',
   // the one map renderer, shared by the planner, the DM screen and play
   'primitives/MapCanvas.tsx',
+  // the one AI-output card, shared by every surface a model writes into
+  'primitives/AcceptTweakRejectCard.tsx',
 ];
 
 /** The modules allowed to name a font family — the type ramp and the sheets. */

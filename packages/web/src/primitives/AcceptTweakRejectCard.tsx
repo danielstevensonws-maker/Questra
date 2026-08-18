@@ -3,15 +3,19 @@
  * CLAUDE.md law #2 "the app must never say no" pairs with "AI suggests, the
  * DM decides"; component-list A3).
  *
- * Rebuilt to the Claude Design handoff (Design_handoff/design_handoff_accepttweakreject/).
- * Floats as a glass card over the battle-map ground — centered, no scrim
- * (unlike InfoPanel's slide-over). Any AI output that populates UI renders
- * through this ONE card; there is no second AI presentation anywhere in the
- * product.
+ * Any AI output that populates UI renders through this ONE card; there is no
+ * second AI presentation anywhere in the product. The play screen's journal
+ * had quietly become one — its own quote-plus-buttons block, in its own visual
+ * language, doing this card's job — so it now renders this card inline instead.
+ * That is what `placement` is for:
  *
- * THE INVARIANT: nothing an AI writes is applied until a human presses
- * Accept (or edits it via Tweak and saves, or picks a Fallback option).
- * Reject always leaves the scene untouched.
+ *   float   it interrupted you. A glass card over the map, its own shadow.
+ *   inline  it is one item in the journal's stream. No glass of its own, an
+ *           accent rule down the left edge, and the same three motions.
+ *
+ * THE INVARIANT: nothing an AI writes is applied until a human presses Accept
+ * (or edits it via Tweak and saves, or picks a Fallback option). Reject always
+ * leaves the scene untouched.
  *
  * THE HOST OWNS THE STATE MACHINE. This component never transitions itself —
  * it only reports intent via callbacks (onAccept/onReject/…) and the host
@@ -19,17 +23,21 @@
  * keeps the state machine visible and testable in the caller, the same way
  * InfoPanel's open/close lives in its caller, not inside the panel.
  *
- * Content is agnostic via `kind`: "text" renders prose (and offers Tweak,
- * since prose is free-editable); "structured" renders label/value rows (a
- * ruling's check/DC/consequence) and never offers Tweak — see
- * aiOutputToCard.ts for the @questra/contracts → StructuredRow[] mapping.
+ * Content is agnostic via `kind`: "text" renders prose, "structured" renders
+ * label/value rows (a ruling's check/DC/consequence). See aiOutputToCard.ts
+ * for the @questra/contracts → StructuredRow[] mapping — a new AI output
+ * schema needs a mapping there, never a change here.
  */
-import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
+import { Button } from '@questra/ui';
+import { DesignStyles, Eyebrow, narration, prose, quote, statMeta, statValue } from '../design/index.js';
 
 export type CardState = 'streaming' | 'draft' | 'tweak' | 'fallback' | 'resolved';
 export type CardKind = 'text' | 'structured';
 export type CardOutcome = 'accepted' | 'tweaked' | 'rejected';
+
+/** Over the map, or inside the journal's stream. Default "float". */
+export type CardPlacement = 'float' | 'inline';
 
 export interface StructuredRow {
   label: string;
@@ -46,13 +54,20 @@ export interface FallbackOption {
 
 export interface AcceptTweakRejectCardProps {
   state: CardState;
-  /** Body shape for draft/streaming/tweak. Only "text" drafts offer Tweak. Default "text". */
+  /** Body shape for draft/streaming/tweak. Default "text". */
   kind?: CardKind;
+  /** Default "float". */
+  placement?: CardPlacement;
   /** Header eyebrow. Default "Suggestion" (or "Fallback" in the fallback state). */
   eyebrow?: string;
   /** Header source tag, e.g. "DM Narration" / "DM Ruling". */
   source?: string;
 
+  /**
+   * What the player said that prompted this. Shown above the body so a
+   * suggestion in a busy journal still says what it is answering.
+   */
+  quoted?: string;
   /** Prose body (draft/streaming/tweak seed). */
   text?: string;
   /** Structured ruling body. */
@@ -62,8 +77,13 @@ export interface AcceptTweakRejectCardProps {
   fallbackPrompt?: string;
   fallbackOptions?: FallbackOption[];
 
-  /** Footer labels. */
+  /**
+   * Footer labels. Accept defaults to "Accept", or on the ladder to the rung
+   * currently armed ("Use Moderate (13)") so the button never names a
+   * difficulty other than the one it will apply.
+   */
   acceptLabel?: string;
+  tweakLabel?: string;
   rejectLabel?: string;
 
   /** Outcome shown in the resolved state. Default "accepted". */
@@ -83,19 +103,19 @@ export interface AcceptTweakRejectCardProps {
   onOutcome?: (outcome: CardOutcome) => void;
 }
 
-const mono = 'var(--qa-font-mono)';
-const body = 'var(--qa-font-body)';
-
 export function AcceptTweakRejectCard({
   state,
   kind = 'text',
+  placement = 'float',
   eyebrow,
   source,
+  quoted,
   text = '',
   rows = [],
   fallbackPrompt = "The assistant couldn't reach a ruling. Set the difficulty yourself:",
   fallbackOptions = [],
-  acceptLabel = 'Accept',
+  acceptLabel,
+  tweakLabel = 'Tweak',
   rejectLabel = 'Reject',
   outcome = 'accepted',
   onAccept,
@@ -105,9 +125,15 @@ export function AcceptTweakRejectCard({
   onCancelTweak,
   onUndo,
   onOutcome,
-}: AcceptTweakRejectCardProps) {
+}: AcceptTweakRejectCardProps): ReactElement {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const [tweakText, setTweakText] = useState(text);
+
+  // Which rung of the ladder is armed. The recommendation is only a starting
+  // position — see the option tiles for why it has to be changeable.
+  const recommended = fallbackOptions.find((o) => o.recommended) ?? fallbackOptions[0];
+  const [picked, setPicked] = useState<string | undefined>(recommended?.name);
+  useEffect(() => setPicked(recommended?.name), [recommended?.name]);
 
   // Seed + focus (caret at end) only on ENTERING tweak mode — `text` is
   // deliberately not a dependency, or every keystroke upstream would stomp
@@ -126,267 +152,145 @@ export function AcceptTweakRejectCard({
   const structured = kind === 'structured';
   const isFallback = state === 'fallback';
   const isDecision = state === 'draft' || state === 'fallback';
-  const showTweakBtn = state === 'draft' && !structured && onTweak !== undefined;
+  // Tweak is offered whenever the host can honour it, prose or ruling. The
+  // card used to refuse it on structured content, which quietly conflated two
+  // different things: a ruling's rows are not free-text editable (true — the
+  // tweak MODE below stays prose-only), and a ruling cannot be argued with
+  // (false, and law 1 says the opposite). A structured host answers Tweak by
+  // opening the difficulty ladder; a prose host opens the editor.
+  const showTweakBtn = state === 'draft' && onTweak !== undefined;
   const showFooter = state === 'draft' || state === 'fallback' || state === 'tweak';
 
   const resolvedEyebrow = eyebrow ?? (isFallback ? 'Fallback' : 'Suggestion');
   const resolvedSource = source ?? (structured ? 'DM Ruling' : 'DM Narration');
 
-  const outcomeCopy: Record<CardOutcome, { text: string; color: string }> = {
-    accepted: { text: 'Accepted — applied to the scene.', color: 'var(--qa-success)' },
-    tweaked: { text: 'Saved your changes — applied to the scene.', color: 'var(--qa-success)' },
-    rejected: { text: 'Rejected — nothing was applied.', color: 'var(--qa-ink-faint)' },
+  const done: Record<CardOutcome, string> = {
+    accepted: 'Accepted — applied to the scene.',
+    tweaked: 'Saved your changes — applied to the scene.',
+    rejected: 'Rejected — nothing was applied.',
   };
-  const oc = outcomeCopy[outcome];
 
-  const handleAccept = () => {
-    const option = isFallback ? fallbackOptions.find((o) => o.recommended) : undefined;
+  // Button writes its padding as an inline style, so a class cannot shrink it
+  // — the size has to arrive the same way. Three full-size buttons overflow a
+  // rail; compacting them keeps the three motions on one or two tidy lines.
+  const btn: CSSProperties | undefined =
+    placement === 'inline' ? { padding: 'var(--qa-s1) var(--qa-s3)', fontSize: 'var(--qa-text-label)' } : undefined;
+
+  // On the ladder, Accept names what it will apply — and has to keep naming it
+  // as the pick moves, or the button says Moderate while Hard is armed. An
+  // explicit label still wins: a caller who wants "Ask for the roll" gets it.
+  const pickedOption = fallbackOptions.find((o) => o.name === picked);
+  const accept =
+    acceptLabel ?? (isFallback && pickedOption !== undefined ? `Use ${pickedOption.name} (${pickedOption.value})` : 'Accept');
+
+  const handleAccept = (): void => {
+    const option = isFallback ? pickedOption : undefined;
     onAccept?.(option);
     onOutcome?.('accepted');
   };
-  const handleReject = () => {
+  const handleReject = (): void => {
     onReject?.();
     onOutcome?.('rejected');
   };
-  const handleSaveTweak = () => {
+  const handleSaveTweak = (): void => {
     onSaveTweak?.(tweakText);
     onOutcome?.('tweaked');
   };
 
   return (
     <section
-      className="qa-atr-card"
+      className={`qa2-ai is-${placement}`}
       role="region"
       aria-label={`${resolvedEyebrow} — ${structured ? 'DM ruling' : 'narration'}`}
       aria-busy={state === 'streaming'}
-      style={{
-        width: 560,
-        maxWidth: '100%',
-        background: 'var(--qa-glass)',
-        border: 'var(--qa-hairline) solid var(--qa-glass-border)',
-        borderRadius: 'var(--qa-radius-lg)',
-        backdropFilter: 'blur(var(--qa-glass-blur))',
-        WebkitBackdropFilter: 'blur(var(--qa-glass-blur))',
-        boxShadow: 'var(--qa-shadow-pop)',
-        overflow: 'hidden',
-        color: 'var(--qa-ink)',
-        fontFamily: body,
-        animation: 'qa-card-in var(--qa-dur) var(--qa-ease-out)',
-      }}
     >
-      {/* ---- header ----------------------------------------------------- */}
-      <header
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 'var(--qa-s3)',
-          padding: 'var(--qa-s5) var(--qa-s5) var(--qa-s3)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--qa-s2)' }}>
-          <span
-            title="An assistant wrote this"
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 'var(--qa-radius-round)',
-              background: 'var(--qa-accent)',
-              boxShadow: '0 0 8px var(--qa-accent-glow)',
-              flex: 'none',
-            }}
-          />
-          <span
-            style={{
-              fontFamily: mono,
-              fontSize: 'var(--qa-text-whisper)',
-              letterSpacing: 'var(--qa-tracking-caps)',
-              textTransform: 'uppercase',
-              color: 'var(--qa-ink-dim)',
-            }}
-          >
-            {resolvedEyebrow}
-          </span>
-        </div>
-        <span
-          style={{
-            fontFamily: mono,
-            fontSize: 'var(--qa-text-whisper)',
-            letterSpacing: 'var(--qa-tracking-caps)',
-            textTransform: 'uppercase',
-            color: 'var(--qa-ink-faint)',
-          }}
-        >
-          {resolvedSource}
+      <DesignStyles />
+
+      <header className="qa2-ai-head">
+        <span className="qa2-ai-who">
+          <span className="qa2-ai-dot" title="An assistant wrote this" />
+          <Eyebrow>{resolvedEyebrow}</Eyebrow>
         </span>
+        <span style={statMeta}>{resolvedSource}</span>
       </header>
 
-      {/* ---- body --------------------------------------------------------- */}
-      <div style={{ padding: '0 var(--qa-s5) var(--qa-s5)' }}>
-        {state === 'draft' && !structured && (
-          <p
-            style={{
-              fontFamily: body,
-              fontSize: 'var(--qa-text-body)',
-              lineHeight: 1.6,
-              color: 'var(--qa-ink)',
-              margin: 0,
-              whiteSpace: 'pre-line',
-              textWrap: 'pretty',
-            }}
-          >
-            {text}
-          </p>
-        )}
+      <div className="qa2-ai-body">
+        {quoted !== undefined && <p style={{ ...quote, margin: 0 }}>&ldquo;{quoted}&rdquo;</p>}
 
-        {state === 'draft' && structured && (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {rows.map((row, i) => (
-              <StructuredRowLine key={row.label} row={row} first={i === 0} />
-            ))}
-          </div>
-        )}
+        {state === 'draft' && !structured && <p style={{ ...narration, margin: 0, whiteSpace: 'pre-line' }}>{text}</p>}
+
+        {state === 'draft' && structured && rows.map((row) => <RulingRow key={row.label} row={row} />)}
 
         {state === 'streaming' && (
-          <p
-            style={{
-              fontFamily: body,
-              fontSize: 'var(--qa-text-body)',
-              lineHeight: 1.6,
-              color: 'var(--qa-ink)',
-              margin: 0,
-              whiteSpace: 'pre-line',
-            }}
-          >
+          <p style={{ ...narration, margin: 0, whiteSpace: 'pre-line' }}>
             {text}
-            <span
-              style={{
-                display: 'inline-block',
-                width: 2,
-                height: '1.05em',
-                verticalAlign: -2,
-                marginLeft: 2,
-                background: 'var(--qa-accent)',
-                animation: 'qa-blink 1s steps(1) infinite',
-              }}
-            />
+            <span className="qa2-ai-caret" aria-hidden="true" />
           </p>
         )}
 
         {state === 'tweak' && (
-          <textarea
-            ref={taRef}
-            value={tweakText}
-            onChange={(e) => setTweakText(e.target.value)}
-            aria-label="Edit the suggestion"
-            style={{
-              width: '100%',
-              minHeight: 148,
-              resize: 'vertical',
-              background: 'var(--qa-glass-solid)',
-              border: 'var(--qa-hairline) solid var(--qa-accent-line)',
-              borderRadius: 'var(--qa-radius)',
-              padding: 'var(--qa-s3)',
-              fontFamily: body,
-              fontSize: 'var(--qa-text-body)',
-              lineHeight: 1.55,
-              color: 'var(--qa-ink)',
-              outline: 'none',
-              boxShadow: '0 0 0 3px var(--qa-accent-soft)',
-            }}
-          />
+          <span className="qa2-open">
+            <textarea
+              ref={taRef}
+              className="qa2-input"
+              value={tweakText}
+              onChange={(e) => setTweakText(e.target.value)}
+              aria-label="Edit the suggestion"
+              style={{ ...prose, minHeight: 148, width: '100%' }}
+            />
+          </span>
         )}
 
         {state === 'fallback' && (
           <>
-            <p
-              style={{
-                fontFamily: body,
-                fontSize: 'var(--qa-text-body)',
-                lineHeight: 1.55,
-                color: 'var(--qa-ink-dim)',
-                margin: '0 0 var(--qa-s4)',
-                textWrap: 'pretty',
-              }}
-            >
-              {fallbackPrompt}
-            </p>
-            <div style={{ display: 'flex', gap: 'var(--qa-s2)' }}>
+            <p style={{ ...prose, margin: 0 }}>{fallbackPrompt}</p>
+            <div className="qa2-ai-opts" role="radiogroup" aria-label="Difficulty">
               {fallbackOptions.map((option) => (
-                <div
+                <button
                   key={option.name}
-                  style={{
-                    flex: 1,
-                    textAlign: 'center',
-                    padding: 'var(--qa-s3)',
-                    borderRadius: 'var(--qa-radius)',
-                    background: option.recommended === true ? 'var(--qa-accent-soft)' : 'var(--qa-chip)',
-                    border: `var(--qa-hairline) solid ${option.recommended === true ? 'var(--qa-accent-line)' : 'var(--qa-glass-border)'}`,
-                  }}
+                  type="button"
+                  role="radio"
+                  aria-checked={option.name === picked}
+                  className={`qa2-ai-opt${option.name === picked ? ' is-picked' : ''}`}
+                  onClick={() => setPicked(option.name)}
                 >
-                  <div style={{ fontFamily: body, fontSize: 'var(--qa-text-label)', color: 'var(--qa-ink-dim)' }}>{option.name}</div>
-                  <div style={{ fontFamily: mono, fontSize: 'var(--qa-text-lg)', color: 'var(--qa-ink)', lineHeight: 1.1, marginTop: 2 }}>
-                    {option.value}
-                  </div>
-                </div>
+                  <span style={prose}>{option.name}</span>
+                  <span style={statValue}>{option.value}</span>
+                </button>
               ))}
             </div>
           </>
         )}
 
         {state === 'resolved' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--qa-s3)' }}>
-            <span style={{ width: 8, height: 8, borderRadius: 'var(--qa-radius-round)', background: oc.color, flex: 'none' }} />
-            <span style={{ fontFamily: body, fontSize: 'var(--qa-text-body)', color: 'var(--qa-ink-dim)' }}>{oc.text}</span>
-            <button
-              type="button"
-              onClick={() => onUndo?.()}
-              style={{
-                marginLeft: 'auto',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: mono,
-                fontSize: 'var(--qa-text-whisper)',
-                letterSpacing: 'var(--qa-tracking-caps)',
-                textTransform: 'uppercase',
-                color: 'var(--qa-ink-faint)',
-                transition: 'color var(--qa-dur) var(--qa-ease)',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--qa-ink)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--qa-ink-faint)')}
-            >
+          <div className="qa2-ai-done">
+            <span className={`qa2-ai-seal${outcome === 'rejected' ? '' : ' is-applied'}`} />
+            <span style={prose}>{done[outcome]}</span>
+            <button type="button" className="qa2-ai-undo" style={statMeta} onClick={() => onUndo?.()}>
               Undo
             </button>
           </div>
         )}
       </div>
 
-      {/* ---- footer: deciding happens HERE ------------------------------ */}
+      {/* deciding happens HERE, and only here */}
       {showFooter && (
-        <footer
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--qa-s2)',
-            padding: 'var(--qa-s4) var(--qa-s5)',
-            background: 'var(--qa-glass-solid)',
-            borderTop: 'var(--qa-hairline) solid var(--qa-glass-border)',
-          }}
-        >
+        <footer className="qa2-ai-foot">
           {isDecision && (
             <>
-              <PrimaryButton label={acceptLabel} onClick={handleAccept} />
-              {showTweakBtn && <GhostButton label="Tweak" onClick={() => onTweak?.()} />}
-              <div style={{ flex: 1, minWidth: 'var(--qa-s6)' }} />
-              <RejectButton label={rejectLabel} onClick={handleReject} />
+              <Button variant="primary" style={btn} onClick={handleAccept}>{accept}</Button>
+              {showTweakBtn && <Button style={btn} onClick={() => onTweak?.()}>{tweakLabel}</Button>}
+              {/* Pushing Reject to the far edge separates a destructive motion
+                  from the ones beside it. A rail has no far edge to push to. */}
+              {placement === 'float' && <span style={{ flex: 1 }} />}
+              <Button variant="danger" style={btn} onClick={handleReject}>{rejectLabel}</Button>
             </>
           )}
 
           {state === 'tweak' && (
             <>
-              <PrimaryButton label="Save changes" onClick={handleSaveTweak} />
-              <GhostButton label="Cancel" onClick={() => onCancelTweak?.()} />
+              <Button variant="primary" style={btn} onClick={handleSaveTweak}>Save changes</Button>
+              <Button style={btn} onClick={() => onCancelTweak?.()}>Cancel</Button>
             </>
           )}
         </footer>
@@ -395,124 +299,20 @@ export function AcceptTweakRejectCard({
   );
 }
 
-/** One structured row: mono uppercase label (left, fixed width), value styled by variant (right). */
-function StructuredRowLine({ row, first }: { row: StructuredRow; first: boolean }) {
+/** One ruling row — mono label, value styled by what it IS rather than where it sits. */
+function RulingRow({ row }: { row: StructuredRow }): ReactElement {
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 'var(--qa-s4)',
-        padding: 'var(--qa-s3) 0',
-        ...(first ? {} : { borderTop: 'var(--qa-hairline) solid var(--qa-glass-border)' }),
-      }}
-    >
-      <div
-        style={{
-          fontFamily: mono,
-          fontSize: 'var(--qa-text-whisper)',
-          letterSpacing: 'var(--qa-tracking-caps)',
-          textTransform: 'uppercase',
-          color: 'var(--qa-ink-dim)',
-          width: 96,
-          flex: 'none',
-          paddingTop: 3,
-        }}
-      >
-        {row.label}
-      </div>
-      <div style={rowValueStyle(row.variant)}>{row.value}</div>
+    <div className={`qa2-rowline${row.variant === 'note' ? ' is-note' : ''}`}>
+      <span style={statMeta}>{row.label}</span>
+      <span style={valueRole(row.variant)}>{row.value}</span>
     </div>
   );
 }
 
-function rowValueStyle(variant: StructuredRow['variant']): CSSProperties {
-  if (variant === 'number') {
-    return { fontFamily: mono, fontSize: 'var(--qa-text-lg)', color: 'var(--qa-ink)', lineHeight: 1.2 };
-  }
-  if (variant === 'note') {
-    return { fontFamily: body, fontStyle: 'italic', fontSize: 'var(--qa-text-body)', color: 'var(--qa-ink-dim)', lineHeight: 1.45 };
-  }
-  return { fontFamily: body, fontSize: 'var(--qa-text-body)', color: 'var(--qa-ink)', lineHeight: 1.4 };
-}
-
-const btnBase: CSSProperties = {
-  height: 40,
-  display: 'grid',
-  placeItems: 'center',
-  borderRadius: 'var(--qa-radius)',
-  fontFamily: body,
-  fontSize: 'var(--qa-text-body)',
-  fontWeight: 500,
-  cursor: 'pointer',
-};
-
-function PrimaryButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        ...btnBase,
-        padding: '0 var(--qa-s5)',
-        background: 'var(--qa-accent)',
-        color: 'var(--qa-accent-ink)',
-        border: 'none',
-        transition: 'box-shadow var(--qa-dur) var(--qa-ease), transform var(--qa-dur-fast) var(--qa-ease)',
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 8px 24px -8px var(--qa-accent-glow)')}
-      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
-      onMouseDown={(e) => (e.currentTarget.style.transform = 'translateY(1px)')}
-      onMouseUp={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-    >
-      {label}
-    </button>
-  );
-}
-
-function GhostButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        ...btnBase,
-        padding: '0 var(--qa-s4)',
-        background: 'transparent',
-        color: 'var(--qa-ink)',
-        border: 'var(--qa-hairline) solid var(--qa-glass-border)',
-        transition: 'border-color var(--qa-dur) var(--qa-ease)',
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--qa-ink-faint)')}
-      onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--qa-glass-border)')}
-    >
-      {label}
-    </button>
-  );
-}
-
-function RejectButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        ...btnBase,
-        padding: '0 var(--qa-s4)',
-        background: 'transparent',
-        color: 'var(--qa-ink-dim)',
-        border: 'var(--qa-hairline) solid transparent',
-        transition: 'all var(--qa-dur) var(--qa-ease)',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.color = 'var(--qa-danger)';
-        e.currentTarget.style.background = 'var(--qa-danger-soft)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.color = 'var(--qa-ink-dim)';
-        e.currentTarget.style.background = 'transparent';
-      }}
-    >
-      {label}
-    </button>
-  );
+function valueRole(variant: StructuredRow['variant']): CSSProperties {
+  if (variant === 'number') return statValue;
+  // A consequence is a sentence, so it reads left to right like one. The other
+  // two are answers to a label and hang off the right edge beside it.
+  if (variant === 'note') return { ...prose, fontStyle: 'italic', color: 'var(--qa-ink-dim)' };
+  return { ...prose, textAlign: 'right' };
 }

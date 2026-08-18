@@ -23,6 +23,7 @@
  */
 import type { ComputedSheet, Intent, Skill } from '@questra/contracts';
 import { greyingReason, type Combatant, type ProjectionState } from '@questra/engine';
+import type { CardOutcome, StructuredRow } from '../AcceptTweakRejectCard.js';
 import { glyphFor, type ExplainVM, type GlyphName } from '../../design/index.js';
 
 /**
@@ -683,13 +684,41 @@ export interface LogRollVM {
   tone: 'hit' | 'miss' | 'neutral';
 }
 
+/**
+ * A proposal from the assistant, sitting in the journal.
+ *
+ * The shape is the AI card's, not a generic list of buttons, because the three
+ * motions are not interchangeable: Accept applies it, Tweak edits it first,
+ * Reject leaves the scene untouched. A caller can rename them — "Ask for the
+ * roll" reads better than "Accept" at a table — but it cannot invent a fourth,
+ * and it cannot make one of them mean something else.
+ *
+ * `outcome` is set once the host has decided, which turns the entry into the
+ * card's resolved state: what happened, and an Undo. A decision that scrolls
+ * away unrecorded is a decision nobody can take back (law 3).
+ */
+export interface LogSuggestionVM {
+  /** the proposal in prose. */
+  detail?: string;
+  /** or the proposal as a ruling — Check / difficulty / on a fail. */
+  rows?: StructuredRow[];
+  acceptLabel?: string;
+  tweakLabel?: string;
+  rejectLabel?: string;
+  onAccept?: () => void;
+  onTweak?: () => void;
+  onReject?: () => void;
+  onUndo?: () => void;
+  outcome?: CardOutcome;
+}
+
 export interface LogEntryVM {
   id: string;
   tone: 'narration' | 'chat' | 'roll' | 'system' | 'suggestion';
   actor: string;
   text: string;
   roll?: LogRollVM;
-  suggestion?: { detail: string; actions: { label: string; onClick: () => void }[] };
+  suggestion?: LogSuggestionVM;
 }
 
 /** What the result bay shows once a roll has settled at the near edge. */
