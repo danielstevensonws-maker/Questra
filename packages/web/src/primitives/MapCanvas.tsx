@@ -1,60 +1,104 @@
 /**
- * MapCanvas — the one renderer, three modes (Brief 06 §5). A single component
- * draws a Room in `edit` (planner), `play` (DM), or `table` (spectator) mode.
- * It calls the ONE contracts geometry — distFt / affectedCells / cellKey —
- * never a second implementation (§4.5), so the highlight a player sees is the
- * same math the engine batch-saves.
+ * MapCanvas — THE map. One renderer, three modes, two fits.
  *
- * Fog is server-side (CLAUDE.md non-negotiable #3): the caller passes a room
- * already run through filterRoomForViewer for player/table viewers, so this
+ * It calls the ONE contracts geometry — distFt / affectedCells / cellKey —
+ * never a second implementation (Brief 06 §4.5), so the highlight a player
+ * sees is the same maths the engine batch-saves. That is the whole reason
+ * there is one of these and not one per screen.
+ *
+ * WHAT THIS ABSORBED. The play screen had grown its own `TableGround`: a
+ * decorative CSS grid with tokens positioned by percentage, standing in for a
+ * map because this component could not fill a viewport. That gap is now a
+ * `fit` prop rather than a second component, so the play screen draws the REAL
+ * room — real fog, real cell tags, real geometry — instead of wallpaper that
+ * merely looked like one.
+ *
+ *   fit="contain"  an element on a page: keeps its radius, border and shadow.
+ *   fit="fill"     the ground beneath a floating HUD: edge to edge, no chrome,
+ *                  and a vignette so glass panels keep contrast at the corners.
+ *
+ * CELLS STAY SQUARE IN BOTH, which is why `fill` centres the grid rather than
+ * stretching it. Stretching would make cells rectangular, and `distFt` assumes
+ * square cells — a stretched map would draw range rings that disagree with the
+ * engine's own answer, which is exactly the class of bug the shared-geometry
+ * rule exists to prevent. Pick a room whose proportions suit the screen and
+ * the fill is edge to edge anyway.
+ *
+ * FOG IS SERVER-SIDE (CLAUDE.md non-negotiable #3): the caller passes a room
+ * already run through `filterRoomForViewer` for player/table viewers, so this
  * component never receives unrevealed cells or hidden/staged tokens to leak.
  * `isFogged` below is presentation only — if a hidden token DID reach the
- * client, this would happily draw it, which is why the filtering happens
+ * client this would happily draw it, which is why the filtering happens
  * upstream, not here.
  *
- * The ground uses the same radial gradient (--qa-map-hi/mid/lo) every other
- * primitive's Storybook "Ground" wrapper renders behind its floating glass —
- * this is that ground, made real and interactive rather than implied scenery.
- * Fog reuses the app's existing "something is hidden from you" language
- * (--qa-scrim + a glass blur) instead of a flat VTT-standard grey box, so the
- * map reads as one visual system with InfoPanel/AcceptTweakRejectCard/etc.,
- * not a bolted-on canvas widget.
- *
- * RESPONSIVE: the canvas fills its container's width and locks its height via
- * `aspect-ratio: w / h`, so cells stay perfectly square at any size — every
- * offset/size below is a percentage of the grid, never a `cellPx`-multiplied
- * absolute pixel. `cellPx` is now a ceiling (`max-width`), not a literal
- * dimension, so a host can cap how large cells get on a big screen without
- * pinning the map to a fixed size on a small one. Grid hairlines stay a crisp
- * 1px regardless of scale via a per-cell background tile (not a naive
- * percentage-width line, which would blur/thicken as the map resizes).
- *
- * Themed entirely via theme/tokens.css variables. No hardcoded colour.
+ * ALLEGIANCE IS NOT IN THE ROOM. A `Room` holds positions; it has no idea who
+ * is on your side, and it should not — the same room renders differently for
+ * every viewer. The caller supplies `present` from the projection, which is
+ * also where the enemy-secrecy rule lands: allies may carry numbers, enemies
+ * get a WORD (Unhurt, Bloodied, Down), because an enemy's exact hit points are
+ * the DM's to reveal.
  */
-import { useMemo } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import { useMemo, type ReactElement, type ReactNode } from 'react';
 import { distFt, affectedCells, cellKey, type Room, type Cell, type AoeShape } from '@questra/contracts';
+import { DesignStyles, Eyebrow, micro, statMeta } from '../design/index.js';
 
 export type MapMode = 'edit' | 'play' | 'table';
+
+/** Contained element, or full-bleed ground under a floating HUD. */
+export type MapFit = 'contain' | 'fill';
+
+/**
+ * How one creature should read to THIS viewer. Supplied by the caller from the
+ * projection, never by the room.
+ */
+export interface TokenPresentation {
+  /**
+   * What this creature is CALLED to this viewer — "Skirmisher", not
+   * `npc-goblin-1`. Names live with allegiance, for the same reason: a room
+   * stores a `creatureRef`, and the DM may have named that goblin for the
+   * table without renaming it in the room. Absent ⇒ initials off the ref,
+   * which is a fallback, not a plan.
+   */
+  name?: string;
+  /** drives the ring colour. Absent ⇒ a neutral disc. */
+  side?: 'you' | 'ally' | 'foe';
+  /** the one word under the disc — Unhurt, Bloodied, Down, Dying. */
+  tag?: string;
+  /** this creature is taking its turn right now. */
+  acting?: boolean;
+  down?: boolean;
+}
 
 export interface MapCanvasProps {
   room: Room;
   mode: MapMode;
-  /** Max cell size in px, as a ceiling on the map's rendered width (gridWidth * cellPx). Default 40. */
+  /** Default "contain". */
+  fit?: MapFit;
+  /** Max cell size in px, as a ceiling on the map's rendered width. Contain only. */
   cellPx?: number;
   /** an AoE template to preview (anchor + shape) — highlights affected cells. */
   aoe?: { shape: AoeShape; anchor: Cell };
   /** measure-from cell: highlights range rings (distFt) from here, e.g. an attacker. */
   measureFrom?: Cell;
+  /** per-creature presentation, keyed by `creatureRef`. */
+  present?: Record<string, TokenPresentation>;
   /** token click (play/edit): select or begin a move. */
-  onTokenClick?: (tokenId: string) => void;
+  onTokenClick?: (creatureRef: string) => void;
   /** cell click (edit: paint / play: move target). */
   onCellClick?: (cell: Cell) => void;
 }
 
-const mono = 'var(--qa-font-mono)';
-
-export function MapCanvas({ room, mode, cellPx = 40, aoe, measureFrom, onTokenClick, onCellClick }: MapCanvasProps) {
+export function MapCanvas({
+  room,
+  mode,
+  fit = 'contain',
+  cellPx = 40,
+  aoe,
+  measureFrom,
+  present,
+  onTokenClick,
+  onCellClick,
+}: MapCanvasProps): ReactElement {
   const { w, h } = room.gridSize;
   const cellPctX = 100 / w;
   const cellPctY = 100 / h;
@@ -64,67 +108,52 @@ export function MapCanvas({ room, mode, cellPx = 40, aoe, measureFrom, onTokenCl
     return new Set(affectedCells(aoe.shape, aoe.anchor).map(cellKey));
   }, [aoe]);
 
+  // Range numbers and the table badge are chrome for the people running the
+  // game; the spectator view stays clean.
   const chrome = mode !== 'table';
+  const filling = fit === 'fill';
 
-  return (
+  const grid = (
     <div
-      role="img"
-      aria-label={`Map ${room.id} (${mode} view)`}
+      className="qa2-map-grid"
       style={{
-        position: 'relative',
-        width: '100%',
-        maxWidth: w * cellPx,
         aspectRatio: `${w} / ${h}`,
-        borderRadius: 'var(--qa-radius)',
-        overflow: 'hidden',
-        userSelect: 'none',
-        // The terrain placeholder IS the ground every other primitive floats
-        // over — the real terrain image replaces the bottom layer in a later
-        // slice, the grid/fog/token layers stay the same either way.
+        ...(filling ? { width: `min(100%, calc(100vh * ${w / h}))` } : { maxWidth: w * cellPx }),
         backgroundImage: [
-          `linear-gradient(to right, transparent calc(100% - 1px), var(--qa-map-grid) calc(100% - 1px))`,
-          `linear-gradient(to bottom, transparent calc(100% - 1px), var(--qa-map-grid) calc(100% - 1px))`,
-          'radial-gradient(120% 90% at 56% 30%, var(--qa-map-hi) 0%, var(--qa-map-mid) 44%, var(--qa-map-lo) 100%)',
+          'linear-gradient(to right, transparent calc(100% - var(--qa-hairline)), var(--qa-map-grid) calc(100% - var(--qa-hairline)))',
+          'linear-gradient(to bottom, transparent calc(100% - var(--qa-hairline)), var(--qa-map-grid) calc(100% - var(--qa-hairline)))',
         ].join(', '),
-        backgroundSize: `${cellPctX}% ${cellPctY}%, ${cellPctX}% ${cellPctY}%, 100% 100%`,
-        border: 'var(--qa-hairline) solid var(--qa-glass-border)',
-        boxShadow: 'var(--qa-shadow)',
+        backgroundSize: `${cellPctX}% ${cellPctY}%, ${cellPctX}% ${cellPctY}%`,
       }}
     >
-      {/* grid + cell states */}
+      {/* cell states: fog, AoE, difficult terrain, and the measure rings */}
       {Array.from({ length: h }, (_, y) =>
         Array.from({ length: w }, (_, x) => {
           const cell = { x, y };
           const key = cellKey(cell);
-          const isRevealed = revealed.has(key);
-          const isFogged = mode !== 'edit' && !isRevealed; // edit sees all; play/table respect fog
+          const isFogged = mode !== 'edit' && !revealed.has(key); // edit sees all
           const tag = room.cellTags[key];
-          const inAoe = affected.has(key);
           const ring = measureFrom !== undefined ? distFt(measureFrom, cell) : undefined;
+          const cls = [
+            'qa2-map-cell',
+            isFogged ? 'is-fogged' : '',
+            !isFogged && affected.has(key) ? 'is-aoe' : '',
+            !isFogged && tag?.difficultTerrain === true ? 'is-difficult' : '',
+          ].filter(Boolean).join(' ');
           return (
             <button
               key={key}
               type="button"
+              className={cls}
               onClick={onCellClick !== undefined ? () => onCellClick(cell) : undefined}
               aria-label={`cell ${x},${y}`}
               style={{
-                position: 'absolute',
                 left: `${x * cellPctX}%`,
                 top: `${y * cellPctY}%`,
                 width: `${cellPctX}%`,
                 height: `${cellPctY}%`,
-                boxSizing: 'border-box',
-                border: 'none',
-                background: cellFill(isFogged, inAoe, tag?.difficultTerrain === true),
-                backdropFilter: isFogged ? 'blur(2px)' : undefined,
-                WebkitBackdropFilter: isFogged ? 'blur(2px)' : undefined,
                 cursor: onCellClick !== undefined ? 'pointer' : 'default',
-                padding: 0,
-                display: 'grid',
-                placeItems: 'center',
-                fontFamily: mono,
-                fontSize: 'var(--qa-text-whisper)',
-                color: 'var(--qa-ink-faint)',
+                ...micro,
               }}
             >
               {chrome && ring !== undefined && ring > 0 && ring <= 15 ? ring : ''}
@@ -133,110 +162,101 @@ export function MapCanvas({ room, mode, cellPx = 40, aoe, measureFrom, onTokenCl
         }),
       )}
 
-      {/* assets: dashed footprints, cross-hatched when they're difficult terrain */}
+      {/*
+        Assets: a footprint you can read at a glance. Blocking ones are solid
+        and outlined — you cannot walk there; passable ones stay dashed and
+        empty. That used to be a tiny glyph in the middle of the rectangle,
+        which at map scale was a speck of dust with a legend nobody has.
+      */}
       {room.assets.map((a) => (
         <div
           key={a.id}
+          className={`qa2-map-asset${a.flags.blocking ? ' is-blocking' : ''}`}
           aria-label={`asset ${a.id}${a.state !== undefined ? ` (${a.state})` : ''}`}
           style={{
-            position: 'absolute',
             left: `${a.cell.x * cellPctX}%`,
             top: `${a.cell.y * cellPctY}%`,
             width: `${a.footprint.w * cellPctX}%`,
             height: `${a.footprint.h * cellPctY}%`,
-            boxSizing: 'border-box',
-            border: `var(--qa-hairline) dashed var(--qa-ink-faint)`,
-            borderRadius: 'var(--qa-radius-sm)',
-            background: 'var(--qa-chip)',
-            display: 'grid',
-            placeItems: 'center',
-            fontFamily: mono,
-            fontSize: 'var(--qa-text-body)',
-            color: 'var(--qa-ink-dim)',
-            pointerEvents: 'none',
           }}
-        >
-          {a.flags.blocking ? '▪' : '▫'}
-        </div>
+        />
       ))}
 
-      {/* tokens: elevated miniature-base discs, inset within their cell, not flat painted circles */}
-      {room.tokens.map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          onClick={onTokenClick !== undefined ? () => onTokenClick(t.id) : undefined}
-          aria-label={`token ${t.creatureRef}${t.staged ? ' (staged)' : ''}`}
-          style={{
-            position: 'absolute',
-            left: `${t.cell.x * cellPctX}%`,
-            top: `${t.cell.y * cellPctY}%`,
-            width: `${cellPctX}%`,
-            height: `${cellPctY}%`,
-            background: 'transparent',
-            border: 'none',
-            padding: 0,
-            cursor: onTokenClick !== undefined ? 'pointer' : 'default',
-          }}
-        >
-          <span
-            aria-hidden="true"
+      {room.tokens.map((t) => {
+        const p = present?.[t.creatureRef];
+        const called = p?.name ?? t.creatureRef;
+        const cls = [
+          'qa2-token',
+          p?.side !== undefined ? `is-${p.side}` : '',
+          p?.acting === true ? 'is-acting' : '',
+          p?.down === true ? 'is-down' : '',
+          t.staged ? 'is-staged' : '',
+        ].filter(Boolean).join(' ');
+        const tagCls = [
+          'qa2-token-tag',
+          p?.tag === 'Bloodied' || p?.tag === 'Dying' ? 'is-hurt' : '',
+          p?.down === true || p?.tag === 'Down' ? 'is-down' : '',
+        ].filter(Boolean).join(' ');
+        return (
+          <button
+            key={t.id}
+            type="button"
+            className={cls}
+            onClick={onTokenClick !== undefined ? () => onTokenClick(t.creatureRef) : undefined}
+            aria-label={`${called}${p?.tag !== undefined ? `, ${p.tag}` : ''}${t.staged ? ' (staged)' : ''}`}
             style={{
-              position: 'absolute',
-              inset: '12%',
-              borderRadius: 'var(--qa-radius-round)',
-              border: `2px solid ${t.staged ? 'var(--qa-ink-faint)' : 'var(--qa-accent)'}`,
-              boxShadow: t.staged ? 'none' : '0 0 0 3px var(--qa-accent-soft), var(--qa-shadow)',
-              background: 'var(--qa-glass-solid)',
-              color: 'var(--qa-ink)',
-              fontFamily: mono,
-              fontSize: 'var(--qa-text-whisper)',
-              fontWeight: 600,
-              opacity: t.staged ? 0.6 : 1,
-              display: 'grid',
-              placeItems: 'center',
+              left: `${t.cell.x * cellPctX}%`,
+              top: `${t.cell.y * cellPctY}%`,
+              width: `${cellPctX}%`,
+              height: `${cellPctY}%`,
+              cursor: onTokenClick !== undefined ? 'pointer' : 'default',
             }}
           >
-            {initials(t.creatureRef)}
-          </span>
-        </button>
-      ))}
+            <span className="qa2-token-disc" style={statMeta}>{initials(called)}</span>
+            {p?.tag !== undefined && <span className={tagCls}>{p.tag}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
 
+  return (
+    <div
+      className={`qa2-map ${filling ? 'is-fill' : 'is-contain'}`}
+      role="img"
+      aria-label={`Map ${room.id} (${mode} view)`}
+      style={filling ? {} : { width: '100%' }}
+    >
+      <DesignStyles />
+      <span className="qa2-map-ground" aria-hidden="true" />
+      {grid}
       {mode === 'table' && <TableBadge />}
     </div>
   );
 }
 
-/** Fog (an ink scrim) beats AoE beats difficult terrain (a gold hazard hatch) beats plain floor. */
-function cellFill(isFogged: boolean, inAoe: boolean, isDifficult: boolean): CSSProperties['background'] {
-  if (isFogged) return 'var(--qa-scrim)';
-  if (inAoe) return 'var(--qa-accent-soft)';
-  if (isDifficult) {
-    return 'repeating-linear-gradient(45deg, var(--qa-gold-soft) 0 4px, transparent 4px 10px)';
-  }
-  return 'transparent';
-}
-
-function initials(ref: string): string {
-  const last = ref.split(/[.-_]/).pop() ?? ref;
-  return last.slice(0, 2).toUpperCase();
+/**
+ * Two letters for the disc. Deliberately dumb — a real portrait replaces this
+ * the moment the asset pipeline lands, and until then initials beat a coloured
+ * blob for telling six creatures apart.
+ *
+ * It takes a NAME when the caller supplied one and a raw `creatureRef` when it
+ * did not, so it has to survive both. Bookkeeping segments are dropped — the
+ * kind prefix and the disambiguating number — because `npc-goblin-1` naively
+ * reduced to "1", and a map of discs reading 1 and 2 next to a turn order
+ * reading Skirmisher and Lookout is a map you cannot use.
+ */
+function initials(label: string): string {
+  const words = label
+    .split(/[.\-_\s]+/)
+    .filter((p) => p !== '' && !/^\d+$/.test(p) && !/^(pc|npc|mon|tok)$/i.test(p));
+  return (words[words.length - 1] ?? label).slice(0, 2).toUpperCase();
 }
 
 function TableBadge(): ReactNode {
   return (
-    <span
-      style={{
-        position: 'absolute',
-        top: 6,
-        right: 8,
-        fontFamily: mono,
-        fontSize: 'var(--qa-text-whisper)',
-        letterSpacing: 'var(--qa-tracking-caps)',
-        textTransform: 'uppercase',
-        color: 'var(--qa-ink-faint)',
-      }}
-    >
-      Table view
+    <span style={{ position: 'absolute', top: 6, right: 8, zIndex: 1 }}>
+      <Eyebrow>Table view</Eyebrow>
     </span>
   );
 }

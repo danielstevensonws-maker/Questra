@@ -14,11 +14,11 @@
  * which needs a computed sheet behind it. The party names and levels are the
  * design request's §9 cast, with Wren moved from "you" to the seat beside you.
  */
-import type { ComputedSheet } from '@questra/contracts';
+import type { ComputedSheet, Room } from '@questra/contracts';
 import type { Combatant, ProjectionState } from '@questra/engine';
 import torvaldSheet from '@questra/contracts/src/fixtures/torvald-sheet.json';
+import type { TokenPresentation } from '../MapCanvas.js';
 import type { FeatureLineVM, InventoryLineVM } from './Overlays.js';
-import type { GroundTokenVM } from './TableGround.js';
 import type { LogEntryVM, ResultVM, SpellCardVM, SpineEntryVM } from './viewModel.js';
 
 export const sheet = torvaldSheet as unknown as ComputedSheet;
@@ -76,6 +76,20 @@ export const TARGETS = [
 ];
 
 /**
+ * What the table calls each creature. ONE map, because the turn order and the
+ * map have to agree: a spine listing Skirmisher beside a disc reading GO is
+ * two names for one goblin, and the player has to do the join themselves.
+ */
+export const NAMES: Record<string, string> = {
+  'pc-wren': 'Wren',
+  'pc-torvald': 'Torvald',
+  'pc-mira': 'Mira',
+  'pc-ozren': 'Ozren',
+  'npc-goblin-1': 'Skirmisher',
+  'npc-goblin-2': 'Lookout',
+};
+
+/**
  * The round in initiative order. Allies carry hit points; enemies carry one
  * word. `acting` and `acted` are what drives the spine's accent — see
  * RoundSpine.tsx.
@@ -90,18 +104,19 @@ export function castOrder(
   // count down to the wrong turn.
   const youId = opts.youId ?? 'pc-torvald';
 
-  const order: Omit<SpineEntryVM, 'acting' | 'acted' | 'kind'>[] = [
-    { id: 'pc-wren', initiative: 21, name: 'Wren', role: 'Rogue · 3', hp: { current: 22, max: 27 } },
-    { id: 'pc-torvald', initiative: 18, name: 'Torvald', role: 'Fighter · 3', hp: { current: torvald.hp, max: torvald.maxHp } },
-    { id: 'npc-goblin-1', initiative: 15, name: 'Skirmisher', role: 'Goblin', hurt: 'Bloodied' },
-    { id: 'pc-mira', initiative: 12, name: 'Mira', role: 'Cleric · 3', hp: { current: mira.hp, max: mira.maxHp } },
-    { id: 'npc-goblin-2', initiative: 9, name: 'Lookout', role: 'Goblin', hurt: 'Unhurt' },
-    { id: 'pc-ozren', initiative: 7, name: 'Ozren', role: 'Wizard · 3', hp: { current: 9, max: 20 } },
+  const order: Omit<SpineEntryVM, 'acting' | 'acted' | 'kind' | 'name'>[] = [
+    { id: 'pc-wren', initiative: 21, role: 'Rogue · 3', hp: { current: 22, max: 27 } },
+    { id: 'pc-torvald', initiative: 18, role: 'Fighter · 3', hp: { current: torvald.hp, max: torvald.maxHp } },
+    { id: 'npc-goblin-1', initiative: 15, role: 'Goblin', hurt: 'Bloodied' },
+    { id: 'pc-mira', initiative: 12, role: 'Cleric · 3', hp: { current: mira.hp, max: mira.maxHp } },
+    { id: 'npc-goblin-2', initiative: 9, role: 'Goblin', hurt: 'Unhurt' },
+    { id: 'pc-ozren', initiative: 7, role: 'Wizard · 3', hp: { current: 9, max: 20 } },
   ];
 
   const at = order.findIndex((e) => e.id === actingId);
   return order.map((e, i) => ({
     ...e,
+    name: NAMES[e.id] ?? e.id,
     kind: e.id === youId ? 'you' : e.hurt !== undefined ? 'foe' : 'ally',
     acting: i === at,
     acted: at >= 0 && i < at,
@@ -109,20 +124,74 @@ export function castOrder(
   }));
 }
 
-export function tokens(actingId: string, opts: { yourHp?: number; yourTag?: string } = {}): GroundTokenVM[] {
-  const down = opts.yourHp !== undefined && opts.yourHp <= 0;
-  return [
-    { id: 'pc-wren', label: 'W', x: 38, y: 42, kind: 'ally', acting: actingId === 'pc-wren' },
-    {
-      id: 'pc-torvald', label: 'T', x: 46, y: 53, kind: 'you', acting: actingId === 'pc-torvald',
-      ...(opts.yourTag !== undefined ? { tag: opts.yourTag } : {}),
-      ...(down ? { down: true } : {}),
-    },
-    { id: 'pc-mira', label: 'M', x: 33, y: 60, kind: 'ally', acting: actingId === 'pc-mira' },
-    { id: 'pc-ozren', label: 'O', x: 27, y: 47, kind: 'ally', acting: actingId === 'pc-ozren' },
-    { id: 'npc-goblin-1', label: 'G1', x: 59, y: 37, kind: 'foe', tag: 'Bloodied', acting: actingId === 'npc-goblin-1' },
-    { id: 'npc-goblin-2', label: 'G2', x: 65, y: 47, kind: 'foe', tag: 'Unhurt', acting: actingId === 'npc-goblin-2' },
-  ];
+/**
+ * The yard behind the ruined steading, as a real `Room` rather than the
+ * decorative CSS grid the play screen used to draw. 24×15 is chosen so the
+ * grid's proportions match a widescreen viewport closely enough that
+ * `fit="fill"` reaches the edges while cells stay square — see MapCanvas for
+ * why square is non-negotiable.
+ *
+ * Fully revealed, because this is what a PLAYER sees after
+ * `filterRoomForViewer` has run: unrevealed cells never reach the client at
+ * all. The fog machinery is still exercised by the DM/editor stories, which
+ * pass a partially-revealed room.
+ */
+const ALL_CELLS: string[] = Array.from({ length: 15 }, (_, y) =>
+  Array.from({ length: 24 }, (_, x) => `${x},${y}`),
+).flat();
+
+export const ROOM: Room = {
+  id: 'room.ruined-steading-yard',
+  terrainImageRef: 'terrain.steading-yard',
+  gridSize: { w: 24, h: 15 },
+  cellTags: {
+    // The churned ground around the well, and the muck along the barn wall.
+    '11,7': { difficultTerrain: true }, '12,7': { difficultTerrain: true },
+    '11,8': { difficultTerrain: true }, '12,8': { difficultTerrain: true },
+    '3,12': { difficultTerrain: true }, '4,12': { difficultTerrain: true }, '5,12': { difficultTerrain: true },
+  },
+  revealed: ALL_CELLS,
+  assets: [
+    { id: 'asset.well', imageRef: 'asset.well', cell: { x: 11, y: 7 }, footprint: { w: 2, h: 2 }, flags: { blocking: true, movable: false, interactive: true, difficultTerrain: false } },
+    { id: 'asset.cart', imageRef: 'asset.cart', cell: { x: 4, y: 3 }, footprint: { w: 3, h: 2 }, flags: { blocking: true, movable: true, interactive: false, difficultTerrain: false } },
+    { id: 'asset.barn-door', imageRef: 'asset.door', cell: { x: 20, y: 5 }, footprint: { w: 1, h: 2 }, flags: { blocking: false, movable: false, interactive: true, difficultTerrain: false }, state: 'open' },
+    { id: 'asset.crates', imageRef: 'asset.crates', cell: { x: 17, y: 11 }, footprint: { w: 2, h: 1 }, flags: { blocking: true, movable: true, interactive: false, difficultTerrain: false } },
+  ],
+  tokens: [
+    { id: 'tok.wren', creatureRef: 'pc-wren', cell: { x: 8, y: 5 }, size: 'small', hidden: false, staged: false },
+    { id: 'tok.torvald', creatureRef: 'pc-torvald', cell: { x: 10, y: 8 }, size: 'medium', hidden: false, staged: false },
+    { id: 'tok.mira', creatureRef: 'pc-mira', cell: { x: 6, y: 9 }, size: 'medium', hidden: false, staged: false },
+    { id: 'tok.ozren', creatureRef: 'pc-ozren', cell: { x: 5, y: 7 }, size: 'medium', hidden: false, staged: false },
+    { id: 'tok.g1', creatureRef: 'npc-goblin-1', cell: { x: 15, y: 4 }, size: 'small', hidden: false, staged: false },
+    { id: 'tok.g2', creatureRef: 'npc-goblin-2', cell: { x: 18, y: 7 }, size: 'small', hidden: false, staged: false },
+  ],
+};
+
+/**
+ * Who each creature is TO YOU, which the room itself cannot know. Allies carry
+ * their state; enemies carry a word only — an enemy's exact hit points are the
+ * DM's to reveal.
+ */
+export function present(actingId: string, opts: { yourId?: string; yourTag?: string; yourDown?: boolean } = {}): Record<string, TokenPresentation> {
+  const youId = opts.yourId ?? 'pc-torvald';
+  const sideOf = (id: string): 'you' | 'ally' | 'foe' =>
+    id === youId ? 'you' : id.startsWith('npc-') ? 'foe' : 'ally';
+
+  const out: Record<string, TokenPresentation> = {};
+  for (const t of ROOM.tokens) {
+    const id = t.creatureRef;
+    const name = NAMES[id];
+    out[id] = {
+      ...(name !== undefined ? { name } : {}),
+      side: sideOf(id),
+      acting: id === actingId,
+      ...(id === 'npc-goblin-1' ? { tag: 'Bloodied' } : {}),
+      ...(id === 'npc-goblin-2' ? { tag: 'Unhurt' } : {}),
+      ...(id === youId && opts.yourTag !== undefined ? { tag: opts.yourTag } : {}),
+      ...(id === youId && opts.yourDown === true ? { down: true } : {}),
+    };
+  }
+  return out;
 }
 
 export const NOTES = {

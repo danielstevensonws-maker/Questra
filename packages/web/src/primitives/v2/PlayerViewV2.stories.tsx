@@ -20,7 +20,7 @@ import { toHero, toSpells, toTiles, type DyingVM, type ResultVM } from './viewMo
 import {
   ENTRIES, FEATURES, IDENTITY, INVENTORY, NOTES, RESULT, SCENE, TARGETS,
   MIRA_FEATURES, MIRA_IDENTITY, MIRA_INVENTORY, MIRA_SLOTS, MIRA_SPELLS,
-  castOrder, mira, miraSheet, mirasTurn, sheet, tokens, torvald, wrensTurn, yourTurn,
+  ROOM, castOrder, mira, miraSheet, mirasTurn, present, sheet, torvald, wrensTurn, yourTurn,
 } from './fixtures.js';
 
 const meta: Meta = { title: 'Play/Player View v2', parameters: { layout: 'fullscreen' } };
@@ -70,7 +70,8 @@ export const YourTurn: Story = {
         scene={SCENE}
         hero={hero}
         cast={castOrder('pc-torvald')}
-        tokens={tokens('pc-torvald')}
+        room={ROOM}
+        present={present('pc-torvald')}
         tiles={tiles}
         turn={{
           active: true,
@@ -109,7 +110,8 @@ export const Waiting: Story = {
         scene={SCENE}
         hero={hero}
         cast={castOrder('pc-wren')}
-        tokens={tokens('pc-wren')}
+        room={ROOM}
+        present={present('pc-wren')}
         tiles={tiles}
         turn={{ active: false, activeName: 'Wren', movement: { left: 0, max: 30 }, targets: TARGETS }}
         entries={ENTRIES.slice(0, 4)}
@@ -139,7 +141,8 @@ export const Bloodied: Story = {
         scene={SCENE}
         hero={hero}
         cast={castOrder('pc-torvald').map((c) => (c.kind === 'you' ? { ...c, hp: { current: 5, max: 12 } } : c))}
-        tokens={tokens('pc-torvald', { yourTag: 'Bloodied' })}
+        room={ROOM}
+        present={present('pc-torvald', { yourTag: 'Bloodied' })}
         tiles={tiles}
         turn={{ active: true, movement: { left: 10, max: 30 }, targets: TARGETS, spent: { bonus: true } }}
         entries={ENTRIES}
@@ -187,7 +190,8 @@ export const Dying: Story = {
         hero={hero}
         cast={castOrder('pc-torvald', { yourStatus: state.phase === 'dead' ? 'Dead' : state.phase === 'stable' ? 'Stable' : 'Dying' })
           .map((c) => (c.kind === 'you' ? { ...c, hp: { current: 0, max: 12 } } : c))}
-        tokens={tokens('pc-torvald', { yourHp: 0, yourTag: state.phase === 'stable' ? 'Stable' : 'Dying' })}
+        room={ROOM}
+        present={present('pc-torvald', { yourTag: state.phase === 'stable' ? 'Stable' : 'Dying', yourDown: true })}
         tiles={tiles}
         turn={{ active: true, movement: { left: 0, max: 30 } }}
         dying={state}
@@ -223,7 +227,8 @@ export const RollLanded: Story = {
         scene={SCENE}
         hero={hero}
         cast={castOrder('pc-torvald')}
-        tokens={tokens('pc-torvald')}
+        room={ROOM}
+        present={present('pc-torvald')}
         tiles={tiles}
         turn={{ active: true, movement: { left: 15, max: 30 }, targets: TARGETS, spent: { action: true } }}
         result={result}
@@ -259,7 +264,8 @@ export const HowANumberWorks: Story = {
         scene={SCENE}
         hero={hero}
         cast={castOrder('pc-torvald')}
-        tokens={tokens('pc-torvald')}
+        room={ROOM}
+        present={present('pc-torvald')}
         tiles={tiles}
         turn={{ active: true, movement: { left: 15, max: 30 }, targets: TARGETS }}
         entries={ENTRIES}
@@ -289,7 +295,8 @@ export const TheFolio: Story = {
         scene={SCENE}
         hero={hero}
         cast={castOrder('pc-torvald')}
-        tokens={tokens('pc-torvald')}
+        room={ROOM}
+        present={present('pc-torvald')}
         tiles={tiles}
         turn={{ active: true, movement: { left: 15, max: 30 }, targets: TARGETS }}
         entries={ENTRIES}
@@ -315,7 +322,8 @@ export const TableMenuOpen: Story = {
         scene={SCENE}
         hero={hero}
         cast={castOrder('pc-torvald')}
-        tokens={tokens('pc-torvald')}
+        room={ROOM}
+        present={present('pc-torvald')}
         tiles={tiles}
         turn={{ active: true, movement: { left: 15, max: 30 }, targets: TARGETS }}
         entries={ENTRIES}
@@ -345,7 +353,8 @@ export const FirstSession: Story = {
         scene={{ ...SCENE, round: 1, elapsed: '00:06:12' }}
         hero={hero}
         cast={castOrder('pc-torvald')}
-        tokens={tokens('pc-torvald')}
+        room={ROOM}
+        present={present('pc-torvald')}
         tiles={tiles}
         turn={{ active: true, movement: { left: 30, max: 30 }, targets: TARGETS }}
         entries={[
@@ -379,7 +388,8 @@ export const Exploring: Story = {
         // them. A rail that keeps listing defeated enemies is telling the
         // player the fight is still on.
         cast={castOrder('nobody').filter((c) => c.kind !== 'foe')}
-        tokens={tokens('nobody').filter((t) => t.kind !== 'foe')}
+        room={{ ...ROOM, tokens: ROOM.tokens.filter((t) => !t.creatureRef.startsWith('npc-')) }}
+        present={present('nobody')}
         tiles={tiles}
         turn={{ active: true, exploring: true }}
         entries={[
@@ -431,7 +441,8 @@ export const MiraTheCleric: Story = {
         scene={SCENE}
         hero={hero}
         cast={castOrder('pc-mira', { youId: 'pc-mira' })}
-        tokens={tokens('pc-mira')}
+        room={ROOM}
+        present={present('pc-mira', { yourId: 'pc-mira' })}
         tiles={tiles}
         turn={{
           active: true,
@@ -472,7 +483,8 @@ export const MirasSpellbook: Story = {
         scene={SCENE}
         hero={hero}
         cast={castOrder('pc-mira', { youId: 'pc-mira' })}
-        tokens={tokens('pc-mira')}
+        room={ROOM}
+        present={present('pc-mira', { yourId: 'pc-mira' })}
         tiles={tiles}
         turn={{ active: true, movement: { left: 30, max: 30 }, targets: TARGETS }}
         entries={ENTRIES.slice(0, 3)}
@@ -509,7 +521,8 @@ export const EyesUp: Story = {
         scene={SCENE}
         hero={hero}
         cast={castOrder('pc-wren')}
-        tokens={tokens('pc-wren')}
+        room={ROOM}
+        present={present('pc-wren')}
         tiles={tiles}
         turn={{ active: false, activeName: 'Wren', movement: { left: 0, max: 30 }, targets: TARGETS }}
         entries={ENTRIES}

@@ -54,7 +54,8 @@ const HUD_FILES = [
   'primitives/v2/RoundSpine.tsx',
   'primitives/v2/SceneRail.tsx',
   'primitives/v2/ScreenStyles.tsx',
-  'primitives/v2/TableGround.tsx',
+  // the one map renderer, shared by the planner, the DM screen and play
+  'primitives/MapCanvas.tsx',
 ];
 
 /** The modules allowed to name a font family — the type ramp and the sheets. */

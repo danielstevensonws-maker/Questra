@@ -364,6 +364,116 @@ const CSS = `
 .qa2-step > button { width: 28px; height: 26px; border: none; background: transparent; color: var(--qa-ink-dim); cursor: pointer; font-family: var(--qa-font-mono); }
 .qa2-step > button:hover { color: var(--qa-accent); }
 
+/* ---- the map ---------------------------------------------------------------
+   One renderer serves the planner, the DM screen and the play screen, so its
+   chrome lives here rather than beside any one of them. Two fits:
+
+   contain — an element on a page. Keeps its own radius, border and shadow.
+   fill    — the ground beneath a floating HUD. Edge to edge, no chrome of its
+             own, and a vignette so glass panels keep their contrast at the
+             corners where they sit (design request §8: text must stay legible
+             over ANY map).
+
+   Cells stay SQUARE in both. The grid layer keeps its aspect ratio and centres
+   inside the fill, rather than stretching to the container — stretching would
+   make cells rectangular, and distFt assumes square cells, so a stretched map
+   would draw range rings that disagree with the engine's own geometry. */
+.qa2-map { position: relative; overflow: hidden; user-select: none; }
+.qa2-map.is-contain { border-radius: var(--qa-radius); border: var(--qa-hairline) solid var(--qa-glass-border); box-shadow: var(--qa-shadow); }
+.qa2-map.is-fill { position: absolute; inset: 0; z-index: 0; display: grid; place-items: center; }
+.qa2-map-ground {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(130% 105% at 52% 36%, var(--qa-map-hi) 0%, var(--qa-map-mid) 42%, var(--qa-map-lo) 100%);
+}
+.qa2-map.is-fill .qa2-map-ground::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(126% 108% at 50% 42%, transparent 62%, var(--qa-map-lo) 100%);
+  opacity: 0.55;
+}
+/* The grid itself. Square cells, centred, never taller or wider than the room
+   it is drawing. */
+.qa2-map-grid { position: relative; max-width: 100%; max-height: 100%; }
+.qa2-map.is-contain .qa2-map-grid { width: 100%; }
+.qa2-map-cell {
+  position: absolute;
+  box-sizing: border-box;
+  border: none;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+}
+.qa2-map-cell.is-fogged { background: var(--qa-scrim); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+.qa2-map-cell.is-aoe { background: var(--qa-accent-soft); }
+.qa2-map-cell.is-difficult { background: repeating-linear-gradient(45deg, var(--qa-gold-soft) 0 4px, transparent 4px 10px); }
+/* An asset's footprint says one thing: can I walk through it. Blocking reads
+   solid and outlined, passable reads dashed and empty. No glyph, no legend. */
+.qa2-map-asset {
+  position: absolute;
+  box-sizing: border-box;
+  border: var(--qa-hairline) dashed var(--qa-ink-faint);
+  border-radius: var(--qa-radius-sm);
+  background: transparent;
+  pointer-events: none;
+}
+.qa2-map-asset.is-blocking {
+  border-style: solid;
+  border-color: var(--qa-glass-border);
+  background: var(--qa-chip);
+}
+
+/* ---- tokens ----------------------------------------------------------------
+   A creature on the map. The ring carries allegiance, which the ROOM does not
+   know — a room holds positions, not sides — so the caller supplies it from
+   the projection. Enemies get a word rather than a number under them: an
+   enemy's exact hit points are the DM's to reveal, and a player is owed enough
+   to make a decision and no more. */
+.qa2-token {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.qa2-token-disc {
+  position: absolute;
+  inset: 12%;
+  border-radius: var(--qa-radius-round);
+  border: 2px solid var(--qa-glass-border);
+  background: var(--qa-glass-solid);
+  color: var(--qa-ink-dim);
+  display: grid;
+  place-items: center;
+}
+.qa2-token.is-ally .qa2-token-disc { border-color: var(--qa-success); color: var(--qa-ink); }
+.qa2-token.is-foe .qa2-token-disc { border-color: var(--qa-danger); color: var(--qa-ink); }
+.qa2-token.is-you .qa2-token-disc { border-color: var(--qa-accent); box-shadow: 0 0 0 3px var(--qa-accent-soft); color: var(--qa-ink); }
+.qa2-token.is-acting .qa2-token-disc { animation: qa2-breathe var(--qa-dice-settle) var(--qa-ease) infinite alternate; }
+.qa2-token.is-down .qa2-token-disc, .qa2-token.is-staged .qa2-token-disc { opacity: 0.55; }
+.qa2-token-tag {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: var(--qa-s1);
+  padding: 0 var(--qa-s1);
+  border-radius: var(--qa-radius-sm);
+  background: var(--qa-glass-solid);
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--qa-ink-dim);
+}
+.qa2-token-tag.is-hurt { color: var(--qa-danger); }
+.qa2-token-tag.is-down { color: var(--qa-ink-faint); }
+
 /* ---- quality floor ---------------------------------------------------------
    Scoped by class-prefix rather than to one screen's root. The earlier version
    of these rules keyed off the play screen's own wrapper, which meant any

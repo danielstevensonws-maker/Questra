@@ -15,8 +15,8 @@
  */
 import type { ReactElement, ReactNode } from 'react';
 import { ScreenStyles } from './ScreenStyles.js';
-import { TableGround } from './TableGround.js';
-import { tokens } from './fixtures.js';
+import { MapCanvas } from '../MapCanvas.js';
+import { ROOM, present } from './fixtures.js';
 
 export function Stage({
   children,
@@ -32,7 +32,7 @@ export function Stage({
   return (
     <div className="qa2-screen" style={{ height: '100vh' }}>
       <ScreenStyles />
-      <TableGround tokens={bare ? [] : tokens(acting)} />
+      <MapCanvas room={bare ? { ...ROOM, tokens: [] } : ROOM} mode="play" fit="fill" present={present(acting)} />
       {children}
     </div>
   );

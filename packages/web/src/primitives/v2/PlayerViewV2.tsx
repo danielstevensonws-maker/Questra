@@ -60,7 +60,8 @@ import { NearEdge, type NearEdgeTargetVM } from './NearEdge.js';
 import { RoundSpine } from './RoundSpine.js';
 import { SceneRail } from './SceneRail.js';
 import { ScreenStyles } from './ScreenStyles.js';
-import { TableGround, type GroundTokenVM } from './TableGround.js';
+import { MapCanvas, type TokenPresentation } from '../MapCanvas.js';
+import type { Room } from '@questra/contracts';
 import { InfoPanel, fromExplain } from '../InfoPanel.js';
 import {
   ComposeSheet, Folio, PauseOverlay, Scrim, TableMenu,
@@ -75,7 +76,10 @@ export interface PlayerViewV2Props {
   hero: HeroVM;
   /** the round, in initiative order — allies with hit points, enemies with a word. */
   cast: SpineEntryVM[];
-  tokens: GroundTokenVM[];
+  /** the room itself — real geometry, real fog, drawn by the one map renderer. */
+  room: Room;
+  /** who each creature is TO THIS VIEWER; the room does not know. */
+  present?: Record<string, TokenPresentation>;
   tiles: TileVM[];
   turn: {
     active: boolean;
@@ -130,7 +134,8 @@ export function PlayerViewV2({
   scene,
   hero,
   cast,
-  tokens,
+  room,
+  present,
   tiles,
   turn,
   entries,
@@ -201,7 +206,13 @@ export function PlayerViewV2({
     >
       <ScreenStyles />
 
-      <TableGround tokens={tokens} {...(onTarget !== undefined ? { onTokenClick: onTarget } : {})} />
+      <MapCanvas
+        room={room}
+        mode="play"
+        fit="fill"
+        {...(present !== undefined ? { present } : {})}
+        {...(onTarget !== undefined ? { onTokenClick: onTarget } : {})}
+      />
 
       <SceneRail
         title={scene.title}
@@ -320,5 +331,4 @@ export function PlayerViewV2({
 }
 
 export type { FeatureLineVM, InventoryLineVM, MenuAction, RollStance } from './Overlays.js';
-export type { GroundTokenVM } from './TableGround.js';
 export type { NearEdgeTargetVM } from './NearEdge.js';
