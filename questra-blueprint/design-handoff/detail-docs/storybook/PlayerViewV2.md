@@ -263,10 +263,11 @@ how far Bonus could grow beside it before Reaction got pushed down:
 - **reaction: 4** — pinned to real data, not eyeballed, and it does **not**
   move for visual fullness, even now that Bonus is wide enough that Reaction
   visibly has room to spare beside it. Counted every reaction-cast spell in
-  `packages/engine/src/data/spells.draft.json` (312 real SRD entries) by
+  `packages/engine/src/data/spells.draft.json` (339 real SRD entries) by
   class: no class list has more than 3 (Wizard/Sorcerer top out at Shield,
   Counterspell, Feather Fall). Add the universal Opportunity Attack and the
-  real ceiling for any single-class character, at any level, is 4.
+  real ceiling for any single-class character, at any level, is 4. Re-counted
+  after the 27 cantrips landed — none of them is reaction-cast, so the 4 holds.
   `ActionRows.test.tsx` holds that exact case by name (a Wizard with all
   three). A sourced fact about the ruleset outranks "make the row look
   fuller" every time.
@@ -501,21 +502,19 @@ object.
   gained `cantripChoices` / `preparedSpellIds` — their absence was the actual
   reason `prepared` could never be populated.
 
-  What is still hand-authored is **Mira's own list**, and only because of the
-  dataset: all 312 ingested spells are `qa: 'draft'` and none is a Cleric spell
-  that has passed the rules-lawyer check, so there is nothing verified to point
-  `preparedSpellIds` at. When the spell QA pass lands, her tiles come from
+  What is still hand-authored is **Mira's own list**, and the reason has
+  narrowed to one thing. The dataset now carries 339 spells across levels 0–9,
+  109 of them Cleric spells, so her list could point at real ids today — but no
+  draft spell has an authored `effects[]`, and that is where a card's save, DC
+  and damage come from. Resolving her from the data now would give correct names
+  and ranges on blank tiles, which is worse than the stand-in. When the
+  rules-lawyer pass fills `effects[]` in, her tiles come from
   `spellcasting.prepared` and `fixtures.ts`'s hand-written list is deleted.
   Nothing in the components moves.
 
   `test/v2-caster-fixture.test.ts` holds the hand-authored numbers to the
   contract's own `derivationSumsToValue` invariant and to Cleric-3 arithmetic,
   so the stand-in cannot quietly teach the wrong shape.
-
-- **The spell dataset has no cantrips.** The M1.2 ingestion produced levels 1–9
-  and not one level-0 spell, so `cantripChoices` has nothing legal to point at
-  and the folio's cantrip row has no real data behind it. Recorded as a failing-
-  when-fixed assertion in `engine/test/casters.golden.test.ts`.
 
 - **Slot exhaustion greys a spell now.** `checkIntent`'s `cast` branch takes an
   optional `slotsRemaining` and refuses with "No level 3 slots left — take a rest

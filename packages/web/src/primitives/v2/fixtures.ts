@@ -271,9 +271,12 @@ export const RESULT: ResultVM = {
  * than before. `packages/engine/src/sim/sheet.ts` now attaches `spellcasting`
  * to every caster type, computes her slots and her prepared ceiling, and
  * resolves chosen spell ids into real `SpellCard`s. What it cannot do is
- * resolve HERS: the ingested spell dataset carries 312 spells at levels 1–9,
- * all still `qa: 'draft'`, and no cantrips at all — so there is no verified
- * Cleric spell to point `preparedSpellIds` at yet.
+ * resolve HERS *with numbers on it*. The dataset now carries 339 spells across
+ * levels 0–9 (109 of them Cleric spells, 7 of those cantrips), so her list could
+ * be pointed at real ids — but not one draft spell has an authored `effects[]`,
+ * and that is where a card's save, DC and damage come from. Resolving her from
+ * the data today would give correct names and ranges on blank tiles. The tiles
+ * stay hand-authored until the rules-lawyer pass fills `effects[]` in.
  *
  * What she therefore DOES prove: that the action row holds a caster's tile
  * count without wrapping, that the glyphs separate when most of a row is

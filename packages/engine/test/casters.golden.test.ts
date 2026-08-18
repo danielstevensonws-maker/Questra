@@ -191,19 +191,39 @@ describe('illegal spell choices are refused in plain language', () => {
     expect(reason(who('class.wizard', 5, { cantripChoices: ['spell.fireball'] })))
       .toBe('Fireball is a level 3 spell, not a cantrip.');
   });
+
+  it('a cantrip in the prepared list', () => {
+    expect(reason(who('class.wizard', 5, { preparedSpellIds: ['spell.fire-bolt'] })))
+      .toBe('Fire Bolt is a cantrip — it belongs with your cantrips, not your prepared spells.');
+  });
 });
 
-describe('KNOWN GAP — the spell dataset has no cantrips', () => {
-  /**
-   * The M1.2 ingestion produced 312 spells at levels 1–9 and not one level-0
-   * spell, so `cantripChoices` currently has nothing legal to point at and the
-   * "a cantrip cannot go in the prepared list" branch has no data to exercise.
-   * Recorded here rather than left silent (Playbook: no silent caps) — this
-   * test is meant to FAIL once the ingestion learns to read cantrips, which is
-   * the signal to write the missing case above and delete this block.
-   */
-  it('is still true, and fails loudly when it stops being true', () => {
-    const cantrips = [...rules.spellsById.values()].filter((s) => s.entityType === 'spell' && s.meta.level === 0);
-    expect(cantrips, 'cantrips now ingest — write the cantrip cases and drop this block').toHaveLength(0);
+describe('cantrips', () => {
+  it('resolve like any other spell, at level 0', () => {
+    const sheet = computeSheet(who('class.wizard', 5, { cantripChoices: ['spell.fire-bolt', 'spell.mage-hand'] }), rules);
+    const [bolt, hand] = sheet.spellcasting!.cantrips;
+    expect(bolt!.name).toBe('Fire Bolt');
+    expect(bolt!.level).toBe(0);
+    expect(bolt!.school).toBe('evocation');
+    expect(bolt!.rangeFt).toBe(120);
+    expect(hand!.name).toBe('Mage Hand');
+  });
+
+  it('do not count against the prepared ceiling', () => {
+    // A level 1 Paladin prepares 2 — cantrips are a separate column in the table.
+    const sheet = computeSheet(who('class.paladin', 1, {
+      preparedSpellIds: ['spell.bless', 'spell.heroism'],
+      cantripChoices: [],
+    }), rules);
+    expect(sheet.spellcasting!.prepared).toHaveLength(2);
+    expect(sheet.spellcasting!.preparedMax).toBe(2);
+  });
+
+  it('are still held to the class list', () => {
+    // Eldritch Blast is Warlock-only.
+    let msg = '';
+    try { computeSheet(who('class.wizard', 5, { cantripChoices: ['spell.eldritch-blast'] }), rules); }
+    catch (e) { msg = (e as Error).message; }
+    expect(msg).toBe("Eldritch Blast isn't on the Wizard spell list.");
   });
 });
