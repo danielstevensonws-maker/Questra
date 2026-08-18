@@ -78,9 +78,23 @@ never renders. When present it renders in `--q-danger`.
 
 ### Presentation
 
-Each row is: a drag handle column (`⠿` plus the 1-based position, `aria-hidden`
-since the buttons carry the semantics) → the caller's content → the control
-column. Themed entirely via `theme/tokens.css`.
+Each row is a `.qa2-card`: a grip glyph and the 1-based position in a disc (both
+`aria-hidden`, since the buttons carry the semantics) → the caller's content →
+the control column of `.qa2-mini` buttons. Rows are separate cards with a gap
+rather than a welded list, so a card being dragged reads as a card.
+
+Drag state is drawn on both ends: the row being dragged dims, and the row it is
+over takes an accent border — the drop target used to be invisible.
+
+**The number is information.** This is one of the few lists in the product that
+earns its numbering: "which scene is this" is a real question a DM asks, and the
+answer changes when the order does. Numbers as decoration are exactly what the
+design language rules out elsewhere.
+
+The marks are drawn glyphs (`grip`, `chevronUp`, `chevronDown`, `close`), not
+the `⠿ ▲ ▼ ✕` characters they replaced — box-drawing characters render at a
+different weight in whatever font the user happens to have. Every value is a
+`--qa-*` token, enforced by the type-hygiene suite.
 
 ---
 

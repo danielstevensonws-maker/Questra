@@ -40,8 +40,8 @@ is kept out of player payloads by `eventVisibleTo` / `filterStream` in
 `packages/contracts/src/play/visibility.ts` — the choke point — and **never** by
 this component.
 
-The visual "secret" treatment here (the `--q-secret` tint, the left border, the
-🔒) is a **reminder to the DM about what they are typing**, not a protection. A
+The visual "secret" treatment here (the heavier left rule, the lock mark) is a
+**reminder to the DM about what they are typing**, not a protection. A
 player client must never be sent the secret half in the first place. If the only
 thing stopping a player seeing a secret were this component's styling, the
 system would already be broken.
@@ -79,13 +79,25 @@ multiline suits scene notes.
 
 ### Presentation
 
-Each half is a bordered block with a 3 px left accent border — `--q-ink-faint`
-for public, `--q-secret` for secret — and a small badge label: `Public` /
-`Secret · DM only` with a lock mark. Default placeholders state the audience
-plainly: *"Everyone at the table sees this"* / *"Only you (the DM) see this."*
+Each half is the shared `Field` from `design/parts.tsx` — a mono-caps label
+boxed **with** its control rather than floating above it, because these arrive
+in stacks (notes over cast over secrets) and a label separated from its box by
+the stack's gap attaches itself to the field above just as readily as the one
+below. Default placeholders state the audience plainly: *"Everyone at the table
+sees this"* / *"Only you (the DM) see this."*
 
-Labels are properly associated via `useId()` + `htmlFor`. Themed entirely via
-`theme/tokens.css`.
+The two halves are told apart by **ink weight only**: a `--qa-ink-faint` rule
+down the public half, `--qa-ink-dim` down the secret one, plus the lock on its
+label. Design has not supplied a `--qa-secret` tint and a session must not
+invent one — `packages/theme/test/tokens.test.ts` deliberately asserts its
+absence. Swap in the real token, and drop that guard line, the day it lands.
+
+The lock is a drawn glyph, not the 🔒 emoji it used to be. Emoji carry their own
+palette and their own era, and one sitting beside mono caps in a warm-dark frame
+looked like it had wandered in from another product.
+
+Labels are properly associated via `useId()` + `htmlFor`. Every value is a
+`--qa-*` token, enforced by the type-hygiene suite.
 
 ---
 

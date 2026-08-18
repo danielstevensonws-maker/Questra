@@ -45,8 +45,10 @@ Used for: a campaign premise, a class fantasy — anything that is one answer.
 
 - Presets are toggles.
 - Free-form entries become tags too: type and press **Enter** (or blur) to add.
-- Custom tags render as removable chips (`✕`), visually distinct from the preset
-  chips by being always-on.
+- Custom tags render as removable chips, visually distinct from the preset
+  chips by being always-on. The distinction is behavioural, not decorative: a
+  preset you deselect is still on offer, but something you typed has nowhere to
+  go back to, so it needs a delete rather than a deselect.
 - Duplicates are rejected on add.
 
 Used for: appearance traits, scene tags — anything additive.
@@ -58,10 +60,22 @@ buffer in tags mode, which is transient by nature (it empties on add).
 
 ### Shared internals
 
-`PickField` and `TagsField` share `Field` (label + optional help), `ChipRow`,
-`Chip`, and `inputStyle` — so the two modes are visually identical apart from
+`PickField` and `TagsField` share a `Labelled` wrapper (label, then the offers,
+then the box you can ignore them in) and the shared layer's `Tag`, `Help` and
+`.qa2-open` text field — so the two modes are visually identical apart from
 behaviour. Chips carry `aria-pressed` for toggle semantics; labels are
-associated via `useId()` + `htmlFor`. Themed entirely via `theme/tokens.css`.
+associated via `useId()` + `htmlFor`. Every value is a `--qa-*` token, enforced
+by the type-hygiene suite.
+
+The label sits **above** the chips rather than boxed with the input (unlike
+`PublicSecretField`'s `Field`), because it names the whole question and the
+chips are part of the answer to it.
+
+**Chips you can press look pressable.** The play HUD's chips carry no border
+when unselected — correct there, where one is always lit and the rest should sit
+back. On an authoring screen nothing is chosen yet and the presets *are* the
+teaching mechanism (law 5), so an unpressed chip keeps a hairline. The row also
+gets a target sized for a finger rather than the HUD's 1 px, via `.qa2-offers`.
 
 The free-form input's default placeholders state the escape hatch explicitly:
 *"Or write your own…"* (pick) and *"Add your own — press Enter"* (tags).

@@ -83,9 +83,18 @@ already carries the state.
 
 ### Presentation
 
-A bordered panel, `maxHeight: 420` with the list scrolling. Each row: check mark
-→ name over hint → the `kind` label right-aligned in small-caps mono. Selected
-rows get an 8% accent wash. Themed entirely via `theme/tokens.css`.
+One boxed control — `.qa2-picker`: a search line over a list that scrolls at
+420 px. Boxed because a search that scrolled away from its own results would be
+two controls, not one.
+
+Each row is the shared `.qa2-row`: tick → name over hint → the `kind` label
+right-aligned in small-caps mono. Rows are flat until you touch them, so a long
+list reads as a list rather than forty competing cards; selected rows take the
+accent wash.
+
+**The tick's column is reserved whether or not it is ticked**, so picking an
+item does not shove its name sideways under the cursor. Every value is a
+`--qa-*` token, enforced by the type-hygiene suite.
 
 ---
 

@@ -73,10 +73,18 @@ unchanged**.
 
 ### Options vs. the bare Take/Decline
 
-- With `options`: each renders as a Take-styled button carrying an optional
-  `detail` suffix (`Reaction`, `2 actions`, `DC 13 or restrained`), then a
-  spacer, then `Decline`. `onTake(optionId)`.
-- Without: a single `Take` / `Decline` pair. `onTake()` with no argument.
+- With `options`: each renders as a quiet button carrying an optional `detail`
+  suffix (`Reaction`, `2 actions`, `1 point`), then a spacer, then `Decline`.
+  `onTake(optionId)`.
+- Without: a single accented `Take` / `Decline` pair. `onTake()` with no
+  argument.
+
+**The accent answers "whether", not "which".** A bare prompt asks one question —
+take it or not — so Take is the committing action and wears the accent. A menu
+of costed moves asks a different question, and the accent has no answer to it:
+rendering every option accented made a one-point Detect shout as loudly as a
+two-point Wing Attack. Options are a menu — quiet, equal, with their cost on
+them. Decline keeps danger either way.
 
 ### The DM can always answer for anyone
 
@@ -84,12 +92,25 @@ Brief 08 §1. `asDm` adds an italic *"Answering for {holder}."* note in the body
 The card's behaviour is otherwise identical — the DM is simply exercising the
 holder's choice.
 
+### It is the same material as the assistant's card
+
+Both arrive over whatever you were looking at, asking for one decision, so both
+are built on `.qa2-modal` — glass, three bands, one rhythm — and differ only in
+width and contents. They were two hand-rolled glass cards that had already
+drifted apart in padding, shadow and button styling; two interrupts reading as
+two different products.
+
+This card's one addition is the countdown bar across the top, which turns
+danger-coloured at ten seconds. That is the only moment this card raises its
+voice.
+
 ### Accessibility & theming
 
 - `role="alertdialog"` with a label combining kind and holder.
 - The countdown carries `aria-label="{n} seconds left"` on a `<time>` element,
   with `tabular-nums` so the digits don't jitter.
-- Themed entirely via `theme/tokens.css`.
+- Type comes from the shared ramp's roles; chrome from `design/styles.tsx`. The
+  card is on the `HUD_FILES` list, so it cannot drift back.
 
 ---
 

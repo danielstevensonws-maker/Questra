@@ -17,8 +17,12 @@ reach in the repo — the `mode` prop is what selects which screen it is serving
 | `play` | **Play View** (DM) | The DM running the session. Fog respected in the render, range rings and AoE previews available. |
 | `table` | **Table View** (shared/spectator screen) | The whole table. Receives an already-filtered room and adds a `Table view` badge. |
 
-`TableBackdrop` also composes it in `table` mode as the ground under the Player
-View's HUD glass.
+The Player View composes it in `play` mode with `fit="fill"` as the ground under
+its floating glass. That used to be a separate component — `v2/TableGround`, a
+decorative CSS grid with tokens positioned by percentage — because this one
+could not fill a viewport. Two renderers for one concept, and only one of them
+called the contracts geometry. The gap is a `fit` prop now, so the play screen
+draws the real room: real fog, real cell tags, real `distFt`.
 
 ## What it is for
 
@@ -107,8 +111,33 @@ removed.
 |---|---|
 | `room` | The contracts `Room` — already filtered for the viewer's role. |
 | `mode` | `edit` \| `play` \| `table`. |
-| `cellPx` | Cell size in px (default 40; `TableBackdrop` uses 96). |
+| `fit` | `contain` (default) — an element on a page, keeps its radius, border, shadow and width ceiling. `fill` — the ground beneath a floating HUD: edge to edge, no chrome, plus a vignette so glass panels keep contrast at the corners. |
+| `cellPx` | Cell size in px (default 40). A ceiling on rendered width; `contain` only. |
+| `present` | Per-creature presentation from the projection, keyed by `creatureRef`: `name`, `side`, `tag`, `acting`, `down`. |
 | `aoe` | `{shape, anchor}` to preview. |
 | `measureFrom` | Cell to measure range rings from. |
 | `onTokenClick` | Select or begin a move. |
 | `onCellClick` | Paint (edit) or move target (play). |
+
+## What the room does not know
+
+A `Room` holds positions. It has no idea who is on your side or what the table
+calls them — and it should not, because the same room renders differently for
+every viewer. Both come from the caller via `present`:
+
+- **Allegiance** drives the ring colour. It is also where the enemy-secrecy rule
+  lands: allies may carry numbers, enemies get a WORD (Unhurt, Bloodied, Down),
+  because an enemy's exact hit points are the DM's to reveal.
+- **Names** drive the disc initials and the accessible label. Without them the
+  disc initials its `creatureRef`, so `npc-goblin-1` reduces to "1" — a map of
+  discs reading 1 and 2 beside a turn order reading Skirmisher and Lookout, with
+  the player left to do the join. `primitives/MapCanvas.test.tsx` asserts every
+  disc matches its spine entry.
+
+## Cells stay square in both fits
+
+`fill` centres the grid rather than stretching it. `distFt` assumes square
+cells, so a stretched map would draw range rings that disagree with the engine's
+own answer — exactly the class of bug the one-geometry rule (Brief 06 §4.5)
+exists to prevent. Pick a room whose proportions suit the screen and the fill
+reaches the edges anyway: the play screen's demo room is 24×15 for that reason.

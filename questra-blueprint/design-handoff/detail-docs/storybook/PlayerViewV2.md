@@ -8,16 +8,21 @@
 
 ## What this is
 
-A **second concept** for the player's screen, authored fresh alongside
-[PlayerHub](PlayerHub.md) rather than replacing it. Both are live in Storybook
-and both are meant to stay there until the owner picks one. Where v1 is a bar of
-panels docked to the bottom of a map, v2 is a frame around it.
+**The player's screen.** It began as a second concept, authored fresh alongside
+[PlayerHub](PlayerHub.md) — a bar of panels docked to the bottom of a map — with
+both kept live until the owner picked one. The owner picked this one, and v1 was
+deleted along with the components only it used. The "v2" in the name is now
+historical: there is one Player View.
+
+Its design language was then extracted into `packages/web/src/design/` so the
+rest of the product could speak it too, and the primitives were rebuilt on it.
+See the [catalogue README](README.md) for what consolidated into what.
 
 Owner decisions taken before any code was written:
 
 | Question | Decision |
 |---|---|
-| Reuse v1's components? | **No — fresh.** v2 shares only `@questra/ui` primitives and `--qa-*` tokens with v1. |
+| Reuse v1's components? | **No — fresh.** It shared only `@questra/ui` primitives and `--qa-*` tokens with v1, which is why deleting v1 cost this screen nothing. |
 | Who is the player? | **Torvald**, on the real `torvald-sheet.json` fixture, so every "how is this worked out" sheet shows true derivations. |
 | Enemies on the left rail? | **Yes** — in turn order, carrying one word for how hurt they are and never a number. |
 | Frame or overlay? | **Overlay.** The map is the appeal; the HUD floats over it as discrete panels. |
@@ -361,6 +366,17 @@ Notes, narration, table talk, rolls and ruling suggestions arrive in one stream
 in the order they happened, because that is the order a table experiences them
 in. A ruling suggestion is a **proposal with three answers** — ask for the roll,
 change it, no roll needed — never a ruling that applies itself (law 1).
+
+Those three answers are not the rail's own buttons. The suggestion renders
+`AcceptTweakRejectCard` at `placement="inline"` — THE AI card, docked in the
+stream. The rail used to draw its own quote-plus-buttons block behind a generic
+`actions` array, which meant the product had two ways of putting a model's
+output in front of a human and only one of them carried the guarantee. The
+labels are still the table's ("Ask for the roll" beats "Accept" at a table); the
+meanings are the card's, and a caller cannot invent a fourth. A decided
+suggestion stays in the log as the card's resolved state, Undo included — a
+decision that scrolls away unrecorded is one nobody can take back (law 3).
+
 Collapsed, both rails become small **pills** in their corners — "Round 3 ·
 You're next", "Assistant · 1 waiting" — rather than the thin edge-welded strips
 of the `LOG CLOSED.PNG` reference. A HUD that floats should not grow an edge when
@@ -420,8 +436,8 @@ the **real map ground**. Two consequences worth knowing:
 
 - These panels are translucent glass. On Storybook's flat canvas they read as
   washed-out grey cards and every judgement made about them there is wrong. The
-  repo already had this rule for v1 (`TableBackdrop`) and it matters more here,
-  where the map is the point.
+  ground is the REAL `MapCanvas` drawing the REAL room, not a gradient standing
+  in for one — glass judged against the wrong material is judged wrong.
 - Because the stage is the actual root, an isolated panel lands in **exactly**
   the position it occupies in the composed screen — spine top-left, journal
   bottom-right, action bar centred. Nothing is re-laid-out for the sake of a
@@ -431,7 +447,7 @@ the **real map ground**. Two consequences worth knowing:
 
 ## Files
 
-All under `packages/web/src/primitives/v2/`.
+The screen, under `packages/web/src/primitives/v2/`:
 
 | File | What it owns |
 |---|---|
@@ -441,20 +457,33 @@ All under `packages/web/src/primitives/v2/`.
 | `NearEdge.tsx` | Your two bottom panels: identity/vitals/conditions, and turn line + actions + open line, plus the roll card and the death-save ladder. |
 | `ActionRows.tsx` | The two rows (Bonus+Reaction top, Action alone bottom), sockets, the overflow tile, and the fixed detail strip. |
 | `JournalRail.tsx` | Right edge: notes, feed, collapsible rolls, ruling suggestions, reactions, composer. |
-| `Overlays.tsx` | ExplainSheet · ComposeSheet · Folio · TableMenu · PauseOverlay. |
-| `TableGround.tsx` | The map as the ground, full bleed, with the legibility vignette. |
+| `Overlays.tsx` | ComposeSheet · Folio · TableMenu · PauseOverlay · Scrim. |
 | `viewModel.ts` | The seam: `ComputedSheet` + projection + `greyingReason` → view-models. |
-| `parts.tsx` | The repeats — `ExplainValue`, `Tag`, `HP`, `Ctl`, `Meter`. |
+| `ScreenStyles.tsx` | PLACEMENT — where each panel sits. Chrome lives in the shared layer. |
+| `stage.tsx` | The Storybook ground: the real screen root, so an isolated panel lands where it really sits. |
+| `fixtures.ts` | The demo table and the demo room. Torvald real; everyone else hand-built, as the rail's needs allow. |
+
+The language it is built from, under `packages/web/src/design/` — extracted out
+of this screen so every other surface could speak it too:
+
+| File | What it owns |
+|---|---|
 | `type.ts` | The type ramp as roles. |
 | `glyphs.tsx` | The drawn marks, in `currentColor`. |
-| `ScreenStyles.tsx` | The one stylesheet — hover, focus, reduced motion, the frame's hairlines. |
-| `fixtures.ts` | The demo table. Torvald real; everyone else hand-built, as the rail's needs allow. |
+| `parts.tsx` | The repeats — `ExplainValue`, `Tag`, `Field`, `HP`, `Ctl`, `Meter`. |
+| `styles.tsx` | CHROME and BEHAVIOUR — fill, border, rhythm, hover, focus-visible, reduced motion. Owns no positions. |
+| `explain.ts` | `ExplainVM` — a value, its rows, and a sentence. Presentational, not a game concept. |
 
-`packages/web/test/hud-type-hygiene.test.ts` scans every v2 surface from day one
-— no numeric font size, no directly named font family outside a type module, no
-hex or `rgb()` literal, no literal duration. `ScreenStyles.tsx` is in scope too:
-it is a stylesheet, but a hex colour in a template literal is exactly as much of
-a leak as one in a style object.
+Two of this screen's own components are gone, absorbed rather than deleted:
+`TableGround` became `MapCanvas`'s `fit="fill"`, and `ExplainSheet` became
+`InfoPanel`'s explain entry path. Both were second implementations of something
+the primitives already owned.
+
+`packages/web/test/hud-type-hygiene.test.ts` scans every surface on the layer —
+no numeric font size, no directly named font family outside a type module, no
+hex or `rgb()` literal, no literal duration. The stylesheets are in scope too: a
+hex colour in a template literal is exactly as much of a leak as one in a style
+object.
 
 ## Known gaps
 

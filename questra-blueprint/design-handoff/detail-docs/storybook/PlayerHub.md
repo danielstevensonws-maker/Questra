@@ -1,6 +1,18 @@
-# Play/PlayerHub
+# Play/PlayerHub — SUPERSEDED
 
-**Story file:** `packages/web/src/primitives/PlayerHub.stories.tsx`
+> **This describes code that no longer exists.** There were two authored
+> directions for the Player View; the owner picked v2, and this one — the hub
+> bar docked to the bottom of a map — was deleted along with `VitalsBar`,
+> `ActionBar`, `DeathSaveCard`, `DiceLog`, `PlayerMenu`, `StatBar`,
+> `SceneHeader`, `TurnStrip` and `sheetToPlayerHub`. See
+> [PlayerViewV2.md](PlayerViewV2.md) for the surface that shipped.
+>
+> The document is kept for the design reasoning in it — the dying ladder, the
+> greying rule, the seam from `ComputedSheet` to a hub view-model — all of
+> which v2 re-implements rather than discards. Read it as a record, never as a
+> description of the tree. Everything below this line is as it was written.
+
+**Story file:** `packages/web/src/primitives/PlayerHub.stories.tsx` *(deleted)*
 **Storybook title:** `Play/PlayerHub` — the only story file outside the `Primitives/` tree.
 **Brief:** 10 §2 (Play UI) · dying ladder from Brief 04 · legality from Brief 02/05
 
