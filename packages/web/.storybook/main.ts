@@ -3,8 +3,10 @@ import { contractsSrcAlias } from '../contracts-src-alias';
 import { engineSrcAlias } from '../engine-src-alias';
 
 const config: StorybookConfig = {
-  // Two trees only: Primitives/* (judged in isolation) and, later, Play/*
-  // (staged over a real map). There are no screen-level stories.
+  // Primitives/* (judged in isolation), Play/* (staged over a real map — the
+  // one whole screen there is Player View v2), and Shell/* (the account/
+  // campaign screens — Landing, Home, Join — the second whole-screen exception,
+  // staged over the same map material rather than a play session's state).
   stories: ['../src/**/*.stories.@(ts|tsx)'],
   framework: { name: '@storybook/react-vite', options: {} },
   // Storybook dev AND its static build read @questra/contracts and @questra/engine

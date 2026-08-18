@@ -42,6 +42,7 @@ export {
   castName,
   eyebrow,
   heroName,
+  heroTitle,
   itemName,
   micro,
   narration,

@@ -194,6 +194,52 @@ const CSS = `
 }
 .qa2-badge.is-yours { background: var(--qa-accent); color: var(--qa-accent-ink); box-shadow: 0 0 18px -4px var(--qa-accent-glow); }
 
+/* ---- the primary call to action ---------------------------------------------
+   The one button on a shell screen (Landing's Enter, Join's Join) that gets the
+   accent SPENT rather than hinted at — everywhere else on these screens the
+   accent stays reserved, same "one accent, never decorative" law the HUD
+   already keeps. Built from the same materials as qa2-badge.is-yours (accent
+   fill + its glow token) at a size meant for a thumb, not a HUD chip. */
+.qa2-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--qa-s2);
+  padding: var(--qa-s3) var(--qa-s6);
+  border: none;
+  border-radius: var(--qa-radius-round);
+  background: var(--qa-accent);
+  color: var(--qa-accent-ink);
+  cursor: pointer;
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-label);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  box-shadow: 0 0 32px -6px var(--qa-accent-glow), var(--qa-shadow);
+  transition: transform var(--qa-dur-fast) var(--qa-ease), box-shadow var(--qa-dur-fast) var(--qa-ease);
+}
+.qa2-cta:hover { transform: translateY(-1px); box-shadow: 0 0 40px -4px var(--qa-accent-glow), var(--qa-shadow); }
+.qa2-cta:active { transform: translateY(0); }
+.qa2-cta[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+.qa2-cta[aria-disabled="true"]:hover { transform: none; }
+/* The quiet second action beside a CTA — "sign in" under "Enter". A link, not
+   a button: it never competes for the one accent. */
+.qa2-quiet-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--qa-ink-faint);
+  cursor: pointer;
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: color var(--qa-dur-fast) var(--qa-ease), text-decoration-color var(--qa-dur-fast) var(--qa-ease);
+}
+.qa2-quiet-link:hover { color: var(--qa-ink); text-decoration-color: var(--qa-ink-faint); }
+
 .qa2-meter { width: 96px; height: 4px; border-radius: var(--qa-radius-round); background: var(--qa-chip); overflow: hidden; }
 .qa2-meter > span { display: block; height: 100%; border-radius: var(--qa-radius-round); background: var(--qa-ink-dim); transition: width var(--qa-dur-slow) var(--qa-ease); }
 

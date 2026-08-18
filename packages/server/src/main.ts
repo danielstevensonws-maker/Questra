@@ -9,6 +9,7 @@
  */
 import { pathToFileURL } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { ClientMsgSchema, type ServerMsg } from '@questra/contracts';
 import { SyncCore } from './sync-core.js';
@@ -23,11 +24,18 @@ export interface StartOptions {
    * ⇒ a bare sync server (dev without accounts, tests).
    */
   auth?: (app: FastifyInstance) => void;
+  /** The web app's origin (undefined ⇒ no CORS registered — tests hit the app directly). */
+  corsOrigin?: string;
 }
 
 /** Start the HTTP (Fastify) + WebSocket (ws) server. Returns a stop() handle. */
 export async function start(opts: StartOptions): Promise<{ port: number; stop: () => Promise<void> }> {
   const app = Fastify({ logger: false });
+  if (opts.corsOrigin) {
+    // credentialed (the refresh cookie) — `*` can't carry credentials, so this is a
+    // named origin, not a wildcard (ADR-0004 spirit: least surface, not "allow everyone").
+    await app.register(cors, { origin: opts.corsOrigin, credentials: true });
+  }
   app.get('/health', async () => ({ ok: true }));
   opts.auth?.(app);
 
@@ -82,7 +90,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   loadDotEnvLocal();
   const config = readConfig();
   const built = createApp(config);
-  const { port } = await start({ core: built.core, auth: built.auth, port: config.port });
+  const { port } = await start({ core: built.core, auth: built.auth, port: config.port, corsOrigin: config.webOrigin });
   const where = config.databaseUrl ? 'Postgres (durable)' : 'in-memory (no DATABASE_URL)';
   console.log(`[questra] server on http://0.0.0.0:${port} — store: ${where}`);
   const shutdown = async () => { await built.close(); process.exit(0); };

@@ -15,6 +15,7 @@
     "migrate:down": "npm run migrate down"
   },
   "dependencies": {
+    "@fastify/cors": "^10.0.1",
     "@questra/contracts": "*",
     "@questra/engine": "*",
     "fastify": "^5.2.0",

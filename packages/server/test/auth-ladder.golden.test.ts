@@ -120,6 +120,17 @@ describe('auth ladder (Brief 14 §1)', () => {
     expect(mailer.sent.length).toBe(0);
   });
 
+  it('getSelf (GET /auth/me\'s read) returns the client-safe self-view, never a deleted one', async () => {
+    const { self } = await svc.signup('dora@example.com', 'dora password', 'Dora');
+    const fetched = await svc.getSelf(self.id);
+    expect(() => SelfAccountSchema.parse(fetched)).not.toThrow();
+    expect(fetched).toEqual(self); // signup's own return is already the self-view — must agree
+    expect(fetched).not.toHaveProperty('passwordHash');
+
+    await svc.deleteAccount(self.id);
+    await expect(svc.getSelf(self.id)).rejects.toMatchObject({ status: 401, code: 'auth' });
+  });
+
   it('an expired access token no longer verifies', async () => {
     await svc.signup('carol@example.com', 'carol password', 'Carol');
     await svc.verifyEmail(extractToken(mailer.lastTo('carol@example.com')!.body));

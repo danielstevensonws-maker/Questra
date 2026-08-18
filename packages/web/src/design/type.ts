@@ -46,6 +46,23 @@ export const heroName: CSSProperties = {
   lineHeight: 1,
 };
 
+/**
+ * The wordmark and the shell's page titles (Landing, Home, Join) — the display
+ * role at its ceiling, `--qa-text-display`. The ramp has no size above this one
+ * (six sizes exist; nothing here invents a seventh), so a screen that wants the
+ * wordmark bigger than 40px scales the CONTAINER with `transform`, never the
+ * font-size — composition is the composing screen's job, per design/styles.tsx's
+ * own split of chrome vs. position. That keeps the actual type-size vocabulary
+ * exactly six values everywhere, title screen included.
+ */
+export const heroTitle: CSSProperties = {
+  fontFamily: display,
+  fontSize: 'var(--qa-text-display)',
+  color: 'var(--qa-ink)',
+  lineHeight: 1,
+  letterSpacing: '0.01em',
+};
+
 /** The scene's name in the top rail. */
 export const sceneName: CSSProperties = {
   fontFamily: display,

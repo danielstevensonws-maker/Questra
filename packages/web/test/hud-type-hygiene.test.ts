@@ -68,13 +68,23 @@ const HUD_FILES = [
   'primitives/PromptHolderCard.tsx',
   'primitives/PublicSecretField.tsx',
   'primitives/PullFromCampaignPicker.tsx',
+  // the account/campaign shell (Brief 14 §3, M3 minimal)
+  'shell/ShellStyles.tsx',
+  'shell/Landing.tsx',
+  'shell/Home.tsx',
+  'shell/JoinFlow.tsx',
+  'shell/CreateCampaign.tsx',
+  'shell/CampaignPlaceholder.tsx',
+  'shell/Nav.tsx',
+  'shell/ShellStates.tsx',
+  'shell/AuthField.tsx',
 ];
 
 /** The modules allowed to name a font family — the type ramp and the sheets. */
-const TYPE_MODULES = new Set(['design/type.ts', 'design/styles.tsx', 'primitives/v2/ScreenStyles.tsx']);
+const TYPE_MODULES = new Set(['design/type.ts', 'design/styles.tsx', 'primitives/v2/ScreenStyles.tsx', 'shell/ShellStyles.tsx']);
 
 /** The stylesheets, whose CSS lives in a template literal (see the backtick test). */
-const STYLESHEETS = ['design/styles.tsx', 'primitives/v2/ScreenStyles.tsx'];
+const STYLESHEETS = ['design/styles.tsx', 'primitives/v2/ScreenStyles.tsx', 'shell/ShellStyles.tsx'];
 
 const files = HUD_FILES.map((name) => ({ name, text: readFileSync(join(src, name), 'utf8') }));
 
