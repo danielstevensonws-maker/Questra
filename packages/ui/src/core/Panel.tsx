@@ -17,9 +17,11 @@ export interface PanelProps {
   large?: boolean;
   className?: string;
   style?: CSSProperties;
+  /** Names the region when the panel IS the landmark (e.g. a player's whole HUD). */
+  'aria-label'?: string;
 }
 
-export function Panel({ children, tone = 'glass', large = false, className, style }: PanelProps) {
+export function Panel({ children, tone = 'glass', large = false, className, style, 'aria-label': ariaLabel }: PanelProps) {
   const base: CSSProperties = {
     background: tone === 'solid' ? 'var(--qa-glass-solid)' : 'var(--qa-glass)',
     border: 'var(--qa-hairline) solid var(--qa-glass-border)',
@@ -34,7 +36,7 @@ export function Panel({ children, tone = 'glass', large = false, className, styl
   };
 
   return (
-    <div className={className} style={{ ...base, ...style }}>
+    <div className={className} style={{ ...base, ...style }} aria-label={ariaLabel}>
       {children}
     </div>
   );

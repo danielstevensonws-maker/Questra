@@ -11,6 +11,7 @@
     "check": "tsc -p tsconfig.json --noEmit && vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
     "@questra/contracts": "*"
   },
   "devDependencies": {

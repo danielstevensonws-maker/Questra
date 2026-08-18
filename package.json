@@ -13,7 +13,7 @@
     "prestorybook": "npm run build:contracts",
     "storybook": "npm run storybook -w @questra/web",
     "build-storybook": "npm run build:contracts && npm run build-storybook -w @questra/web",
-    "prebuild": "npm run build:contracts",
+    "prebuild": "npm run build:contracts && npm run build -w @questra/engine",
     "build": "npm run build -w @questra/web"
   }
 }

@@ -16,6 +16,7 @@ import {
   type NamedModifier,
 } from '@questra/contracts';
 import { abilityMod, type Combatant, type ProjectionState } from './state.js';
+import { narration } from './narration.js';
 
 /** RNG contract: return an integer in [1, sides]. */
 export type Rng = (sides: number) => number;
@@ -230,28 +231,19 @@ export function resolveAttack(
       resultingHp,
     } as PlayEvent['body']);
 
-    // Step 8 — narration.
-    emit({
-      t: 'narration',
-      text: narrate(attacker, target, finalAmount, input.damageType, resultingHp),
-      from: 'engine',
-    } as PlayEvent['body']);
+    // Step 8 — narration, from the template pack (deterministic; never an AI call).
+    const narrator = { name: attacker.name, maxHp: attacker.maxHp, prone: attacker.conditions.some((c) => c.conditionId === 'condition.prone') };
+    const victim = { name: target.name, maxHp: target.maxHp };
+    const text = outcome === 'crit'
+      ? narration.crit(narrator, victim, finalAmount, input.damageType, resultingHp)
+      : narration.hit(narrator, victim, finalAmount, input.damageType, resultingHp);
+    emit({ t: 'narration', text, from: 'engine' } as PlayEvent['body']);
   } else {
-    emit({ t: 'narration', text: `${attacker.name} misses ${target.name}.`, from: 'engine' } as PlayEvent['body']);
+    const narrator = { name: attacker.name, maxHp: attacker.maxHp };
+    const victim = { name: target.name, maxHp: target.maxHp };
+    const text = outcome === 'fumble' ? narration.fumble(narrator, victim) : narration.miss(narrator, victim);
+    emit({ t: 'narration', text, from: 'engine' } as PlayEvent['body']);
   }
 
   return events;
-}
-
-/** Step 8 — plain-English narration per outcome. Templates, never an AI call. */
-function narrate(attacker: Combatant, target: Combatant, amount: number, type: string, resultingHp: number): string {
-  const prone = attacker.conditions.some((c) => c.conditionId === 'condition.prone');
-  const opener = prone ? `${attacker.name}, fighting from the ground, still lands it` : `${attacker.name} lands the hit`;
-  const health = resultingHp === 0 ? `${target.name} drops.` : resultingHp <= Math.floor(target.maxHp / 2) ? `${target.name} is barely standing.` : `${target.name} takes it.`;
-  return `${opener} — ${amount} ${type}. ${sentenceCase(health)}`;
-}
-
-/** Capitalize the first letter of a sentence (creature names like "the goblin" become "The goblin"). */
-function sentenceCase(s: string): string {
-  return s.length > 0 ? s[0]!.toUpperCase() + s.slice(1) : s;
 }

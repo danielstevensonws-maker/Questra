@@ -36,11 +36,50 @@ file — see [ComposeRollSheet.md](ComposeRollSheet.md).
 
 ```
 PlayerHub
-├── IdentityHeader   (inline — Avatar from @questra/ui + name + level)
-├── VitalsBar        (dimmed when dying)
-├── ActionBar   ⇄  DeathSaveCard      ← THE FLIP
-└── DiceLog + sideSheets              (dimmed during first-contact)
+├── character panel   IdentityHeader (Avatar + name + level)
+│                     VitalsBar   (dimmed when dying)
+│                     readiness   (init · hit dice · carrying, pinned bottom)
+├── StatBar           its own panel, paired beside the character panel
+└── action panel      TurnStrip                     ← attached to this panel
+                      ActionBar ⇄ DeathSaveCard     ← THE FLIP
+
+SceneHeader and DiceLog are siblings on the screen, not children.
 ```
+
+### Three panels, one chrome contract (2026-08 redesign)
+
+    [ character ][ stats ]        [ turn strip ]
+                                  [ action bar ]        (log, a sibling)
+
+Grouped by the question each panel answers. **Who you are** (character + stats)
+pairs off to the left; **what you can do** takes the centre of the screen,
+because it is the only panel a player actually operates — the other two are
+read, not clicked. The turn strip is attached to the *action* panel rather than
+spanning the whole bar: whose turn it is, what you're aimed at, and how far you
+can move are all facts about acting.
+
+These were briefly merged into one hairline-divided frame to stop three cards of
+three different widths (240 / 216 / 340) and two different radii from
+disagreeing. Separation came back by request — and the fix turned out to be
+portable. **It was never the merging; it was the shared chrome contract:** one
+radius (`large`), one padding (`--qa-s4`), one internal rhythm (`--qa-s3`), one
+fill, one type ramp. That contract lives in `PlayerHub`'s `HubPanel`, and in
+`StatBar`'s own `Panel` for when it ships standalone — **those two must be kept
+in step.** Build any new hub surface through `HubPanel` and they cannot drift
+apart again.
+
+Also worth knowing:
+
+- `StatBar` takes a `chrome` prop: `panel` (default, its own surface) or `bare`
+  (no wrapper, for a parent that owns the chrome).
+- **AC is no longer duplicated.** It used to render in both `VitalsBar` and
+  `StatBar`'s header. It now lives only with the vitals, where a defensive
+  number belongs; `StatBar`'s footer carries speed and passive perception.
+- The gap in the middle of the character panel is **reserved, not dead** — it's
+  where condition chips render. The readiness line is pinned to the bottom
+  (`marginTop: auto`), which lands it on the same baseline as `StatBar`'s
+  footer chips.
+- `Panel` gained an `aria-label` prop so each surface can name its region.
 
 ### The flip
 
@@ -84,6 +123,37 @@ an `InfoPanel` on that derivation. `toVitals()` packs the AC derivation
 that panel has something to show. Brief 10 §1: every number renders from a
 Derived value.
 
+### Typography — five roles, three sizes
+
+The hub had drifted into **four sizes doing one job**: `8.5px`, `9px`, `9.5px`
+and the real `--qa-text-whisper` (10px) were all rendering "small mono caps
+label", plus one-off `13px`/`22px`. Nothing caught it — `packages/ui`'s
+token-hygiene suite scans only that package, and these primitives live in
+`packages/web`.
+
+`hudType.ts` replaces sizes with **roles**, so a component cannot pick a number:
+
+| Role | Token | Font |
+|---|---|---|
+| `sectionLabel` | whisper 10 | mono, caps, tracked |
+| `name` | lg 20 | IM Fell English |
+| `statValue` | lg 20 | mono |
+| `statMeta` | **label 12** | mono |
+| `itemName` / `prose` | **label 12** | EB Garamond |
+
+The rule underneath (Player View design request §3): **prose is a serif, data is
+mono** — a player should be able to tell at a glance whether they're reading the
+story or reading their character. `--qa-text-label` (12px) was previously unused
+in the hub, which is exactly why `13px` kept being invented to fill the 10→16
+gap. No new tokens: `packages/theme` is byte-identity-guarded against the
+upstream Claude Design project, so the ramp had to be composed from what exists.
+
+`packages/web/test/hud-type-hygiene.test.ts` now fails the build on a numeric
+`fontSize`, a directly-named font family, a colour literal, or a literal
+duration in any HUD file. It is scoped to the HUD file list rather than all of
+`packages/web` — the wizard/lobby surfaces have their own drift, and failing on
+those here would just get the suite skipped. Widen `HUD_FILES` as they land.
+
 ### Component detail
 
 **`VitalsBar`** — composes `HPBar` + `Chip` from `@questra/ui` rather than
@@ -91,10 +161,35 @@ reinventing bars and pills. Computes nothing except display: `bloodied` is
 already decided in `toVitals()` as `hp > 0 && hp <= floor(maxHp/2)` and surfaces
 as a danger `Chip`. Temporary HP renders as a separate `+N temporary` line.
 
-**`ActionBar`** — three fixed rows (Action / Bonus Action / Reaction), each
-rendered only if it has tiles. Each tile shows name, `+N to hit`, a damage
-`Chip`, and a resource `Chip` (`"2 of 2"`). Attacks are hard-coded to the
-`action` row and resource-bearing features to `bonus` in `toActionTiles`.
+**`ActionBar`** — two labelled rows, not three: Action on its own (usually the
+busiest economy), Bonus and Reaction sharing a second row split by a hairline
+divider (three full-width rows read as too tall and too empty once
+Bonus/Reaction's typical 1-2 real tiles are padded out). Attacks are hard-coded
+to the `action` row and resource-bearing features to `bonus` in
+`toActionTiles`. The dashed `+` placeholder sockets are real progression slots
+(where a future ability will go), not filler — they still pad each economy out
+to its own `minSlots`.
+
+To-hit and damage are **off the tile face**, in a reserved **detail strip**
+under the rows. Not an expanding tile: an expanding tile reflows its row, so
+sweeping the mouse across six sockets makes the bar jitter. The strip is fixed
+height, so nothing above it ever moves. It also gives greying somewhere honest
+to live — the reason used to replace the tile's *name* and wrap to three ragged
+lines, which is what made a greyed row look broken. Now the tile keeps its name
+and the strip carries the explanation ("It isn't Torvald's turn."). With nothing
+hovered the strip falls back to the first legal tile, so it is never empty.
+
+**`TurnStrip`** — turn badge · target chips · movement meter, along the frame's
+top edge. The hub had every number a character *sheet* holds and nothing a
+*turn* holds, which is the other half of why it read as static: a sheet is a
+document, a turn is a game. The badge is the one accent-filled element in the
+whole HUD; targets use the accent *line* only, so nothing competes with it.
+Deliberately **not animated** — CLAUDE.md law 4 prefers glanceable state over
+motion that pulls the eye while another player is talking, and a static fill
+plus `--qa-accent-glow` needs no reduced-motion variant.
+
+**`SceneHeader`** — scene name, round, whose turn, session clock. Floats
+top-centre, non-interactive.
 
 **`DeathSaveCard`** — three success pips, three failure pips, one big button.
 Disabled unless `phase === 'dying'`. Headlines per phase: *Making death saves /

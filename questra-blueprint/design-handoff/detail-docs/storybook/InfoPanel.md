@@ -75,20 +75,65 @@ none, and sheet values compute theirs at runtime, so the caller supplies it.
 
 ### Presentation and accessibility
 
-- A right-side slide-over: fixed overlay, `max-w-md`, `role="dialog"` +
-  `aria-modal="true"` + `aria-labelledby`.
-- Escape closes; focus moves into the panel on open.
-- Clicking the scrim closes; clicks inside stop propagation.
-- `q-slide-in` animation, disabled under `prefers-reduced-motion`.
+**Changed (owner decision, 2026-07-23): a tap-anchored popover, not a right-side
+slide-over.** InfoPanel opens floating next to whatever `?` was tapped — a class
+card in the wizard grid, a condition chip in the Player View HUD, a spell row in
+the compendium — instead of sliding in from the screen edge. Applies everywhere
+InfoPanel is used (see the Screens table above); there is only the one
+presentation now, not a lighter variant for some contexts and the old slide-over
+for others.
+
+- **Anchored, collision-aware positioning.** The panel places itself next to its
+  trigger element and flips/shifts to stay fully on-screen (e.g. opens above the
+  trigger instead of below if it would run off the bottom of the viewport, and
+  the reverse). Never renders clipped or off-screen.
+- **Sized to content, capped and scrollable.** `max-w-md` still applies as an
+  upper bound; add a `max-h` cap with internal scroll once content exceeds it.
+  Layers 2/3 stay collapsed by default (existing behaviour), so most popovers
+  stay small in practice — the cap is a backstop for when a reader opens
+  everything, not the common case.
+- **Choose stays a sticky footer** — now pinned to the bottom of the popover
+  card itself (it scrolls with the card, not the viewport).
+- Escape closes; focus moves into the panel on open. Clicking outside the
+  popover closes it; clicks inside stop propagation. (No full-screen scrim —
+  see the modality note below.)
+- Surface: use the `--qa-glass-solid` fill already reserved for popovers
+  (player-view-screen.md §2) rather than the slide-over's translucent glass —
+  a popover floating over dense content needs to stay legible without a scrim
+  behind it.
+- Animation: scale/fade in from the anchor point (replaces `q-slide-in`'s
+  edge-slide); disabled under `prefers-reduced-motion` as before.
 - Themed entirely via `theme/tokens.css` variables — the Claude Design token set
   drops into that one file and this re-themes with no edits here (ADR-0014).
+
+**⚠ owner-confirm (two open sub-questions, not yet decided):**
+1. **Modality.** The old slide-over was a true modal (`aria-modal="true"`,
+   full-screen scrim, background inert while open) — appropriate for a
+   full-screen takeover, less obviously right for a small popover. Default
+   assumed here: **stays modal** (`role="dialog"` + `aria-modal="true"`,
+   background inert, no visible scrim) because several contexts end in a
+   **Choose** commitment and shouldn't be interruptible by a stray click
+   through to the board/grid behind it. A lighter non-modal popover
+   (background stays interactive, closes on outside-click but doesn't block
+   it) would feel snappier for read-only taps mid-combat in the Player View —
+   worth a real decision, not an assumption, before this ships broadly.
+2. **Narrow-viewport fallback.** An anchored popover degrades on phone-width
+   screens (little room to flip/shift into). ADR-0016 A7 only names the player
+   hub, death-save card, and dice surface as explicitly responsive for v1 —
+   InfoPanel isn't on that list, so whether it needs its own narrow-viewport
+   treatment (e.g. falling back to a bottom sheet below some breakpoint) is
+   genuinely undecided, not just unspecified.
 
 ---
 
 ## The stories
 
 All four wrap the panel in a `Harness` that starts open and offers a re-open
-button.
+button. **With the anchored-popover change above, that re-open button *is* the
+anchor** — the harness needs a real trigger element (a `?` button) for the
+popover to position against, not just an open/closed boolean. Update the
+harness alongside the component so every story demonstrates real anchored
+positioning, not a floating-in-the-void panel.
 
 | Story | Source | Shows |
 |---|---|---|

@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@questra/contracts": "*",
+    "@questra/engine": "*",
     "@questra/theme": "*",
     "@questra/ui": "*",
     "react": "^19.0.0",

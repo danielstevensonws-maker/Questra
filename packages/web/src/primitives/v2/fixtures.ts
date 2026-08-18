@@ -1,0 +1,392 @@
+/**
+ * v2/fixtures — the demo table, built on the REAL contracts fixture.
+ *
+ * You are Torvald, and every number about him comes from `torvald-sheet.json`
+ * through `toHero` — Armor Class 18 is Chain Mail 16 plus a Shield 2 because
+ * that is literally what the sheet says, so tapping it shows true working
+ * rather than a plausible-looking invention. That is the whole reason the owner
+ * chose Torvald over the design request's Wren for these stories: a screen
+ * whose promise is "no number you cannot interrogate" should not be
+ * demonstrated with numbers nobody derived.
+ *
+ * Everyone ELSE at the table is hand-built, and correctly so — the spine only
+ * ever shows an ally's hit points and an enemy's condition in one word, none of
+ * which needs a computed sheet behind it. The party names and levels are the
+ * design request's §9 cast, with Wren moved from "you" to the seat beside you.
+ */
+import type { ComputedSheet } from '@questra/contracts';
+import type { Combatant, ProjectionState } from '@questra/engine';
+import torvaldSheet from '@questra/contracts/src/fixtures/torvald-sheet.json';
+import type { FeatureLineVM, InventoryLineVM } from './Overlays.js';
+import type { GroundTokenVM } from './TableGround.js';
+import type { LogEntryVM, ResultVM, SpellCardVM, SpineEntryVM } from './viewModel.js';
+
+export const sheet = torvaldSheet as unknown as ComputedSheet;
+
+export const IDENTITY = { className: 'Fighter', level: 3 };
+
+export const torvald: Combatant = {
+  id: 'pc-torvald', name: 'Torvald',
+  abilities: { str: 16, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
+  profBonus: 2, maxHp: 12, hp: 12, tempHp: 0, ac: 18, conditions: [], isPlayer: true,
+};
+
+export const wren: Combatant = {
+  id: 'pc-wren', name: 'Wren',
+  abilities: { str: 10, dex: 17, con: 12, int: 13, wis: 14, cha: 11 },
+  profBonus: 2, maxHp: 27, hp: 22, tempHp: 0, ac: 14, conditions: [], isPlayer: true,
+};
+
+export const skirmisher: Combatant = {
+  id: 'npc-goblin-1', name: 'the skirmisher',
+  abilities: { str: 8, dex: 15, con: 10, int: 10, wis: 8, cha: 8 },
+  profBonus: 2, maxHp: 10, hp: 4, tempHp: 0, ac: 15, conditions: [], isPlayer: false,
+};
+
+export const lookout: Combatant = {
+  id: 'npc-goblin-2', name: 'the lookout',
+  abilities: { str: 8, dex: 15, con: 10, int: 10, wis: 8, cha: 8 },
+  profBonus: 2, maxHp: 10, hp: 10, tempHp: 0, ac: 15, conditions: [], isPlayer: false,
+};
+
+const COMBATANTS: Record<string, Combatant> = {
+  'pc-torvald': torvald, 'pc-wren': wren, 'npc-goblin-1': skirmisher, 'npc-goblin-2': lookout,
+};
+
+/** Torvald is up. */
+export const yourTurn: ProjectionState = {
+  combatants: COMBATANTS, round: 3, activeCreatureId: 'pc-torvald', nextSeq: 1,
+};
+
+/** Wren is up — every tile of Torvald's greys, each carrying the server's reason. */
+export const wrensTurn: ProjectionState = {
+  combatants: COMBATANTS, round: 3, activeCreatureId: 'pc-wren', nextSeq: 1,
+};
+
+export const SCENE = {
+  title: 'The Ruined Steading',
+  subtitle: 'Outskirts · Dusk',
+  round: 3,
+  elapsed: '01:42:33',
+};
+
+export const TARGETS = [
+  { id: 'npc-goblin-1', name: 'skirmisher', selected: true },
+  { id: 'npc-goblin-2', name: 'lookout', selected: false },
+];
+
+/**
+ * The round in initiative order. Allies carry hit points; enemies carry one
+ * word. `acting` and `acted` are what drives the spine's accent — see
+ * RoundSpine.tsx.
+ */
+export function castOrder(
+  actingId: string,
+  opts: { yourStatus?: string; youId?: string } = {},
+): SpineEntryVM[] {
+  // WHICH ONE IS YOU is a parameter, not a constant. The spine's whole job is
+  // answering "when am I up", and it computes that from the entry marked `you`
+  // — so hardcoding Torvald made the caster story mark the wrong player and
+  // count down to the wrong turn.
+  const youId = opts.youId ?? 'pc-torvald';
+
+  const order: Omit<SpineEntryVM, 'acting' | 'acted' | 'kind'>[] = [
+    { id: 'pc-wren', initiative: 21, name: 'Wren', role: 'Rogue · 3', hp: { current: 22, max: 27 } },
+    { id: 'pc-torvald', initiative: 18, name: 'Torvald', role: 'Fighter · 3', hp: { current: torvald.hp, max: torvald.maxHp } },
+    { id: 'npc-goblin-1', initiative: 15, name: 'Skirmisher', role: 'Goblin', hurt: 'Bloodied' },
+    { id: 'pc-mira', initiative: 12, name: 'Mira', role: 'Cleric · 3', hp: { current: mira.hp, max: mira.maxHp } },
+    { id: 'npc-goblin-2', initiative: 9, name: 'Lookout', role: 'Goblin', hurt: 'Unhurt' },
+    { id: 'pc-ozren', initiative: 7, name: 'Ozren', role: 'Wizard · 3', hp: { current: 9, max: 20 } },
+  ];
+
+  const at = order.findIndex((e) => e.id === actingId);
+  return order.map((e, i) => ({
+    ...e,
+    kind: e.id === youId ? 'you' : e.hurt !== undefined ? 'foe' : 'ally',
+    acting: i === at,
+    acted: at >= 0 && i < at,
+    ...(e.id === youId && opts.yourStatus !== undefined ? { status: opts.yourStatus } : {}),
+  }));
+}
+
+export function tokens(actingId: string, opts: { yourHp?: number; yourTag?: string } = {}): GroundTokenVM[] {
+  const down = opts.yourHp !== undefined && opts.yourHp <= 0;
+  return [
+    { id: 'pc-wren', label: 'W', x: 38, y: 42, kind: 'ally', acting: actingId === 'pc-wren' },
+    {
+      id: 'pc-torvald', label: 'T', x: 46, y: 53, kind: 'you', acting: actingId === 'pc-torvald',
+      ...(opts.yourTag !== undefined ? { tag: opts.yourTag } : {}),
+      ...(down ? { down: true } : {}),
+    },
+    { id: 'pc-mira', label: 'M', x: 33, y: 60, kind: 'ally', acting: actingId === 'pc-mira' },
+    { id: 'pc-ozren', label: 'O', x: 27, y: 47, kind: 'ally', acting: actingId === 'pc-ozren' },
+    { id: 'npc-goblin-1', label: 'G1', x: 59, y: 37, kind: 'foe', tag: 'Bloodied', acting: actingId === 'npc-goblin-1' },
+    { id: 'npc-goblin-2', label: 'G2', x: 65, y: 47, kind: 'foe', tag: 'Unhurt', acting: actingId === 'npc-goblin-2' },
+  ];
+}
+
+export const NOTES = {
+  title: 'The Ruined Steading — your notes',
+  lines: [
+    'The lookout bolts for the barn once it is bloodied — Wren called it.',
+    'The well hides a cellar hatch, barred from below.',
+    'Bram the farmer is tied up in the loft. He will shout a warning.',
+  ],
+};
+
+const noop = (what: string) => () => console.log(what);
+
+export const ENTRIES: LogEntryVM[] = [
+  { id: '1', tone: 'narration', actor: 'DM', text: 'Smoke drifts across the yard. The skirmisher staggers back, and the lookout edges toward the well.' },
+  { id: '2', tone: 'chat', actor: 'Torvald', text: 'I stay between them and Mira.' },
+  {
+    id: '3', tone: 'roll', actor: 'Wren · Attack', text: 'Shortbow on the skirmisher',
+    roll: {
+      total: 18,
+      rows: [
+        { label: 'd20', value: '13' },
+        { label: 'DEX', value: '+3' },
+        { label: 'Proficiency', value: '+2' },
+      ],
+      verdict: 'Hit — against Armor Class 15',
+      tone: 'hit',
+    },
+  },
+  { id: '4', tone: 'narration', actor: 'Engine', text: 'Wren hits the skirmisher for 6 piercing. It is bloodied.' },
+  {
+    id: '5', tone: 'suggestion', actor: 'Ruling suggestion',
+    text: 'I want to swing on the well-rope and drop on the lookout.',
+    suggestion: {
+      detail: 'This looks like Dexterity (Acrobatics) against difficulty 13. On a miss, Wren lands flat in the goblin’s square.',
+      actions: [
+        { label: 'Ask for the roll', onClick: noop('ask for the roll') },
+        { label: 'Change it', onClick: noop('change it') },
+        { label: 'No roll needed', onClick: noop('no roll') },
+      ],
+    },
+  },
+  { id: '6', tone: 'narration', actor: 'DM', text: 'Torvald — you are up. The lookout has one eye on you and one on the barn door.' },
+];
+
+export const RESULT: ResultVM = {
+  label: 'Longsword on the skirmisher',
+  total: 19,
+  rows: [
+    { label: 'd20', value: '14' },
+    { label: 'STR', value: '+3' },
+    { label: 'Proficiency', value: '+2' },
+  ],
+  verdict: 'Hit — against Armor Class 15',
+  tone: 'hit',
+};
+
+// ---- Mira, and what is honest about her ------------------------------------
+
+/**
+ * MIRA IS HAND-AUTHORED, AND TORVALD IS NOT. The distinction matters more than
+ * the fixture does.
+ *
+ * Torvald's sheet is `torvald-sheet.json` — the shape the engine actually
+ * computes, so tapping his Armor Class shows the working the engine did.
+ * Mira's sheet below is written by hand: `packages/engine/src/sim/sheet.ts`
+ * only attaches `spellcasting` when `casterType === 'full'`, and even then
+ * hardcodes `prepared: []`. There are no spell cards on any sheet yet, for any
+ * class, so there is nothing real to render a caster from.
+ *
+ * What she therefore DOES prove: that the action row holds a caster's tile
+ * count without wrapping, that the glyphs separate when most of a row is
+ * spells, that the folio's Spells tab has a shape worth filling, and that the
+ * concentration badge reads. What she does NOT prove: that the engine can
+ * produce any of it.
+ *
+ * Every number here is arithmetically consistent with a Cleric 3 (WIS 17, prof
+ * +2) and every `derivation` sums to its `value`, because `derivationSumsToValue`
+ * is a stated invariant of the contract and a fixture that violated it would be
+ * teaching the wrong shape to whoever wires the real thing.
+ */
+export const MIRA_IDENTITY = { className: 'Cleric', level: 3 };
+
+const d = (value: number, derivation: { label: string; value: number }[]) => ({ value, derivation });
+
+export const miraSheet: ComputedSheet = {
+  abilities: {
+    str: d(12, [{ label: 'Base', value: 12 }]),
+    dex: d(10, [{ label: 'Base', value: 10 }]),
+    con: d(14, [{ label: 'Base', value: 13 }, { label: 'Background', value: 1 }]),
+    int: d(11, [{ label: 'Base', value: 11 }]),
+    wis: d(17, [{ label: 'Base', value: 15 }, { label: 'Background', value: 2 }]),
+    cha: d(13, [{ label: 'Base', value: 13 }]),
+  },
+  profBonus: d(2, [{ label: 'Level 3', value: 2 }]),
+  hp: {
+    value: { max: 24, hitDie: 'd8', hitDiceMax: 3 },
+    derivation: [
+      { label: 'Hit die (max at level 1)', value: 8 },
+      { label: 'Levels 2-3', value: 10 },
+      { label: 'CON', value: 6 },
+    ],
+  },
+  acOptions: [
+    d(13, [{ label: 'Chain Shirt', value: 13 }]),
+    d(15, [{ label: 'Chain Shirt', value: 13 }, { label: 'Shield', value: 2 }]),
+  ],
+  acDefault: 1,
+  initiative: d(0, [{ label: 'DEX', value: 0 }]),
+  saves: {
+    str: d(1, [{ label: 'STR', value: 1 }]),
+    dex: d(0, [{ label: 'DEX', value: 0 }]),
+    con: d(2, [{ label: 'CON', value: 2 }]),
+    int: d(0, [{ label: 'INT', value: 0 }]),
+    wis: d(5, [{ label: 'WIS', value: 3 }, { label: 'Proficiency', value: 2 }]),
+    cha: d(3, [{ label: 'CHA', value: 1 }, { label: 'Proficiency', value: 2 }]),
+  },
+  skills: {
+    insight: d(5, [{ label: 'WIS', value: 3 }, { label: 'Proficiency', value: 2 }]),
+    medicine: d(5, [{ label: 'WIS', value: 3 }, { label: 'Proficiency', value: 2 }]),
+    persuasion: d(3, [{ label: 'CHA', value: 1 }, { label: 'Proficiency', value: 2 }]),
+    religion: d(2, [{ label: 'INT', value: 0 }, { label: 'Proficiency', value: 2 }]),
+  },
+  passives: {
+    perception: d(15, [{ label: 'Base', value: 10 }, { label: 'WIS', value: 3 }, { label: 'Proficiency', value: 2 }]),
+    investigation: d(10, [{ label: 'Base', value: 10 }, { label: 'INT', value: 0 }]),
+    insight: d(15, [{ label: 'Base', value: 10 }, { label: 'WIS', value: 3 }, { label: 'Proficiency', value: 2 }]),
+  },
+  speedFt: d(30, [{ label: 'Species', value: 30 }]),
+  attacks: [
+    {
+      name: 'Mace',
+      toHit: 3,
+      toHitDerivation: [{ label: 'STR', value: 1 }, { label: 'Proficiency', value: 2 }],
+      damage: '1d6 + 1',
+      damageType: 'bludgeoning',
+      ability: 'str',
+      tags: ['action', 'melee'],
+    },
+  ],
+  features: [
+    { id: 'feature.cleric.channel-divinity', name: 'Channel Divinity', resource: { pool: 'feature.channel_divinity', max: 1, remaining: 1 } },
+  ],
+  spellcasting: {
+    ability: 'wis',
+    saveDc: d(13, [{ label: 'Base', value: 8 }, { label: 'Proficiency', value: 2 }, { label: 'WIS', value: 3 }]),
+    attackBonus: d(5, [{ label: 'Proficiency', value: 2 }, { label: 'WIS', value: 3 }]),
+    slots: { '1': 4, '2': 2 },
+    prepared: [],
+  },
+  coins: { cp: 0, sp: 8, ep: 0, gp: 14, pp: 0 },
+};
+
+export const mira: Combatant = {
+  id: 'pc-mira', name: 'Mira',
+  abilities: { str: 12, dex: 10, con: 14, int: 11, wis: 17, cha: 13 },
+  profBonus: 2, maxHp: 24, hp: 18, tempHp: 0, ac: 15, conditions: [], isPlayer: true,
+  // Real projection state, not invented: `concentratingOn` is already on the
+  // engine's Combatant, so the badge this drives is server-driven today.
+  concentratingOn: 'Bless',
+};
+
+/** Mira's turn, with the rest of the table where the Torvald states leave them. */
+export const mirasTurn: ProjectionState = {
+  combatants: { 'pc-torvald': torvald, 'pc-wren': wren, 'pc-mira': mira, 'npc-goblin-1': skirmisher, 'npc-goblin-2': lookout },
+  round: 3, activeCreatureId: 'pc-mira', nextSeq: 1,
+};
+
+/** What a Cleric 3 would actually have prepared. Hand-written — see the note above. */
+export const MIRA_SPELLS: SpellCardVM[] = [
+  {
+    id: 'spell.sacred-flame', name: 'Sacred Flame', level: 0, economy: 'action',
+    save: { ability: 'DEX', dc: 13 }, damage: '1d8 radiant', range: '60 ft',
+    detail: 'light falls on one creature you can see; a Dexterity save for half nothing, 1d8 radiant on a fail',
+    rule: 'Cover does not help against this one — the light comes from above. They roll a Dexterity save against your spell save DC; on a failure they take 1d8 radiant, and on a success nothing happens.',
+  },
+  {
+    id: 'spell.guiding-bolt', name: 'Guiding Bolt', level: 1, economy: 'action',
+    attack: 5, damage: '4d6 radiant', range: '120 ft',
+    detail: 'a bolt of light you roll to hit with; the next attack against that target has advantage',
+    rule: 'Roll a spell attack. On a hit it is 4d6 radiant, and the next person to attack that creature before your next turn rolls with advantage — worth saying out loud so somebody uses it.',
+  },
+  {
+    id: 'spell.cure-wounds', name: 'Cure Wounds', level: 1, economy: 'action',
+    damage: '1d8 + 3 healed', range: 'touch',
+    detail: 'touch someone and give them hit points back',
+    rule: 'No roll. Touch a creature and they get 1d8 + your Wisdom back in hit points. It does nothing for anything undead or constructed.',
+  },
+  {
+    id: 'spell.bless', name: 'Bless', level: 1, economy: 'action',
+    concentration: true, range: '30 ft, up to three',
+    detail: 'up to three of you add 1d4 to attacks and saving throws while you hold it',
+    rule: 'While you hold your concentration, up to three creatures add 1d4 to every attack roll and saving throw they make. Losing concentration ends it for all of them at once.',
+  },
+  {
+    id: 'spell.spiritual-weapon', name: 'Spiritual Weapon', level: 2, economy: 'bonus',
+    attack: 5, damage: '1d8 + 3 force', range: '60 ft',
+    detail: 'a floating weapon that strikes on your bonus action and moves 20 ft each turn',
+    rule: 'A weapon of light appears and attacks for you. It costs a bonus action to summon and a bonus action each turn after to move and swing again, which means you can cast something else with your action in the same turn.',
+  },
+  {
+    id: 'spell.shield-of-faith', name: 'Shield of Faith', level: 1, economy: 'bonus',
+    concentration: true, range: '60 ft',
+    detail: 'one creature gets +2 to Armor Class while you hold it',
+    rule: 'Two points of Armor Class on somebody who is about to be hit a lot. It needs concentration, so it competes with Bless — you can only hold one.',
+  },
+];
+
+/** Slots Mira has left this fight: two of four level-1 spent, both level-2 intact. */
+export const MIRA_SLOTS: Record<number, number> = { 1: 2, 2: 2 };
+
+export const MIRA_FEATURES: FeatureLineVM[] = [
+  {
+    id: 'feature.cleric.channel-divinity',
+    name: 'Channel Divinity',
+    resource: '1 of 1 left',
+    text: 'A burst of your deity’s power, once between rests. Your domain decides what it does — turning undead is the one every Cleric gets.',
+  },
+  {
+    id: 'feature.cleric.domain',
+    name: 'Divine Domain',
+    text: 'The part of your faith you lean on. It adds spells to your prepared list for free, and they never count against how many you can prepare.',
+  },
+];
+
+export const MIRA_INVENTORY: InventoryLineVM[] = [
+  { id: 'item.chain-shirt', name: 'Chain Shirt', note: 'Worn', equipped: true, flavour: 'Light enough to kneel in, which matters more than she expected.' },
+  { id: 'item.shield-holy', name: 'Shield', note: 'Left arm', equipped: true },
+  { id: 'item.mace', name: 'Mace', note: 'Drawn', equipped: true },
+  { id: 'item.holy-symbol', name: 'Holy Symbol', note: 'Worn at the throat', equipped: true, flavour: 'Worn smooth at the edges from being held.' },
+  { id: 'item.healers-kit', name: "Healer's Kit", note: '10 uses' },
+  { id: 'item.priests-pack', name: "Priest's Pack" },
+];
+
+export const FEATURES: FeatureLineVM[] = [
+  {
+    id: 'feature.fighter.second-wind',
+    name: 'Second Wind',
+    resource: '2 of 2 left',
+    text: 'Catch your breath and get some hit points back, once or twice between rests. It costs your bonus action, so you can still swing in the same turn.',
+  },
+  {
+    id: 'feature.fighter.fighting-style',
+    name: 'Fighting Style — Defense',
+    text: 'While you are wearing armor, you are a little harder to hit. It is already counted in your Armor Class.',
+  },
+  {
+    id: 'feature.fighter.action-surge',
+    name: 'Action Surge',
+    resource: 'Arrives at level 2',
+    text: 'One extra action on your turn, once per rest. It will appear in your Action row the moment you have it.',
+  },
+];
+
+/**
+ * Torvald's gear. The item names come from the fixture's equipment; the notes
+ * and flavour are written here because @questra/contracts has no Item catalog
+ * yet — when it grows one, this list is what it replaces.
+ */
+export const INVENTORY: InventoryLineVM[] = [
+  { id: 'item.chain-mail', name: 'Chain Mail', note: 'Worn', equipped: true, flavour: 'Heavy, hot, and the reason you are still standing.' },
+  { id: 'item.shield', name: 'Shield', note: 'Left arm', equipped: true, flavour: 'Oak and iron, with a dent you have stopped explaining.' },
+  { id: 'item.longsword', name: 'Longsword', note: 'Drawn', equipped: true },
+  { id: 'item.dagger', name: 'Dagger', qty: 2 },
+  { id: 'item.explorers-pack', name: "Explorer's Pack", note: 'Rope, tinderbox, rations' },
+  { id: 'item.torch', name: 'Torch', qty: 5 },
+];

@@ -6,6 +6,7 @@
  */
 export * from './ruling.js';
 export * from './stub-model.js';
+export * from './config.js';
 export * from './imagegen/tokens.js';
 export * from './imagegen/assembler.js';
 export * from './imagegen/service.js';

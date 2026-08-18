@@ -9,3 +9,4 @@
  * This package holds NO game logic and imports no contracts — it is look only.
  */
 export * from './core/index.js';
+export * from './hud/index.js';
