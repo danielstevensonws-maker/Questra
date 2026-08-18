@@ -267,16 +267,19 @@ export const RESULT: ResultVM = {
  *
  * Torvald's sheet is `torvald-sheet.json` — the shape the engine actually
  * computes, so tapping his Armor Class shows the working the engine did.
- * Mira's sheet below is written by hand: `packages/engine/src/sim/sheet.ts`
- * only attaches `spellcasting` when `casterType === 'full'`, and even then
- * hardcodes `prepared: []`. There are no spell cards on any sheet yet, for any
- * class, so there is nothing real to render a caster from.
+ * Mira's SPELL TILES below are still written by hand, but for a narrower reason
+ * than before. `packages/engine/src/sim/sheet.ts` now attaches `spellcasting`
+ * to every caster type, computes her slots and her prepared ceiling, and
+ * resolves chosen spell ids into real `SpellCard`s. What it cannot do is
+ * resolve HERS: the ingested spell dataset carries 312 spells at levels 1–9,
+ * all still `qa: 'draft'`, and no cantrips at all — so there is no verified
+ * Cleric spell to point `preparedSpellIds` at yet.
  *
  * What she therefore DOES prove: that the action row holds a caster's tile
  * count without wrapping, that the glyphs separate when most of a row is
  * spells, that the folio's Spells tab has a shape worth filling, and that the
  * concentration badge reads. What she does NOT prove: that the engine can
- * produce any of it.
+ * resolve a real Cleric spell list — that waits on the spell QA pass.
  *
  * Every number here is arithmetically consistent with a Cleric 3 (WIS 17, prof
  * +2) and every `derivation` sums to its `value`, because `derivationSumsToValue`
@@ -349,8 +352,14 @@ export const miraSheet: ComputedSheet = {
     ability: 'wis',
     saveDc: d(13, [{ label: 'Base', value: 8 }, { label: 'Proficiency', value: 2 }, { label: 'WIS', value: 3 }]),
     attackBonus: d(5, [{ label: 'Proficiency', value: 2 }, { label: 'WIS', value: 3 }]),
+    slotKind: 'slots',
     slots: { '1': 4, '2': 2 },
+    // A level 3 Cleric prepares 6 spells (SRD Cleric table). The engine now
+    // computes this; her six tiles below are still hand-authored because the
+    // spell dataset they would resolve from has no Cleric entries verified yet.
+    preparedMax: 6,
     prepared: [],
+    cantrips: [],
   },
   coins: { cp: 0, sp: 8, ep: 0, gp: 14, pp: 0 },
 };

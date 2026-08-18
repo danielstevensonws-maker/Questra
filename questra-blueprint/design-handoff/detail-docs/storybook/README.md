@@ -102,11 +102,12 @@ tree, and a screen has to be judged assembled *and* part by part.
 - **Casters**: the *design* is exercised — `Play/Player View v2 →
   MiraTheCleric` and `MirasSpellbook` show a Cleric 3 with prepared spells in
   the action row, slot counts, a concentration badge and a filled Spells tab.
-  The *engine* is not: `sim/sheet.ts` attaches `spellcasting` only for
-  `casterType === 'full'` (so **Paladin and Ranger get nothing at any level**)
-  and hardcodes `prepared: []`, so there are no spell cards on any sheet for any
-  class. Mira's numbers are hand-authored and pinned by
-  `test/v2-caster-fixture.test.ts`. See PlayerViewV2.md's Known gaps.
+  The *engine* now backs it: `sim/sheet.ts` attaches `spellcasting` to every
+  caster type (half-casters and Pact Magic included), computes slots from
+  SRD-verified tables, and resolves chosen spell ids into real `SpellCard`s.
+  What remains hand-authored is Mira's own list — every ingested spell is still
+  `qa: 'draft'`, so there is no verified Cleric spell to resolve. Her numbers are
+  pinned by `test/v2-caster-fixture.test.ts`. See PlayerViewV2.md's Known gaps.
 - **Briefs with no primitive yet**: 07 (rests/leveling), 11 (campaign data ops),
   12 (library/moderation), 13 (onboarding), 14 (accounts/app shell), 15 (voice/audio).
 

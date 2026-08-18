@@ -1,10 +1,10 @@
 /**
  * The caster fixture's arithmetic.
  *
- * WHY THIS EXISTS. Mira is hand-authored — the engine cannot produce a caster
- * sheet yet (`sim/sheet.ts` attaches `spellcasting` only for
- * `casterType === 'full'` and hardcodes `prepared: []`), so her numbers are
- * written by a person rather than computed. That is a deliberate stand-in, but
+ * WHY THIS EXISTS. Mira's spell list is hand-authored. The engine can compute a
+ * caster sheet now — `sim/sheet.ts` covers every caster type and resolves spell
+ * ids into real cards — but every ingested spell is still `qa: 'draft'`, so no
+ * verified Cleric spell exists to resolve. That is a deliberate stand-in, but
  * a stand-in that is internally WRONG is worse than none: it teaches the wrong
  * shape to whoever wires the real path, and the screen's whole promise is that
  * a number can be interrogated and will hold up.

@@ -487,36 +487,42 @@ object.
 
 ## Known gaps
 
-- **The caster half is drawn, but the engine cannot feed it.** `MiraTheCleric`
-  and `MirasSpellbook` exercise the whole caster surface — six prepared spells
-  in the action row, slot counts on the tile faces, the concentration badge, the
-  folio's Spells tab with pips and save DC. The *screen* code is final: spells
-  go through the same `greyingReason()` as everything else, using the `cast`
-  intent that already exists in the contracts union.
+- **The caster half is drawn, and the engine now feeds most of it.**
+  `MiraTheCleric` and `MirasSpellbook` exercise the whole caster surface — six
+  prepared spells in the action row, slot counts on the tile faces, the
+  concentration badge, the folio's Spells tab with pips and save DC. The *screen*
+  code is final: spells go through the same `greyingReason()` as everything else,
+  using the `cast` intent that already exists in the contracts union.
 
-  What is standing in is the **data**. `packages/engine/src/sim/sheet.ts`
-  attaches `spellcasting` only when `casterType === 'full'` and hardcodes
-  `prepared: []`, so there are no spell cards on any sheet, for any class.
-  `SpellCardVM` in `viewModel.ts` is the shape the seam needs; when the engine
-  resolves `prepared` into real cards, that becomes its return type and
-  `fixtures.ts`'s hand-written list is deleted. Nothing in the components moves.
+  The engine half landed with the spell-slot work: `sheet.ts` attaches
+  `spellcasting` to **every** caster type, computes slots from tables verified
+  against the SRD text, carries a `preparedMax`, and resolves chosen spell ids
+  into real `SpellCard`s off each spell's own `effects[]`. `CharacterChoices`
+  gained `cantripChoices` / `preparedSpellIds` — their absence was the actual
+  reason `prepared` could never be populated.
+
+  What is still hand-authored is **Mira's own list**, and only because of the
+  dataset: all 312 ingested spells are `qa: 'draft'` and none is a Cleric spell
+  that has passed the rules-lawyer check, so there is nothing verified to point
+  `preparedSpellIds` at. When the spell QA pass lands, her tiles come from
+  `spellcasting.prepared` and `fixtures.ts`'s hand-written list is deleted.
+  Nothing in the components moves.
 
   `test/v2-caster-fixture.test.ts` holds the hand-authored numbers to the
   contract's own `derivationSumsToValue` invariant and to Cleric-3 arithmetic,
   so the stand-in cannot quietly teach the wrong shape.
 
-- **Half-casters get nothing at all.** `sheet.ts` tests
-  `casterType === 'full'`, so **Paladin and Ranger** never receive a
-  `spellcasting` field at any level — this is a rules-engine gap, not a UI one,
-  and it is invisible from this screen. Full casters (Bard, Cleric, Druid,
-  Sorcerer, Warlock, Wizard) at least get the object, empty.
+- **The spell dataset has no cantrips.** The M1.2 ingestion produced levels 1–9
+  and not one level-0 spell, so `cantripChoices` has nothing legal to point at
+  and the folio's cantrip row has no real data behind it. Recorded as a failing-
+  when-fixed assertion in `engine/test/casters.golden.test.ts`.
 
-- **Slot exhaustion does not grey a spell.** `checkIntent`'s `use_feature`
-  branch has a resource test; its `cast` branch has none. Greying on slots
-  client-side would mean inventing a refusal the server would never send, so the
-  count sits on the tile face instead and nothing is refused on its account.
-  When the engine grows that check, these tiles start greying with the real
-  reason and no UI change is needed.
+- **Slot exhaustion greys a spell now.** `checkIntent`'s `cast` branch takes an
+  optional `slotsRemaining` and refuses with "No level 3 slots left — take a rest
+  to get them back." Absent, the check is skipped rather than guessed, the same
+  rule `resourceRemaining` already followed — so a caller that does not know the
+  slot counts still never invents a refusal the server would not send. Cantrips
+  (`slotLevel: 0`) are never refused on this account.
 - **The ground is a placeholder, and it now matters more.** It is layered
   `--qa-map-*` gradients plus a two-level grid, not terrain art. That was
   acceptable when the HUD was the frame; with the map as the hero it is the

@@ -57,6 +57,12 @@ export function checkIntent(
     resourceRemaining?: number;
     /** whether the attack/cast target is within reach/range (caller computes geometry). */
     targetInRange?: boolean;
+    /**
+     * Unspent slots by spell level, when the caller knows them. Absent means the
+     * check is skipped rather than guessed — same rule as `resourceRemaining`.
+     * Cantrips (slotLevel 0) never consult this.
+     */
+    slotsRemaining?: Record<number, number>;
   } = {},
 ): Legality {
   const actor = actorOf(intent, state);
@@ -93,6 +99,13 @@ export function checkIntent(
     case 'cast': {
       if (opts.targetInRange === false) {
         return { legal: false, reason: `That target is out of range.` };
+      }
+      // Cantrips are level 0 and spend nothing, so they can never run out.
+      if (intent.slotLevel > 0 && opts.slotsRemaining !== undefined) {
+        const remaining = opts.slotsRemaining[intent.slotLevel] ?? 0;
+        if (remaining <= 0) {
+          return { legal: false, reason: `No level ${intent.slotLevel} slots left — take a rest to get them back.` };
+        }
       }
       return LEGAL;
     }

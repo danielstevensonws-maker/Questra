@@ -415,12 +415,13 @@ export const Exploring: Story = {
  * cast" note Torvald gets.
  *
  * WHAT IS AND IS NOT REAL HERE. Torvald's numbers come from the engine's own
- * fixture. Mira's are written by hand, because `sheet.ts` attaches
- * `spellcasting` only for `casterType === 'full'` and hardcodes `prepared: []`
- * — there are no spell cards on any sheet yet, for any class. The SCREEN code
- * is final either way: her spells run through the same `greyingReason()` as
- * every other tile, using the `cast` intent that already exists in the
- * contracts union. Only the data is standing in. See `fixtures.ts`.
+ * fixture. Mira's spell LIST is written by hand — not because the engine can't
+ * compute a caster sheet (it now attaches `spellcasting` to every caster type,
+ * derives her slots and prepared ceiling, and resolves spell ids into real
+ * cards) but because every ingested spell is still `qa: 'draft'`, so there is no
+ * verified Cleric spell to resolve. The SCREEN code is final either way: her
+ * spells run through the same `greyingReason()` as every other tile, using the
+ * `cast` intent that already exists in the contracts union. See `fixtures.ts`.
  */
 export const MiraTheCleric: Story = {
   render: function MiraStory(): ReactElement {
