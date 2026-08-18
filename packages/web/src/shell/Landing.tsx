@@ -18,6 +18,7 @@ import { useState, type FormEvent, type ReactElement } from 'react';
 import { Button } from '@questra/ui';
 import { heroTitle, eyebrow, narration, micro } from '../design/index.js';
 import { ShellStyles } from './ShellStyles.js';
+import { Room } from './Room.js';
 import { AuthField } from './AuthField.js';
 import type { SessionApi } from './session.js';
 
@@ -55,17 +56,15 @@ export function Landing({ session, onEntered }: LandingProps): ReactElement {
   return (
     <div className="qa-landing">
       <ShellStyles />
-      <div className="qa2-map is-fill">
-        <div className="qa2-map-ground" />
-      </div>
-      <div className="qa-landing-seam" />
-      <div className="qa-landing-scrim" />
+      {/* Landing is the one screen that gets the doorway light. */}
+      <Room beam />
 
       <div className="qa-landing-content">
         {panel === 'closed' ? (
           <>
             <p className="qa-landing-eyebrow" style={eyebrow}>A session, start to finish</p>
             <h1 className="qa-landing-wordmark" style={heroTitle}>Questra</h1>
+            <span className="qa-landing-rule" />
             <p className="qa-landing-tagline" style={narration}>
               Five friends who&rsquo;ve never played before, finishing a real night of
               D&amp;D together &mdash; tonight, in a browser, no install.

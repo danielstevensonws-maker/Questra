@@ -70,6 +70,7 @@ const HUD_FILES = [
   'primitives/PullFromCampaignPicker.tsx',
   // the account/campaign shell (Brief 14 §3, M3 minimal)
   'shell/ShellStyles.tsx',
+  'shell/Room.tsx',
   'shell/Landing.tsx',
   'shell/Home.tsx',
   'shell/JoinFlow.tsx',

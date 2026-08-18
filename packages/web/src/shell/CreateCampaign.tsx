@@ -11,6 +11,7 @@ import { useState, type FormEvent, type ReactElement } from 'react';
 import type { Campaign } from '@questra/contracts';
 import { heroTitle, eyebrow, narration, micro } from '../design/index.js';
 import { ShellStyles } from './ShellStyles.js';
+import { Room } from './Room.js';
 import { AuthField } from './AuthField.js';
 import type { SessionApi } from './session.js';
 
@@ -53,7 +54,7 @@ export function CreateCampaign({ session, onCreated, onCancel }: CreateCampaignP
   return (
     <div className="qa-join">
       <ShellStyles />
-      <div className="qa2-map is-fill"><div className="qa2-map-ground" /></div>
+      <Room />
       <div className="qa2-sheet qa-join-card" style={{ position: 'static' }}>
         <div className="qa2-sheet-body">
           {!result ? (

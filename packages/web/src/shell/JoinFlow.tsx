@@ -13,6 +13,7 @@ import { Button } from '@questra/ui';
 import type { JoinPreview } from '@questra/contracts';
 import { heroTitle, eyebrow, narration, micro } from '../design/index.js';
 import { ShellStyles } from './ShellStyles.js';
+import { Room } from './Room.js';
 import { AuthField } from './AuthField.js';
 import { ShellLoading, ShellError } from './ShellStates.js';
 import type { SessionApi } from './session.js';
@@ -74,7 +75,7 @@ export function JoinFlow({ code, session, onJoined }: JoinFlowProps): ReactEleme
   return (
     <div className="qa-join">
       <ShellStyles />
-      <div className="qa2-map is-fill"><div className="qa2-map-ground" /></div>
+      <Room />
 
       {!preview && !previewError && <ShellLoading label="Finding your invitation…" />}
       {previewError && <ShellError title="This link doesn't work" detail={previewError} />}

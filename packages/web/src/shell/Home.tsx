@@ -17,6 +17,7 @@ import { useEffect, useState, type ReactElement } from 'react';
 import type { MyCampaigns } from '@questra/contracts';
 import { heroTitle, eyebrow, sceneName, prose, micro } from '../design/index.js';
 import { ShellStyles } from './ShellStyles.js';
+import { Room } from './Room.js';
 import { ShellLoading } from './ShellStates.js';
 import type { SessionApi } from './session.js';
 
@@ -43,7 +44,7 @@ export function Home({ session, onOpenCampaign, onCreateCampaign }: HomeProps): 
   return (
     <div className="qa-home">
       <ShellStyles />
-      <div className="qa2-map is-fill"><div className="qa2-map-ground" /></div>
+      <Room />
       <div className="qa-home-content">
         <div className="qa-home-head">
           <div>
