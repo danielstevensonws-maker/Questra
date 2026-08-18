@@ -13,10 +13,15 @@
  * exists and why v2 was put under the guard on day one rather than after its
  * own drift had set in.
  *
- * It is deliberately scoped to the HUD files rather than all of
- * `packages/web`: the wizard/lobby surfaces have their own drift to clean up
- * and failing on them here would just get this suite skipped. Widen `HUD_FILES`
- * as those surfaces are brought onto the ramp.
+ * The scope has since widened past the HUD. The eight primitives were rebuilt
+ * on the shared design layer — the drift there was worse than the hub's (104
+ * style objects, 55 numeric font sizes, 17 hardcoded font families across
+ * eight files) precisely because nothing was looking at them either. They are
+ * on the list now, so the rebuild cannot quietly come undone.
+ *
+ * What remains outside is the wizard/lobby surfaces, which have their own
+ * cleanup ahead of them; failing on them here would just get this suite
+ * skipped. Widen `HUD_FILES` as each is brought onto the ramp.
  *
  * The rule: a component may not name a font size at all. It asks the type ramp
  * for a ROLE (`eyebrow`, `statValue`, …) and the role owns the token. See
@@ -54,10 +59,15 @@ const HUD_FILES = [
   'primitives/v2/RoundSpine.tsx',
   'primitives/v2/SceneRail.tsx',
   'primitives/v2/ScreenStyles.tsx',
-  // the one map renderer, shared by the planner, the DM screen and play
-  'primitives/MapCanvas.tsx',
-  // the one AI-output card, shared by every surface a model writes into
+  // the primitives, now built from the same language as the play screen
   'primitives/AcceptTweakRejectCard.tsx',
+  'primitives/CardSequencer.tsx',
+  'primitives/InfoPanel.tsx',
+  'primitives/MapCanvas.tsx',
+  'primitives/PresetsAboveFreeForm.tsx',
+  'primitives/PromptHolderCard.tsx',
+  'primitives/PublicSecretField.tsx',
+  'primitives/PullFromCampaignPicker.tsx',
 ];
 
 /** The modules allowed to name a font family — the type ramp and the sheets. */

@@ -150,10 +150,32 @@ const CSS = `
 .qa2-chip.is-danger { color: var(--qa-danger); background: var(--qa-danger-soft); }
 .qa2-chip.is-accent { color: var(--qa-accent); background: var(--qa-accent-soft); }
 .qa2-chip.is-static { cursor: default; }
-/* One chip in a set is lit; the others sit back as plain text so the choice
-   reads at a glance instead of as several equal boxes. */
-.qa2-chip[aria-pressed] { background: transparent; }
+/* One chip in a set is lit; the others sit back so the choice reads at a
+   glance instead of as several equal boxes. They keep a hairline, though:
+   these are the things you are being invited to press, and a chip with no
+   edge at all reads as a label nobody expects to be tappable. */
+.qa2-chip[aria-pressed] { background: transparent; border-color: var(--qa-glass-border); }
+
+/* A row of offers — the presets above a free-text box. Same chip, sized for a
+   finger rather than for the dense play HUD, because on an authoring screen
+   these ARE the teaching mechanism (law 5) and a 1px target teaches nothing. */
+.qa2-offers { display: flex; flex-wrap: wrap; gap: var(--qa-s2); }
+.qa2-offers .qa2-chip { padding: var(--qa-s2) var(--qa-s3); }
 .qa2-chip.is-selected { background: var(--qa-accent-soft); border-color: var(--qa-accent-line); color: var(--qa-accent); }
+/* A chip that carries its own delete: the label is one target, the ✕ another,
+   so removing a tag is never a mis-tap away from toggling it. */
+.qa2-chip-face { border: none; background: none; padding: 0; cursor: pointer; }
+.qa2-chip-x {
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--qa-ink-faint);
+  cursor: pointer;
+  transition: color var(--qa-dur-fast) var(--qa-ease);
+}
+.qa2-chip-x:hover { color: var(--qa-danger); }
 
 /* The one accent-FILLED element on a surface. Used sparingly, by contract —
    design request §2: one accent, never decorative. */
@@ -364,26 +386,149 @@ const CSS = `
 .qa2-step > button { width: 28px; height: 26px; border: none; background: transparent; color: var(--qa-ink-dim); cursor: pointer; font-family: var(--qa-font-mono); }
 .qa2-step > button:hover { color: var(--qa-accent); }
 
-/* ---- the assistant's card --------------------------------------------------
-   ONE surface for anything a model wrote (Orchestration §4). Two placements,
-   because the same proposal arrives in two situations and must read as the
-   same object in both:
+/* ---- the authoring surfaces ------------------------------------------------
+   The DM's screens are made of a handful of shapes repeated: a labelled field,
+   a row in a list, a numbered card. They each hand-rolled their own before,
+   which is why a wizard step and a planner row could sit side by side looking
+   like two products. */
 
-   float  — it interrupted you. A glass card over the map, its own shadow.
-   inline — it is one item in the journal's stream. No shadow, no glass of its
-            own, and an accent rule down the left edge so it reads as a card
-            inside the rail rather than a second rail.
+/* A field is its label and its control, boxed together so the label belongs to
+   the thing under it rather than floating above the gap. */
+.qa2-field { display: flex; flex-direction: column; gap: var(--qa-s2); }
+.qa2-field-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s2);
+  padding: var(--qa-s3) var(--qa-s4);
+  border-left: 3px solid var(--qa-ink-faint);
+  border-radius: var(--qa-radius-sm);
+  background: var(--qa-chip);
+}
+/* The DM's half. Weight only — Design has not supplied a secret tint, and a
+   session must not invent one (theme tokens.test.ts guards its absence). */
+.qa2-field-box.is-secret { border-left-color: var(--qa-ink-dim); }
+.qa2-field-input {
+  width: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--qa-ink);
+  resize: none;
+}
+.qa2-field-input.is-multiline { resize: vertical; }
+.qa2-field-input::placeholder { color: var(--qa-ink-faint); }
+/* Guidance under a field. Quiet, italic, and never where an error would go. */
+.qa2-help { margin: 0; color: var(--qa-ink-faint); font-style: italic; }
 
-   The accent dot is the one thing that never varies: it is how you know a
-   machine wrote this and not the person sitting next to you. */
-.qa2-ai { display: flex; flex-direction: column; overflow: hidden; }
-/* The glass is spelled out rather than composed from qa2-panel: a panel owns
-   its own padding and gap, and this card pads its head, body and footer
-   separately so the footer band can reach the edges. Same tokens, so the two
-   surfaces still read as one material. */
-.qa2-ai.is-float {
-  width: 560px;
+/* One row in a list of things — a pickable NPC, a scene in a session. Rows are
+   flat until you touch them, so a long list reads as a list and not as forty
+   competing cards. */
+.qa2-row {
+  display: flex;
+  align-items: center;
+  gap: var(--qa-s3);
+  width: 100%;
+  padding: var(--qa-s2) var(--qa-s3);
+  border: var(--qa-hairline) solid transparent;
+  border-radius: var(--qa-radius);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--qa-dur-fast) var(--qa-ease), border-color var(--qa-dur-fast) var(--qa-ease);
+}
+.qa2-row:hover { background: var(--qa-chip); border-color: var(--qa-glass-border); }
+.qa2-row.is-picked { background: var(--qa-accent-soft); border-color: var(--qa-accent-line); }
+.qa2-row.is-static { cursor: default; }
+.qa2-row.is-static:hover { background: transparent; border-color: transparent; }
+/* The mark that says "picked". Reserved even when empty, so ticking an item
+   does not shove the whole row sideways. */
+.qa2-row-tick { width: 16px; flex: none; display: grid; place-items: center; color: var(--qa-accent); }
+
+/* A picker: a search line over a scrolling list of rows. It is boxed because
+   it is one control — a search that scrolled away from its own results would
+   be two. */
+.qa2-picker {
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-radius: var(--qa-radius);
+  background: var(--qa-chip);
+  overflow: hidden;
+}
+.qa2-picker-search {
+  display: flex;
+  align-items: center;
+  gap: var(--qa-s2);
+  padding: var(--qa-s3);
+  border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
+  color: var(--qa-ink-faint);
+}
+.qa2-picker-search:focus-within { color: var(--qa-accent); }
+.qa2-picker-list { list-style: none; margin: 0; padding: var(--qa-s2); max-height: 420px; overflow-y: auto; scrollbar-width: thin; }
+.qa2-picker-empty { margin: 0; padding: var(--qa-s4); color: var(--qa-ink-faint); font-style: italic; }
+
+/* A card in an ordered list: its position, its content, its controls. The
+   number is information — it is the answer to "which scene is this" — which is
+   the only reason this list is numbered and the journal's is not. */
+.qa2-seq { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--qa-s2); }
+.qa2-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--qa-s3);
+  padding: var(--qa-s3);
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-radius: var(--qa-radius);
+  background: var(--qa-chip);
+  transition: border-color var(--qa-dur-fast) var(--qa-ease), opacity var(--qa-dur-fast) var(--qa-ease);
+}
+.qa2-card.is-dragging { opacity: 0.45; border-color: var(--qa-accent-line); }
+.qa2-card.is-over { border-color: var(--qa-accent); }
+.qa2-card-no {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--qa-radius-round);
+  background: var(--qa-glass-solid);
+  color: var(--qa-ink-dim);
+}
+.qa2-card-grip { color: var(--qa-ink-faint); cursor: grab; }
+.qa2-card-grip:active { cursor: grabbing; }
+/* Row controls: small, square, quiet until hovered — same family as qa2-ctl
+   but sized for a list rather than a frame. */
+.qa2-mini {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-radius: var(--qa-radius-sm);
+  background: transparent;
+  color: var(--qa-ink-dim);
+  cursor: pointer;
+  transition: color var(--qa-dur-fast) var(--qa-ease), border-color var(--qa-dur-fast) var(--qa-ease);
+}
+.qa2-mini:hover:not(:disabled) { color: var(--qa-accent); border-color: var(--qa-accent-line); }
+.qa2-mini:disabled { opacity: 0.35; cursor: not-allowed; }
+.qa2-mini.is-danger:hover:not(:disabled) { color: var(--qa-danger); border-color: var(--qa-danger); }
+
+/* ---- a card that interrupted you -------------------------------------------
+   Glass over the map, in three bands: what this is, what it says, what you can
+   do about it. The assistant's suggestion and a held prompt are different
+   things arriving for different reasons, but they arrive the SAME WAY — over
+   whatever you were looking at, asking for one decision — so they are made of
+   the same material and laid out to the same rhythm. Only the width and the
+   contents differ.
+
+   Spelled out rather than composed from qa2-panel: a panel owns its own
+   padding and gap, and these pad each band separately so the footer can reach
+   the edges. Same tokens, so they still read as one material. */
+.qa2-modal {
+  display: flex;
+  flex-direction: column;
   max-width: 100%;
+  overflow: hidden;
   border: var(--qa-hairline) solid var(--qa-glass-border);
   border-radius: var(--qa-radius-lg);
   background: var(--qa-glass);
@@ -391,24 +536,27 @@ const CSS = `
   -webkit-backdrop-filter: blur(var(--qa-glass-blur));
   box-shadow: var(--qa-shadow-pop);
   animation: qa2-rise var(--qa-dur) var(--qa-ease);
+  color: var(--qa-ink);
 }
-.qa2-ai.is-inline {
-  width: 100%;
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-left: 2px solid var(--qa-accent-line);
-  border-radius: var(--qa-radius);
-  background: var(--qa-chip);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: none;
-}
-.qa2-ai-head {
+.qa2-modal-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--qa-s3);
   padding: var(--qa-s3) var(--qa-s4) var(--qa-s2);
 }
+.qa2-modal-body { display: flex; flex-direction: column; gap: var(--qa-s3); padding: 0 var(--qa-s4) var(--qa-s4); }
+.qa2-modal-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--qa-s2);
+  flex-wrap: wrap;
+  padding: var(--qa-s3) var(--qa-s4);
+  border-top: var(--qa-hairline) solid var(--qa-glass-border);
+  background: var(--qa-glass-solid);
+}
+/* The one mark that says a machine wrote this and not the person next to you.
+   It never varies with placement. */
 .qa2-ai-who { display: flex; align-items: center; gap: var(--qa-s2); }
 .qa2-ai-dot {
   width: 6px;
@@ -418,25 +566,46 @@ const CSS = `
   background: var(--qa-accent);
   box-shadow: 0 0 8px var(--qa-accent-glow);
 }
-.qa2-ai-body { display: flex; flex-direction: column; gap: var(--qa-s3); padding: 0 var(--qa-s4) var(--qa-s4); }
-.qa2-ai-foot {
-  display: flex;
-  align-items: center;
-  gap: var(--qa-s2);
-  flex-wrap: wrap;
-  padding: var(--qa-s3) var(--qa-s4);
-  border-top: var(--qa-hairline) solid var(--qa-glass-border);
+.qa2-ai.is-float { width: 560px; }
+/* Docked in the journal's stream instead: no glass of its own, because it is
+   already sitting on the rail's, and an accent rule down the left edge so it
+   reads as a card inside the rail rather than a second rail. */
+.qa2-ai.is-inline {
+  width: 100%;
+  border-left: 2px solid var(--qa-accent-line);
+  border-radius: var(--qa-radius);
+  background: var(--qa-chip);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  animation: none;
 }
-.qa2-ai.is-float .qa2-ai-foot { background: var(--qa-glass-solid); }
 /* In a rail there is no room to push Reject to the far edge. The button
    sizing is passed as a style prop rather than set here: Button writes its
    padding inline, and an inline style beats a class every time. */
-.qa2-ai.is-inline .qa2-ai-foot { gap: var(--qa-s1); }
+.qa2-ai.is-inline .qa2-modal-foot { gap: var(--qa-s1); background: transparent; }
+
+/* ---- a prompt somebody is holding ------------------------------------------
+   Same material, one addition: a countdown. It MIRRORS the server's timeout
+   and does not enforce it — the server declines on its own clock — so the bar
+   is information, never the mechanism. It turns danger-coloured at ten
+   seconds, which is the only moment this card raises its voice. */
+.qa2-prompt { width: 480px; }
+.qa2-prompt.is-urgent { border-color: var(--qa-danger); }
+.qa2-prompt-clock { height: 3px; flex: none; background: var(--qa-glass-border); }
+.qa2-prompt-clock > span {
+  display: block;
+  height: 100%;
+  background: var(--qa-accent);
+  transition: width var(--qa-dur) linear, background var(--qa-dur) var(--qa-ease);
+}
+.qa2-prompt.is-urgent .qa2-prompt-clock > span { background: var(--qa-danger); }
+.qa2-prompt-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--qa-s1); }
 /* A label and its value share a line — unless the value is a whole sentence,
    which never survives being squeezed into the right half of a narrow rail.
    Consequences stack under their label and read left to right like prose. */
-.qa2-ai .qa2-rowline > :first-child { flex: none; white-space: nowrap; }
-.qa2-ai .qa2-rowline.is-note { flex-direction: column; align-items: flex-start; gap: 2px; }
+.qa2-modal .qa2-rowline > :first-child { flex: none; white-space: nowrap; }
+.qa2-modal .qa2-rowline.is-note { flex-direction: column; align-items: flex-start; gap: 2px; }
 /* Blinks while the model is still writing, so a half-finished sentence does
    not read as a finished one. */
 .qa2-ai-caret {
@@ -603,7 +772,13 @@ const CSS = `
   outline-offset: 2px;
   border-radius: var(--qa-radius-sm);
 }
-[class*="qa2-"] button { font: inherit; color: inherit; }
+/* Normalise a bare button so it inherits the surface it sits in rather than
+   the browser's default. The :not() is load-bearing: a descendant selector
+   out-specifies a single class, so without it this quietly overrode the font
+   of every design-layer control that is ITSELF a button — qa2-chip lost its
+   mono caps and rendered as large serif the moment one was placed inside any
+   qa2- container. Reset the buttons nobody has styled; leave the rest alone. */
+[class*="qa2-"] button:not([class*="qa2-"]) { font: inherit; color: inherit; }
 .qa2-sr {
   position: absolute;
   width: 1px;

@@ -70,10 +70,17 @@ describe('PublicSecretField — labels and accessibility', () => {
     expect(screen.getByLabelText(/Secret · DM only/)).toBeDefined();
   });
 
+  /**
+   * The lock is a drawn glyph, not the 🔒 emoji it used to be: emoji carry
+   * their own palette and their own era, and this one sat beside mono caps in
+   * a warm-dark frame looking like it had wandered in from another product.
+   */
   it('the secret badge carries the lock mark; the public badge does not', () => {
-    render(<PublicSecretField value={empty} onChange={() => {}} />);
-    expect(screen.getByText('Public')).toBeDefined();
-    expect(screen.getByText(/🔒 Secret · DM only/)).toBeDefined();
+    const { container } = render(<PublicSecretField value={empty} onChange={() => {}} />);
+    const [publicBox, secretBox] = [...container.querySelectorAll('.qa2-field-box')];
+    expect(publicBox?.querySelector('svg')).toBeNull();
+    expect(secretBox?.querySelector('svg')).not.toBeNull();
+    expect(secretBox?.className).toContain('is-secret');
   });
 });
 

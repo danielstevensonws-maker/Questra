@@ -24,9 +24,16 @@
  * promptContextToLines.ts for the adapter that formats the six kinds that
  * DO have a contracts shape today (CLAUDE.md non-negotiable #1: no shape
  * gets invented here in a feature).
+ *
+ * IT IS THE SAME MATERIAL AS THE ASSISTANT'S CARD, and deliberately so: both
+ * arrive over whatever you were looking at, asking for one decision. They
+ * share `.qa2-modal` — glass, three bands, one rhythm — and differ only in
+ * width and contents. Two interrupts that looked like two different products
+ * was the drift this rebuild exists to end.
  */
-import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { Button } from '@questra/ui';
+import { DesignStyles, Eyebrow, heroName, prose, statMeta, statValue } from '../design/index.js';
 
 export interface PromptOptionVM {
   id: string;
@@ -53,10 +60,6 @@ export interface PromptHolderCardProps {
   onDecline: () => void;
 }
 
-const mono = 'var(--qa-font-mono)';
-const body = 'var(--qa-font-body)';
-const display = 'var(--qa-font-display)';
-
 export function PromptHolderCard({
   kind,
   holder,
@@ -66,7 +69,7 @@ export function PromptHolderCard({
   timeoutSec = 60,
   onTake,
   onDecline,
-}: PromptHolderCardProps) {
+}: PromptHolderCardProps): ReactElement {
   const startRef = useRef(Date.now());
   const declinedRef = useRef(false);
   const [remaining, setRemaining] = useState(timeoutSec);
@@ -75,7 +78,7 @@ export function PromptHolderCard({
     startRef.current = Date.now();
     declinedRef.current = false;
 
-    const tick = () => {
+    const tick = (): void => {
       const elapsed = (Date.now() - startRef.current) / 1000;
       const next = Math.max(0, timeoutSec - elapsed);
       setRemaining(next);
@@ -95,229 +98,73 @@ export function PromptHolderCard({
 
   return (
     <section
+      className={urgent ? 'qa2-modal qa2-prompt is-urgent' : 'qa2-modal qa2-prompt'}
       role="alertdialog"
       aria-label={`${kind} — ${holder}`}
-      style={{
-        width: 480,
-        maxWidth: '100%',
-        background: 'var(--qa-glass)',
-        border: `var(--qa-hairline) solid ${urgent ? 'var(--qa-danger)' : 'var(--qa-glass-border)'}`,
-        borderRadius: 'var(--qa-radius-lg)',
-        backdropFilter: 'blur(var(--qa-glass-blur))',
-        WebkitBackdropFilter: 'blur(var(--qa-glass-blur))',
-        boxShadow: 'var(--qa-shadow-pop)',
-        overflow: 'hidden',
-        color: 'var(--qa-ink)',
-        fontFamily: body,
-        animation: 'qa-card-in var(--qa-dur) var(--qa-ease-out)',
-      }}
     >
-      {/* ---- countdown bar — a mirror of the server timeout, not the authority ---- */}
-      <div style={{ height: 3, background: 'var(--qa-glass-border)' }}>
-        <div
-          style={{
-            height: '100%',
-            width: `${pct}%`,
-            background: urgent ? 'var(--qa-danger)' : 'var(--qa-accent)',
-            transition: 'width 250ms linear, background var(--qa-dur) var(--qa-ease)',
-          }}
-        />
-      </div>
+      <DesignStyles />
 
-      {/* ---- header ---- */}
-      <header
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 'var(--qa-s3)',
-          padding: 'var(--qa-s5) var(--qa-s5) 0',
-        }}
-      >
-        <span
-          style={{
-            fontFamily: mono,
-            fontSize: 'var(--qa-text-whisper)',
-            letterSpacing: 'var(--qa-tracking-caps)',
-            textTransform: 'uppercase',
-            color: 'var(--qa-ink-dim)',
-          }}
-        >
-          {kind}
-        </span>
+      {/* The countdown mirrors the server's timeout. It is not the mechanism —
+          the server declines on its own clock whether this bar exists or not. */}
+      <span className="qa2-prompt-clock" aria-hidden="true">
+        <span style={{ width: `${pct}%` }} />
+      </span>
+
+      <header className="qa2-modal-head">
+        <Eyebrow>{kind}</Eyebrow>
         <time
           aria-label={`${remainingWhole} seconds left`}
-          style={{
-            fontFamily: mono,
-            fontVariantNumeric: 'tabular-nums',
-            fontSize: 'var(--qa-text-body)',
-            color: urgent ? 'var(--qa-danger)' : 'var(--qa-ink-faint)',
-          }}
+          style={{ ...statValue, color: urgent ? 'var(--qa-danger)' : 'var(--qa-ink-faint)' }}
         >
           {remainingWhole}s
         </time>
       </header>
 
-      {/* ---- body ---- */}
-      <div style={{ padding: 'var(--qa-s3) var(--qa-s5) var(--qa-s5)' }}>
-        <h2
-          style={{
-            fontFamily: display,
-            fontWeight: 400,
-            fontSize: 'var(--qa-text-title)',
-            lineHeight: 1.1,
-            margin: 0,
-            color: 'var(--qa-ink)',
-          }}
-        >
-          {holder}
-        </h2>
+      <div className="qa2-modal-body">
+        <h2 style={{ ...heroName, margin: 0 }}>{holder}</h2>
 
         {asDm && (
-          <p
-            style={{
-              fontFamily: body,
-              fontStyle: 'italic',
-              fontSize: 'var(--qa-text-whisper)',
-              color: 'var(--qa-ink-faint)',
-              margin: 'var(--qa-s1) 0 0',
-            }}
-          >
+          <p style={{ ...prose, margin: 0, fontStyle: 'italic', color: 'var(--qa-ink-faint)' }}>
             Answering for {holder}.
           </p>
         )}
 
         {context.length > 0 && (
-          <ul
-            style={{
-              listStyle: 'none',
-              margin: 'var(--qa-s4) 0 0',
-              padding: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--qa-s1)',
-            }}
-          >
+          <ul className="qa2-prompt-lines">
             {context.map((line, i) => (
-              <li
-                key={i}
-                style={{
-                  fontFamily: body,
-                  fontSize: 'var(--qa-text-body)',
-                  lineHeight: 1.5,
-                  color: 'var(--qa-ink-dim)',
-                }}
-              >
-                {line}
-              </li>
+              <li key={i} style={prose}>{line}</li>
             ))}
           </ul>
         )}
       </div>
 
-      {/* ---- footer ---- */}
-      <footer
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--qa-s2)',
-          padding: 'var(--qa-s4) var(--qa-s5)',
-          background: 'var(--qa-glass-solid)',
-          borderTop: 'var(--qa-hairline) solid var(--qa-glass-border)',
-          flexWrap: 'wrap',
-        }}
-      >
+      {/*
+        THE ACCENT ANSWERS "WHETHER", NOT "WHICH". A bare prompt asks one
+        question — take it or not — so Take is the committing action and wears
+        the accent. A menu of costed moves asks a different question, and three
+        equally accented buttons answered it by shouting all three at once,
+        making a one-point Detect look as urgent as a two-point Wing Attack.
+        Options are a menu: quiet, equal, with their cost on them.
+      */}
+      <footer className="qa2-modal-foot">
         {options !== undefined && options.length > 0 ? (
           options.map((option) => (
-            <TakeButton key={option.id} onClick={() => onTake(option.id)}>
+            <Button key={option.id} onClick={() => onTake(option.id)}>
               {option.label}
               {option.detail !== undefined && <Detail>{option.detail}</Detail>}
-            </TakeButton>
+            </Button>
           ))
         ) : (
-          <TakeButton onClick={() => onTake()}>Take</TakeButton>
+          <Button variant="primary" onClick={() => onTake()}>Take</Button>
         )}
-        <div style={{ flex: 1, minWidth: 'var(--qa-s6)' }} />
-        <DeclineButton onClick={onDecline}>Decline</DeclineButton>
+        <span style={{ flex: 1 }} />
+        <Button variant="danger" onClick={onDecline}>Decline</Button>
       </footer>
     </section>
   );
 }
 
-function Detail({ children }: { children: ReactNode }) {
-  return (
-    <span
-      style={{
-        marginLeft: 'var(--qa-s2)',
-        fontFamily: mono,
-        fontSize: 'var(--qa-text-whisper)',
-        letterSpacing: 'var(--qa-tracking-caps)',
-        textTransform: 'uppercase',
-        opacity: 0.75,
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
-const btnBase: CSSProperties = {
-  height: 40,
-  display: 'grid',
-  placeItems: 'center',
-  borderRadius: 'var(--qa-radius)',
-  fontFamily: body,
-  fontSize: 'var(--qa-text-body)',
-  fontWeight: 500,
-  cursor: 'pointer',
-};
-
-function TakeButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        ...btnBase,
-        padding: '0 var(--qa-s5)',
-        background: 'var(--qa-accent)',
-        color: 'var(--qa-accent-ink)',
-        border: 'none',
-        transition: 'box-shadow var(--qa-dur) var(--qa-ease), transform var(--qa-dur-fast) var(--qa-ease)',
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 8px 24px -8px var(--qa-accent-glow)')}
-      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
-      onMouseDown={(e) => (e.currentTarget.style.transform = 'translateY(1px)')}
-      onMouseUp={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-    >
-      {children}
-    </button>
-  );
-}
-
-function DeclineButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        ...btnBase,
-        padding: '0 var(--qa-s4)',
-        background: 'transparent',
-        color: 'var(--qa-ink-dim)',
-        border: 'var(--qa-hairline) solid transparent',
-        transition: 'all var(--qa-dur) var(--qa-ease)',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.color = 'var(--qa-danger)';
-        e.currentTarget.style.background = 'var(--qa-danger-soft)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.color = 'var(--qa-ink-dim)';
-        e.currentTarget.style.background = 'transparent';
-      }}
-    >
-      {children}
-    </button>
-  );
+/** What an option COSTS, riding on the option itself rather than a legend. */
+function Detail({ children }: { children: ReactNode }): ReactElement {
+  return <span style={{ ...statMeta, marginLeft: 'var(--qa-s2)', opacity: 0.75 }}>{children}</span>;
 }

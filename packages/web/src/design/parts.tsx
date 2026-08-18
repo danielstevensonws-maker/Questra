@@ -14,7 +14,7 @@
  */
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
 import { Glyph, type GlyphName } from './glyphs.js';
-import { eyebrow, micro, statMeta, statValue } from './type.js';
+import { eyebrow, micro, prose, statMeta, statValue } from './type.js';
 import type { ExplainVM } from './explain.js';
 
 /** A small caps heading. Faint by contract — it never competes with what it names. */
@@ -94,6 +94,7 @@ export function Tag({
   tone = 'neutral',
   selected,
   onClick,
+  onRemove,
   title,
 }: {
   children: ReactNode;
@@ -106,6 +107,13 @@ export function Tag({
   selected?: boolean | undefined;
   /** absent ⇒ the tag renders as a <span>, so it can live inside other buttons. */
   onClick?: (() => void) | undefined;
+  /**
+   * Present ⇒ the tag carries its own ✕. This is what a tag the user WROTE
+   * looks like: a preset can be un-toggled and is still on offer afterwards,
+   * but something you typed has nowhere to go back to, so it needs a delete
+   * rather than a deselect.
+   */
+  onRemove?: (() => void) | undefined;
   title?: string;
 }): ReactElement {
   const cls = [
@@ -114,6 +122,21 @@ export function Tag({
     selected === true ? 'is-selected' : '',
     onClick === undefined ? 'is-static' : '',
   ].filter(Boolean).join(' ');
+
+  if (onRemove !== undefined) {
+    const label = typeof children === 'string' ? children : 'tag';
+    return (
+      <span className={cls} title={title}>
+        {onClick === undefined ? children : (
+          <button type="button" className="qa2-chip-face" onClick={onClick} aria-pressed={selected}>{children}</button>
+        )}
+        <button type="button" className="qa2-chip-x" onClick={onRemove} aria-label={`Remove ${label}`}>
+          <Glyph name="close" size={9} />
+        </button>
+      </span>
+    );
+  }
+
   // A tag with nothing to do is a <span>: these render inside other buttons
   // (the spine's notches), and a button inside a button is invalid markup that
   // swallows the outer control's clicks.
@@ -201,4 +224,66 @@ export function Meter({ value, max, label }: { value: number; max: number; label
 /** The smallest data on the screen — an initiative number, an HP fraction. */
 export function Micro({ children, style }: { children: ReactNode; style?: CSSProperties }): ReactElement {
   return <span style={{ ...micro, ...style }}>{children}</span>;
+}
+
+/**
+ * A labelled text field, for the DM's authoring surfaces.
+ *
+ * The label is boxed WITH its control rather than floating above it, because
+ * these fields arrive in stacks — scene notes over cast over secrets — and a
+ * label separated from its box by the stack's gap attaches itself to the field
+ * above just as readily as the one below.
+ *
+ * `secret` is a reminder to the DM about what they are typing and NOTHING
+ * MORE. What actually keeps DM-only text out of a player's payload is
+ * `eventVisibleTo` / `filterStream` in contracts; if a style were the only
+ * thing standing between a player and a secret, the system would already be
+ * broken.
+ */
+export function Field({
+  id,
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  multiline = false,
+  rows = 2,
+  secret = false,
+  mark,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+  multiline?: boolean;
+  rows?: number;
+  /** the DM-only half: a lock on the label and a heavier rule down the edge. */
+  secret?: boolean;
+  /** an extra mark beside the label, when the field needs one of its own. */
+  mark?: GlyphName;
+}): ReactElement {
+  const glyph = mark ?? (secret ? 'lock' : undefined);
+  const shared = {
+    id,
+    value,
+    placeholder,
+    className: multiline ? 'qa2-field-input is-multiline' : 'qa2-field-input',
+    onChange: (e: { target: { value: string } }) => onChangeText(e.target.value),
+    style: prose,
+  };
+  return (
+    <span className={secret ? 'qa2-field-box is-secret' : 'qa2-field-box'}>
+      <label htmlFor={id} style={{ ...eyebrow, display: 'flex', alignItems: 'center', gap: 'var(--qa-s1)' }}>
+        {glyph !== undefined && <Glyph name={glyph} size={11} />}
+        {label}
+      </label>
+      {multiline ? <textarea rows={rows} {...shared} /> : <input type="text" {...shared} />}
+    </span>
+  );
+}
+
+/** The quiet line under a field. Guidance — never where an error would go. */
+export function Help({ children }: { children: ReactNode }): ReactElement {
+  return <p className="qa2-help" style={prose}>{children}</p>;
 }

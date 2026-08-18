@@ -13,13 +13,18 @@
  * the only one required to work. Native HTML5 drag is layered on top for
  * mouse users; it is never the only way to reorder.
  *
+ * THE NUMBER IS INFORMATION. This is one of the few lists in the product that
+ * earns its numbering: "which scene is this" is a real question a DM asks, and
+ * the answer changes when the order does. Numbers as decoration are exactly
+ * what the design language rules out elsewhere.
+ *
  * Plain language (CLAUDE.md non-negotiable #7): the noun comes from the
  * caller and threads through every generated string ("Move scene up",
  * "Moved scene to position 3 of 4") — there is no hardcoded "beat"/"node"
  * jargon to leak.
  */
-import { useState } from 'react';
-import type { DragEvent, ReactNode } from 'react';
+import { useState, type DragEvent, type ReactElement, type ReactNode } from 'react';
+import { DesignStyles, Glyph, statMeta, type GlyphName } from '../design/index.js';
 
 export interface SequenceItem {
   id: string;
@@ -32,24 +37,9 @@ export interface CardSequencerProps {
   onReorder: (nextOrderedIds: string[]) => void;
   /** Plural, e.g. "scenes" / "sessions" — singularised internally for labels and announcements. */
   itemNoun: string;
-  /** Omit for a fixed-membership list — the ✕ column only renders when this is supplied. */
+  /** Omit for a fixed-membership list — the remove column only renders when this is supplied. */
   onRemove?: (id: string) => void;
 }
-
-const mono = 'var(--qa-font-mono)';
-const body = 'var(--qa-font-body)';
-
-const srOnly = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: 'hidden',
-  clip: 'rect(0,0,0,0)',
-  whiteSpace: 'nowrap',
-  border: 'none',
-} as const;
 
 function singular(noun: string): string {
   return noun.replace(/s$/, '');
@@ -64,93 +54,72 @@ function moveTo<T>(items: T[], from: number, to: number): T[] | null {
   return next;
 }
 
-export function CardSequencer({ items, onReorder, itemNoun, onRemove }: CardSequencerProps) {
+export function CardSequencer({ items, onReorder, itemNoun, onRemove }: CardSequencerProps): ReactElement {
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const noun = singular(itemNoun);
   const handleRemove = onRemove;
 
-  function move(from: number, to: number) {
+  function move(from: number, to: number): void {
     const next = moveTo(items, from, to);
     if (next === null) return;
     onReorder(next.map((item) => item.id));
     setAnnouncement(`Moved ${noun} to position ${to + 1} of ${items.length}.`);
   }
 
-  function onDrop(targetId: string) {
+  function onDrop(targetId: string): void {
     if (draggedId === null) return;
     const from = items.findIndex((item) => item.id === draggedId);
     const to = items.findIndex((item) => item.id === targetId);
     if (from !== -1 && to !== -1) move(from, to);
     setDraggedId(null);
+    setOverId(null);
   }
 
   return (
     <div>
-      <span aria-live="polite" style={srOnly}>
-        {announcement}
-      </span>
-      <ol
-        style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          background: 'var(--qa-chip)',
-          border: 'var(--qa-hairline) solid var(--qa-glass-border)',
-          borderRadius: 'var(--qa-radius)',
-          overflow: 'hidden',
-        }}
-      >
+      <DesignStyles />
+      {/* Reordering by keyboard is silent otherwise — you press a button and
+          the screen reader says nothing about where the card went. */}
+      <span aria-live="polite" className="qa2-sr">{announcement}</span>
+
+      <ol className="qa2-seq">
         {items.map((item, i) => (
           <li
             key={item.id}
+            className={[
+              'qa2-card',
+              draggedId === item.id ? 'is-dragging' : '',
+              overId === item.id && draggedId !== item.id ? 'is-over' : '',
+            ].filter(Boolean).join(' ')}
             draggable
             onDragStart={() => setDraggedId(item.id)}
-            onDragOver={(e: DragEvent<HTMLLIElement>) => e.preventDefault()}
+            onDragOver={(e: DragEvent<HTMLLIElement>) => {
+              e.preventDefault();
+              setOverId(item.id);
+            }}
+            onDragLeave={() => setOverId((id) => (id === item.id ? null : id))}
             onDrop={() => onDrop(item.id)}
-            onDragEnd={() => setDraggedId(null)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--qa-s3)',
-              padding: 'var(--qa-s3) var(--qa-s4)',
-              borderTop: i === 0 ? undefined : 'var(--qa-hairline) solid var(--qa-glass-border)',
-              opacity: draggedId === item.id ? 0.5 : 1,
-              fontFamily: body,
+            onDragEnd={() => {
+              setDraggedId(null);
+              setOverId(null);
             }}
           >
-            <span
-              aria-hidden="true"
-              style={{
-                flex: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                fontFamily: mono,
-                fontSize: 'var(--qa-text-whisper)',
-                color: 'var(--qa-ink-faint)',
-                cursor: 'grab',
-              }}
-            >
-              <span>⠿</span>
-              <span>{i + 1}</span>
+            <span className="qa2-card-grip" aria-hidden="true">
+              <Glyph name="grip" size={14} />
             </span>
+            <span className="qa2-card-no" style={statMeta}>{i + 1}</span>
 
-            <div style={{ flex: 1, minWidth: 0 }}>{item.render}</div>
+            <span style={{ flex: 1, minWidth: 0 }}>{item.render}</span>
 
-            <div style={{ flex: 'none', display: 'flex', gap: 'var(--qa-s1)' }}>
-              <RowButton label={`Move ${noun} up`} disabled={i === 0} onClick={() => move(i, i - 1)}>
-                ▲
-              </RowButton>
-              <RowButton label={`Move ${noun} down`} disabled={i === items.length - 1} onClick={() => move(i, i + 1)}>
-                ▼
-              </RowButton>
+            <span style={{ flex: 'none', display: 'flex', gap: 'var(--qa-s1)' }}>
+              <Mini glyph="chevronUp" label={`Move ${noun} up`} disabled={i === 0} onClick={() => move(i, i - 1)} />
+              <Mini glyph="chevronDown" label={`Move ${noun} down`} disabled={i === items.length - 1} onClick={() => move(i, i + 1)} />
               {handleRemove !== undefined && (
-                <RowButton label={`Remove ${noun}`} danger onClick={() => handleRemove(item.id)}>
-                  ✕
-                </RowButton>
+                <Mini glyph="close" label={`Remove ${noun}`} danger onClick={() => handleRemove(item.id)} />
               )}
-            </div>
+            </span>
           </li>
         ))}
       </ol>
@@ -158,51 +127,29 @@ export function CardSequencer({ items, onReorder, itemNoun, onRemove }: CardSequ
   );
 }
 
-function RowButton({
+function Mini({
+  glyph,
   label,
   disabled = false,
   danger = false,
   onClick,
-  children,
 }: {
+  glyph: GlyphName;
   label: string;
   disabled?: boolean;
   danger?: boolean;
   onClick: () => void;
-  children: ReactNode;
-}) {
+}): ReactElement {
   return (
     <button
       type="button"
+      className={danger ? 'qa2-mini is-danger' : 'qa2-mini'}
       aria-label={label}
+      title={label}
       disabled={disabled}
       onClick={onClick}
-      style={{
-        width: 24,
-        height: 24,
-        display: 'grid',
-        placeItems: 'center',
-        background: 'transparent',
-        border: 'var(--qa-hairline) solid var(--qa-glass-border)',
-        borderRadius: 'var(--qa-radius-sm)',
-        fontFamily: mono,
-        fontSize: 10,
-        color: danger ? 'var(--qa-danger)' : 'var(--qa-ink-dim)',
-        cursor: disabled ? 'default' : 'pointer',
-        opacity: disabled ? 0.3 : 1,
-        transition: 'border-color var(--qa-dur) var(--qa-ease), background var(--qa-dur) var(--qa-ease)',
-      }}
-      onMouseEnter={(e) => {
-        if (disabled) return;
-        e.currentTarget.style.borderColor = danger ? 'var(--qa-danger)' : 'var(--qa-ink-faint)';
-        if (danger) e.currentTarget.style.background = 'var(--qa-danger-soft)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--qa-glass-border)';
-        e.currentTarget.style.background = 'transparent';
-      }}
     >
-      {children}
+      <Glyph name={glyph} size={12} />
     </button>
   );
 }

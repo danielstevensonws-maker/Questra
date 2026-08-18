@@ -199,14 +199,14 @@ export function AcceptTweakRejectCard({
 
   return (
     <section
-      className={`qa2-ai is-${placement}`}
+      className={`qa2-modal qa2-ai is-${placement}`}
       role="region"
       aria-label={`${resolvedEyebrow} — ${structured ? 'DM ruling' : 'narration'}`}
       aria-busy={state === 'streaming'}
     >
       <DesignStyles />
 
-      <header className="qa2-ai-head">
+      <header className="qa2-modal-head">
         <span className="qa2-ai-who">
           <span className="qa2-ai-dot" title="An assistant wrote this" />
           <Eyebrow>{resolvedEyebrow}</Eyebrow>
@@ -214,7 +214,7 @@ export function AcceptTweakRejectCard({
         <span style={statMeta}>{resolvedSource}</span>
       </header>
 
-      <div className="qa2-ai-body">
+      <div className="qa2-modal-body">
         {quoted !== undefined && <p style={{ ...quote, margin: 0 }}>&ldquo;{quoted}&rdquo;</p>}
 
         {state === 'draft' && !structured && <p style={{ ...narration, margin: 0, whiteSpace: 'pre-line' }}>{text}</p>}
@@ -275,7 +275,7 @@ export function AcceptTweakRejectCard({
 
       {/* deciding happens HERE, and only here */}
       {showFooter && (
-        <footer className="qa2-ai-foot">
+        <footer className="qa2-modal-foot">
           {isDecision && (
             <>
               <Button variant="primary" style={btn} onClick={handleAccept}>{accept}</Button>

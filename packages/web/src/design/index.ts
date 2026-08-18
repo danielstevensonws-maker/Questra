@@ -26,6 +26,8 @@ export { Glyph, glyphFor, type GlyphName } from './glyphs.js';
 
 export {
   Ctl,
+  Field,
+  Help,
   Eyebrow,
   ExplainLine,
   ExplainValue,

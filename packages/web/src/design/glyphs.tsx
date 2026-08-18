@@ -21,7 +21,8 @@ export type GlyphName =
   | 'blade' | 'bow' | 'shield' | 'boot' | 'exit' | 'counter' | 'flask' | 'spark'
   | 'heal' | 'bolt' | 'flame' | 'ward' | 'bless' | 'sidestep'
   | 'eye' | 'hand' | 'plus' | 'send' | 'gear' | 'quill' | 'sound' | 'menu'
-  | 'close' | 'chevronLeft' | 'chevronRight' | 'chevronDown' | 'pause' | 'die';
+  | 'close' | 'chevronLeft' | 'chevronRight' | 'chevronUp' | 'chevronDown' | 'pause' | 'die'
+  | 'lock' | 'search' | 'check' | 'grip';
 
 /**
  * ONE AUTHORING CONSTRAINT. This file is scanned by the HUD type-hygiene suite,
@@ -73,6 +74,19 @@ const PATHS: Record<GlyphName, ReactElement> = {
   chevronDown: <path d="M3.2 6 8 10.6 12.8 6" />,
   pause: <><path d="M6 3.6v8.8M10 3.6v8.8" /></>,
   die: <><rect x="2.6" y="2.6" width="10.8" height="10.8" rx="2" /><circle cx="6" cy="6" r=".9" /><circle cx="10" cy="10" r=".9" /></>,
+
+  // ---- the authoring marks -------------------------------------------------
+  // The DM's surfaces were reaching for 🔒 ✓ ✕ ▲ ▼ ⠿ — emoji and box-drawing
+  // characters, which is exactly the toolbar-assembled-from-whatever look the
+  // header rules out, and which render at a different weight in every font the
+  // user might have. Drawn, so they inherit ink like everything else.
+  lock: <><rect x="3.4" y="7" width="9.2" height="7" rx="1.4" /><path d="M5.6 7V4.9a2.4 2.4 0 0 1 4.8 0V7" /></>,
+  search: <><circle cx="7.2" cy="7.2" r="4.4" /><path d="m10.6 10.6 3 3" /></>,
+  check: <path d="m3.2 8.4 3.2 3.2 6.4-7.2" />,
+  chevronUp: <path d="M3.2 10.6 8 6l4.8 4.6" />,
+  // Two columns of dots: the universal "this row can be dragged" mark, and
+  // deliberately quiet — the buttons beside it are the real mechanism.
+  grip: <><circle cx="6" cy="4" r=".9" /><circle cx="10" cy="4" r=".9" /><circle cx="6" cy="8" r=".9" /><circle cx="10" cy="8" r=".9" /><circle cx="6" cy="12" r=".9" /><circle cx="10" cy="12" r=".9" /></>,
 };
 
 export function Glyph({ name, size = 16 }: { name: GlyphName; size?: number }): ReactElement {

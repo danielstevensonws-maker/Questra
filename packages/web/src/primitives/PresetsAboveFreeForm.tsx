@@ -17,14 +17,16 @@
  *   no extra state needed to track "you went your own way".
  * - `'tags'` — a `string[]`. Presets toggle; free-form entries become tags
  *   too (Enter or blur to add, duplicates rejected). Custom tags render as
- *   removable (✕) chips, visually distinct from the always-toggleable
- *   preset chips.
+ *   removable chips, visually distinct from the always-toggleable presets: a
+ *   preset you deselect is still on offer, but something you typed has
+ *   nowhere to go back to, so it gets a delete rather than a deselect.
  *
  * Controlled in both modes — `value`/`onChange` in, nothing owned here
- * except the transient `draft` text buffer in tags mode.
+ * except the tags draft, which is not an answer until it is committed.
  */
-import { useId, useState } from 'react';
-import type { KeyboardEvent, ReactNode } from 'react';
+import { useId, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
+import { DesignStyles, Eyebrow, Help, Tag } from '../design/index.js';
+import { prose } from '../design/index.js';
 
 export interface PresetOption {
   label: string;
@@ -51,62 +53,62 @@ export interface TagsFieldProps extends SharedProps {
 
 export type PresetsAboveFreeFormProps = PickFieldProps | TagsFieldProps;
 
-const mono = 'var(--qa-font-mono)';
-const body = 'var(--qa-font-body)';
-
-export function PresetsAboveFreeForm(props: PresetsAboveFreeFormProps) {
+export function PresetsAboveFreeForm(props: PresetsAboveFreeFormProps): ReactElement {
   if (props.mode === 'tags') return <TagsField {...props} />;
   return <PickField {...props} />;
 }
 
-function PickField({ label, help, presets, value, onChange, placeholder = 'Or write your own…' }: PickFieldProps) {
+function PickField({ label, help, presets, value, onChange, placeholder = 'Or write your own…' }: PickFieldProps): ReactElement {
   const inputId = useId();
   const activeLabel = presets.find((p) => p.label === value)?.label;
 
-  function tap(preset: PresetOption) {
+  function tap(preset: PresetOption): void {
     onChange(preset.label === value ? '' : preset.label);
   }
 
   return (
-    <Field id={inputId} label={label} help={help}>
+    <Labelled id={inputId} label={label} help={help}>
       <ChipRow>
         {presets.map((preset) => (
-          <Chip key={preset.label} selected={preset.label === activeLabel} onClick={() => tap(preset)}>
+          <Tag key={preset.label} selected={preset.label === activeLabel} onClick={() => tap(preset)}>
             {preset.label}
-          </Chip>
+          </Tag>
         ))}
       </ChipRow>
-      <input
-        id={inputId}
-        type="text"
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        style={inputStyle}
-      />
-    </Field>
+      <span className="qa2-open">
+        <input
+          id={inputId}
+          className="qa2-input"
+          type="text"
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          style={prose}
+        />
+      </span>
+    </Labelled>
   );
 }
 
-function TagsField({ label, help, presets, value, onChange, placeholder = 'Add your own — press Enter' }: TagsFieldProps) {
+function TagsField({ label, help, presets, value, onChange, placeholder = 'Add your own — press Enter' }: TagsFieldProps): ReactElement {
   const inputId = useId();
   const [draft, setDraft] = useState('');
 
-  function togglePreset(preset: PresetOption) {
+  function togglePreset(preset: PresetOption): void {
     onChange(value.includes(preset.label) ? value.filter((v) => v !== preset.label) : [...value, preset.label]);
   }
 
-  function removeTag(tag: string) {
+  function removeTag(tag: string): void {
     onChange(value.filter((v) => v !== tag));
   }
 
-  function commitDraft() {
+  function commitDraft(): void {
     const next = draft.trim();
     if (next !== '' && !value.includes(next)) onChange([...value, next]);
     setDraft('');
   }
 
-  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+  function onKeyDown(e: KeyboardEvent<HTMLInputElement>): void {
     if (e.key === 'Enter') {
       e.preventDefault();
       commitDraft();
@@ -116,149 +118,64 @@ function TagsField({ label, help, presets, value, onChange, placeholder = 'Add y
   const customTags = value.filter((v) => !presets.some((p) => p.label === v));
 
   return (
-    <Field id={inputId} label={label} help={help}>
+    <Labelled id={inputId} label={label} help={help}>
       <ChipRow>
         {presets.map((preset) => (
-          <Chip key={preset.label} selected={value.includes(preset.label)} onClick={() => togglePreset(preset)}>
+          <Tag key={preset.label} selected={value.includes(preset.label)} onClick={() => togglePreset(preset)}>
             {preset.label}
-          </Chip>
+          </Tag>
         ))}
         {customTags.map((tag) => (
-          <Chip key={tag} selected onRemove={() => removeTag(tag)}>
+          <Tag key={tag} selected onRemove={() => removeTag(tag)}>
             {tag}
-          </Chip>
+          </Tag>
         ))}
       </ChipRow>
-      <input
-        id={inputId}
-        type="text"
-        value={draft}
-        placeholder={placeholder}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={onKeyDown}
-        onBlur={commitDraft}
-        style={inputStyle}
-      />
-    </Field>
+      <span className="qa2-open">
+        <input
+          id={inputId}
+          className="qa2-input"
+          type="text"
+          value={draft}
+          placeholder={placeholder}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={onKeyDown}
+          onBlur={commitDraft}
+          style={prose}
+        />
+      </span>
+    </Labelled>
   );
 }
 
-function Field({ id, label, help, children }: { id: string; label: string; help?: string | undefined; children: ReactNode }) {
+/**
+ * Label, then the offers, then the box you can ignore them in. The label sits
+ * ABOVE the chips rather than boxed with the input, because it names the whole
+ * question and the chips are part of the answer to it.
+ */
+function Labelled({
+  id,
+  label,
+  help,
+  children,
+}: {
+  id: string;
+  label: string;
+  help?: string | undefined;
+  children: ReactNode;
+}): ReactElement {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--qa-s2)', fontFamily: body }}>
-      <label
-        htmlFor={id}
-        style={{
-          fontFamily: mono,
-          fontSize: 'var(--qa-text-whisper)',
-          letterSpacing: 'var(--qa-tracking-caps)',
-          textTransform: 'uppercase',
-          color: 'var(--qa-ink-dim)',
-        }}
-      >
-        {label}
-      </label>
+    <div className="qa2-field">
+      <DesignStyles />
+      <Eyebrow>
+        <label htmlFor={id}>{label}</label>
+      </Eyebrow>
       {children}
-      {help !== undefined && (
-        <p
-          style={{
-            fontFamily: body,
-            fontStyle: 'italic',
-            fontSize: 'var(--qa-text-whisper)',
-            color: 'var(--qa-ink-faint)',
-            margin: 0,
-          }}
-        >
-          {help}
-        </p>
-      )}
+      {help !== undefined && <Help>{help}</Help>}
     </div>
   );
 }
 
-function ChipRow({ children }: { children: ReactNode }) {
-  return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--qa-s2)' }}>{children}</div>;
+function ChipRow({ children }: { children: ReactNode }): ReactElement {
+  return <div className="qa2-offers">{children}</div>;
 }
-
-function Chip({
-  children,
-  selected,
-  onClick,
-  onRemove,
-}: {
-  children: ReactNode;
-  selected: boolean;
-  onClick?: () => void;
-  onRemove?: () => void;
-}) {
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '6px var(--qa-s3)',
-        borderRadius: 'var(--qa-radius-round)',
-        border: `var(--qa-hairline) solid ${selected ? 'var(--qa-accent-line)' : 'var(--qa-glass-border)'}`,
-        background: selected ? 'var(--qa-accent-soft)' : 'var(--qa-chip)',
-        fontFamily: body,
-        fontSize: 'var(--qa-text-whisper)',
-        color: selected ? 'var(--qa-ink)' : 'var(--qa-ink-dim)',
-      }}
-    >
-      {onClick !== undefined ? (
-        <button
-          type="button"
-          aria-pressed={selected}
-          onClick={onClick}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            margin: 0,
-            font: 'inherit',
-            color: 'inherit',
-            cursor: 'pointer',
-          }}
-        >
-          {children}
-        </button>
-      ) : (
-        <span>{children}</span>
-      )}
-      {onRemove !== undefined && (
-        <button
-          type="button"
-          aria-label={`Remove ${typeof children === 'string' ? children : 'tag'}`}
-          onClick={onRemove}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            margin: 0,
-            fontFamily: mono,
-            fontSize: 10,
-            color: 'var(--qa-ink-faint)',
-            cursor: 'pointer',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--qa-danger)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--qa-ink-faint)')}
-        >
-          ✕
-        </button>
-      )}
-    </span>
-  );
-}
-
-const inputStyle = {
-  width: '100%',
-  background: 'var(--qa-chip)',
-  border: 'var(--qa-hairline) solid var(--qa-glass-border)',
-  borderRadius: 'var(--qa-radius)',
-  padding: 'var(--qa-s3)',
-  fontFamily: body,
-  fontSize: 'var(--qa-text-body)',
-  color: 'var(--qa-ink)',
-  outline: 'none',
-} as const;

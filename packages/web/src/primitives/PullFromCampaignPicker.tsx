@@ -14,9 +14,13 @@
  *
  * Owns no data: `selectedIds` in, `onChange(nextSelectedIds)` out. Search is
  * the picker's own local UI state (not reported to the caller).
+ *
+ * TWO EMPTIES, NEVER ONE MESSAGE. "Nothing in the campaign yet" and "nothing
+ * matched what you typed" are different facts about different problems, and a
+ * DM told the wrong one goes looking for a bug in the wrong place.
  */
-import { useId, useMemo, useState } from 'react';
-import type { CSSProperties, KeyboardEvent } from 'react';
+import { useId, useMemo, useState, type KeyboardEvent, type ReactElement } from 'react';
+import { DesignStyles, Glyph, itemName, prose, statMeta } from '../design/index.js';
 
 export interface PickableItem {
   id: string;
@@ -39,21 +43,6 @@ export interface PullFromCampaignPickerProps {
   emptyLabel?: string;
 }
 
-const mono = 'var(--qa-font-mono)';
-const body = 'var(--qa-font-body)';
-
-const srOnly: CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: 'hidden',
-  clip: 'rect(0,0,0,0)',
-  whiteSpace: 'nowrap',
-  border: 'none',
-};
-
 function matches(item: PickableItem, query: string): boolean {
   return (
     item.name.toLowerCase().includes(query) ||
@@ -68,7 +57,7 @@ export function PullFromCampaignPicker({
   onChange,
   mode = 'multi',
   emptyLabel = 'Nothing in the campaign to pull from yet.',
-}: PullFromCampaignPickerProps) {
+}: PullFromCampaignPickerProps): ReactElement {
   const searchId = useId();
   const [query, setQuery] = useState('');
 
@@ -80,7 +69,7 @@ export function PullFromCampaignPicker({
   const noItemsAtAll = items.length === 0;
   const noMatches = !noItemsAtAll && filtered.length === 0;
 
-  function toggle(id: string) {
+  function toggle(id: string): void {
     if (mode === 'single') {
       onChange(selectedIds.includes(id) ? [] : [id]);
       return;
@@ -88,7 +77,7 @@ export function PullFromCampaignPicker({
     onChange(selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id]);
   }
 
-  function onRowKeyDown(e: KeyboardEvent<HTMLLIElement>, id: string) {
+  function onRowKeyDown(e: KeyboardEvent<HTMLLIElement>, id: string): void {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       toggle(id);
@@ -96,121 +85,53 @@ export function PullFromCampaignPicker({
   }
 
   return (
-    <div
-      style={{
-        fontFamily: body,
-        background: 'var(--qa-chip)',
-        border: 'var(--qa-hairline) solid var(--qa-glass-border)',
-        borderRadius: 'var(--qa-radius)',
-        overflow: 'hidden',
-      }}
-    >
-      <div style={{ padding: 'var(--qa-s3)', borderBottom: 'var(--qa-hairline) solid var(--qa-glass-border)' }}>
-        <label htmlFor={searchId} style={srOnly}>
-          Search
-        </label>
+    <div className="qa2-picker">
+      <DesignStyles />
+      <div className="qa2-picker-search">
+        <label htmlFor={searchId} className="qa2-sr">Search</label>
+        <Glyph name="search" size={13} />
         <input
           id={searchId}
+          className="qa2-field-input"
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search…"
-          style={{
-            width: '100%',
-            background: 'transparent',
-            border: 'none',
-            outline: 'none',
-            fontFamily: body,
-            fontSize: 'var(--qa-text-body)',
-            color: 'var(--qa-ink)',
-            padding: 0,
-          }}
+          style={prose}
         />
       </div>
 
-      {noItemsAtAll && <EmptyMessage text={emptyLabel} />}
-      {noMatches && <EmptyMessage text="No matches." />}
+      {noItemsAtAll && <Empty text={emptyLabel} />}
+      {noMatches && <Empty text="No matches." />}
 
       {!noItemsAtAll && !noMatches && (
-        <ul
-          role="listbox"
-          aria-multiselectable={mode === 'multi'}
-          style={{
-            listStyle: 'none',
-            margin: 0,
-            padding: 0,
-            maxHeight: 420,
-            overflowY: 'auto',
-          }}
-        >
+        <ul className="qa2-picker-list" role="listbox" aria-multiselectable={mode === 'multi'}>
           {filtered.map((item) => {
             const selected = selectedIds.includes(item.id);
             return (
               <li
                 key={item.id}
+                className={selected ? 'qa2-row is-picked' : 'qa2-row'}
                 role="option"
                 aria-selected={selected}
                 tabIndex={0}
                 onClick={() => toggle(item.id)}
                 onKeyDown={(e) => onRowKeyDown(e, item.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--qa-s3)',
-                  padding: 'var(--qa-s3) var(--qa-s4)',
-                  borderTop: 'var(--qa-hairline) solid var(--qa-glass-border)',
-                  background: selected ? 'var(--qa-accent-soft)' : 'transparent',
-                  cursor: 'pointer',
-                }}
               >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    flex: 'none',
-                    width: 16,
-                    height: 16,
-                    display: 'grid',
-                    placeItems: 'center',
-                    borderRadius: 'var(--qa-radius-sm)',
-                    border: `var(--qa-hairline) solid ${selected ? 'var(--qa-accent-line)' : 'var(--qa-glass-border)'}`,
-                    background: selected ? 'var(--qa-accent)' : 'transparent',
-                    color: 'var(--qa-accent-ink)',
-                    fontFamily: mono,
-                    fontSize: 10,
-                    lineHeight: 1,
-                  }}
-                >
-                  {selected ? '✓' : ''}
+                {/* Reserved whether or not it is ticked, so picking an item
+                    does not shove its name sideways under the cursor. */}
+                <span className="qa2-row-tick" aria-hidden="true">
+                  {selected && <Glyph name="check" size={12} />}
                 </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 'var(--qa-text-body)', color: 'var(--qa-ink)' }}>{item.name}</div>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ ...itemName, display: 'block' }}>{item.name}</span>
                   {item.hint !== undefined && (
-                    <div
-                      style={{
-                        fontSize: 'var(--qa-text-whisper)',
-                        color: 'var(--qa-ink-faint)',
-                        marginTop: 2,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
+                    <span style={{ ...prose, color: 'var(--qa-ink-faint)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {item.hint}
-                    </div>
+                    </span>
                   )}
-                </div>
-                <span
-                  style={{
-                    flex: 'none',
-                    fontFamily: mono,
-                    fontSize: 'var(--qa-text-whisper)',
-                    letterSpacing: 'var(--qa-tracking-caps)',
-                    textTransform: 'uppercase',
-                    color: 'var(--qa-ink-faint)',
-                  }}
-                >
-                  {item.kind}
                 </span>
+                <span style={{ ...statMeta, flex: 'none' }}>{item.kind}</span>
               </li>
             );
           })}
@@ -220,19 +141,6 @@ export function PullFromCampaignPicker({
   );
 }
 
-function EmptyMessage({ text }: { text: string }) {
-  return (
-    <p
-      style={{
-        margin: 0,
-        padding: 'var(--qa-s4)',
-        fontFamily: body,
-        fontStyle: 'italic',
-        fontSize: 'var(--qa-text-body)',
-        color: 'var(--qa-ink-faint)',
-      }}
-    >
-      {text}
-    </p>
-  );
+function Empty({ text }: { text: string }): ReactElement {
+  return <p className="qa2-picker-empty" style={prose}>{text}</p>;
 }

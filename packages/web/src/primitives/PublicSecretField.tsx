@@ -21,13 +21,18 @@
  * PROVISIONAL STYLING: the design hasn't supplied a `--qa-secret` tint yet —
  * packages/theme/test/tokens.test.ts deliberately asserts it's still absent,
  * to stop a session from inventing one. The secret half is differentiated by
- * label text, the lock mark, and a neutral ink-weight accent (--qa-ink-dim
- * vs public's --qa-ink-faint) only. Swap in the real token — and drop the
+ * label text, the lock mark, and a neutral ink-weight rule (--qa-ink-dim vs
+ * public's --qa-ink-faint) only. Swap in the real token — and drop the
  * `tokens.test.ts` guard line for it — the day Design supplies it.
+ *
+ * The two halves are the shared `Field`, so this component is now the pairing
+ * and the vocabulary and nothing else: what a labelled box looks like is the
+ * design layer's business, and every other authoring surface gets the same
+ * box for free.
  */
-import { useId } from 'react';
-import type { CSSProperties } from 'react';
+import { useId, type ReactElement } from 'react';
 import type { Visibility } from '@questra/contracts';
+import { DesignStyles, Field, Help } from '../design/index.js';
 
 export interface PublicSecretValue {
   public: string;
@@ -52,9 +57,6 @@ export interface PublicSecretFieldProps {
   help?: string;
 }
 
-const mono = 'var(--qa-font-mono)';
-const body = 'var(--qa-font-body)';
-
 export function PublicSecretField({
   value,
   onChange,
@@ -62,124 +64,31 @@ export function PublicSecretField({
   publicPlaceholder = 'Everyone at the table sees this',
   secretPlaceholder = 'Only you (the DM) see this',
   help,
-}: PublicSecretFieldProps) {
+}: PublicSecretFieldProps): ReactElement {
   const publicId = useId();
   const secretId = useId();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--qa-s3)', fontFamily: body }}>
-      <Half
+    <div className="qa2-field">
+      <DesignStyles />
+      <Field
         id={publicId}
-        badge="Public"
-        accent="var(--qa-ink-faint)"
+        label="Public"
         value={value.public}
         onChangeText={(text) => onChange({ ...value, public: text })}
         placeholder={publicPlaceholder}
         multiline={multiline}
       />
-      <Half
+      <Field
         id={secretId}
-        badge="Secret · DM only"
-        lock
-        accent="var(--qa-ink-dim)"
+        label="Secret · DM only"
+        secret
         value={value.secret}
         onChangeText={(text) => onChange({ ...value, secret: text })}
         placeholder={secretPlaceholder}
         multiline={multiline}
       />
-      {help !== undefined && (
-        <p
-          style={{
-            fontFamily: body,
-            fontStyle: 'italic',
-            fontSize: 'var(--qa-text-whisper)',
-            lineHeight: 1.5,
-            color: 'var(--qa-ink-faint)',
-            margin: 0,
-          }}
-        >
-          {help}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function Half({
-  id,
-  badge,
-  lock = false,
-  accent,
-  value,
-  onChangeText,
-  placeholder,
-  multiline,
-}: {
-  id: string;
-  badge: string;
-  lock?: boolean;
-  accent: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder: string;
-  multiline: boolean;
-}) {
-  const fieldStyle: CSSProperties = {
-    width: '100%',
-    background: 'transparent',
-    border: 'none',
-    outline: 'none',
-    resize: multiline ? 'vertical' : 'none',
-    fontFamily: body,
-    fontSize: 'var(--qa-text-body)',
-    lineHeight: 1.5,
-    color: 'var(--qa-ink)',
-    padding: 0,
-  };
-
-  return (
-    <div
-      style={{
-        background: 'var(--qa-chip)',
-        borderLeft: `3px solid ${accent}`,
-        borderRadius: 'var(--qa-radius-sm)',
-        padding: 'var(--qa-s3) var(--qa-s4)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--qa-s2)',
-      }}
-    >
-      <label
-        htmlFor={id}
-        style={{
-          fontFamily: mono,
-          fontSize: 'var(--qa-text-whisper)',
-          letterSpacing: 'var(--qa-tracking-caps)',
-          textTransform: 'uppercase',
-          color: 'var(--qa-ink-dim)',
-        }}
-      >
-        {lock ? `🔒 ${badge}` : badge}
-      </label>
-      {multiline ? (
-        <textarea
-          id={id}
-          rows={2}
-          value={value}
-          placeholder={placeholder}
-          onChange={(e) => onChangeText(e.target.value)}
-          style={fieldStyle}
-        />
-      ) : (
-        <input
-          id={id}
-          type="text"
-          value={value}
-          placeholder={placeholder}
-          onChange={(e) => onChangeText(e.target.value)}
-          style={fieldStyle}
-        />
-      )}
+      {help !== undefined && <Help>{help}</Help>}
     </div>
   );
 }
