@@ -45,7 +45,13 @@ export type IntentResolver = (
 ) => { ok: true; events: PlayEvent[] } | { ok: false; reason: string };
 
 export interface SyncCoreOptions {
-  resolveToken: (token: string, playSessionId: string) => ResolvedToken | null;
+  /**
+   * Sync or async, so a bare dev server (no accounts) can resolve a token
+   * in-process while the real Brief 14 auth wiring (`makeResolveToken`, which
+   * looks up a JWT + a Postgres membership row) can await it. `onHello` awaits
+   * whichever it gets.
+   */
+  resolveToken: (token: string, playSessionId: string) => ResolvedToken | null | Promise<ResolvedToken | null>;
   resolveIntent: IntentResolver;
   /** initial combatants per session (pre-combat setup); the log folds on top. */
   initialCombatants?: (playSessionId: string) => Combatant[];
@@ -155,8 +161,25 @@ export class SyncCore {
     return done;
   }
 
+  /**
+   * A truly synchronous resolveToken (the bare dev server, and every existing
+   * golden test) must finish `hello` in the same tick `onMessage` was called —
+   * `await`ing even a non-Promise value still costs a microtask, which is enough
+   * to reorder a test that calls `hello()` then inspects `received` immediately
+   * after. So this only goes through the Promise branch when the caller's
+   * `resolveToken` actually returned one (the real Brief 14 auth, which awaits a
+   * JWT verify + a Postgres membership lookup).
+   */
   private onHello(conn: Connection, msg: Extract<ClientMsg, { m: 'hello' }>): void {
-    const resolved = this.opts.resolveToken(msg.token, msg.playSessionId);
+    const maybe = this.opts.resolveToken(msg.token, msg.playSessionId);
+    if (maybe instanceof Promise) {
+      maybe.then((resolved) => this.finishHello(conn, msg, resolved)).catch(() => this.err(conn, 'bad_message'));
+    } else {
+      this.finishHello(conn, msg, maybe);
+    }
+  }
+
+  private finishHello(conn: Connection, msg: Extract<ClientMsg, { m: 'hello' }>, resolved: ResolvedToken | null): void {
     if (!resolved) return this.err(conn, 'auth');
     if (resolved.playSessionId !== msg.playSessionId) return this.err(conn, 'not_member');
 
