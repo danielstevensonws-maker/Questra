@@ -1,15 +1,21 @@
 /**
- * v2/parts — the repeats the frame is assembled from.
+ * design/parts — the repeats every surface is assembled from.
  *
  * These exist so that "every number is tappable" (design request §5) is a thing
- * the screen DOES rather than a thing each surface remembers to do. A readout
+ * the app DOES rather than a thing each surface remembers to do. A readout
  * built with `ExplainValue` cannot ship without its derivation, because the
- * derivation is the prop that makes it render.
+ * derivation is the prop that makes it render — the promise is enforced by the
+ * type, not by reviewer diligence.
+ *
+ * They are in the shared layer because the authoring surfaces need them just as
+ * much as the play screen does: a wizard step showing a computed ability
+ * modifier, a planner row showing a session count, and a combatant's Armor
+ * Class are the same readout wearing different data.
  */
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
 import { Glyph, type GlyphName } from './glyphs.js';
 import { eyebrow, micro, statMeta, statValue } from './type.js';
-import type { ExplainVM } from './viewModel.js';
+import type { ExplainVM } from './explain.js';
 
 /** A small caps heading. Faint by contract — it never competes with what it names. */
 export function Eyebrow({ children, style }: { children: ReactNode; style?: CSSProperties }): ReactElement {

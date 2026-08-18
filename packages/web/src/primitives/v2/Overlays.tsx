@@ -19,9 +19,7 @@
  */
 import { useState, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import { Button } from '@questra/ui';
-import { Glyph } from './glyphs.js';
-import { Eyebrow } from './parts.js';
-import { heroName, itemName, narration, prose, quote, rollTotal, sceneName, statMeta, statValue } from './type.js';
+import { Eyebrow, Glyph, heroName, itemName, narration, prose, quote, rollTotal, sceneName, statMeta, statValue } from '../../design/index.js';
 import type { ExplainVM, HeroVM } from './viewModel.js';
 
 // ---- shared chrome ---------------------------------------------------------

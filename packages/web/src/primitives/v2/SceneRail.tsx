@@ -15,8 +15,7 @@
  * would leave a player checking two places for one fact.
  */
 import type { ReactElement } from 'react';
-import { Ctl } from './parts.js';
-import { sceneName, statMeta } from './type.js';
+import { Ctl, sceneName, statMeta } from '../../design/index.js';
 
 export interface SceneRailProps {
   title: string;

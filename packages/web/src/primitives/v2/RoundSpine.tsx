@@ -27,9 +27,7 @@
  * reads as a cast list with a running order rather than a table of rows.
  */
 import type { ReactElement } from 'react';
-import { Glyph } from './glyphs.js';
-import { Eyebrow, HP, Micro, Tag } from './parts.js';
-import { castName, prose, statMeta } from './type.js';
+import { castName, Eyebrow, Glyph, HP, Micro, prose, statMeta, Tag } from '../../design/index.js';
 import type { SpineEntryVM } from './viewModel.js';
 
 export interface RoundSpineProps {

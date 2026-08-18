@@ -1,5 +1,5 @@
 /**
- * v2/glyphs — the screen's small marks, as inline SVG.
+ * design/glyphs — the app's small marks, as inline SVG.
  *
  * WHY NOT EMOJI. The one place v2 uses emoji is the reactions row, where the
  * emoji IS the message. Everywhere else — action tiles, frame controls — the

@@ -1,49 +1,43 @@
 /**
- * v2/ScreenStyles — the one stylesheet for Player View v2.
+ * v2/ScreenStyles — the Player View's own layout, and nothing else.
  *
- * WHY A STYLESHEET AND NOT INLINE STYLES. v1's HUD is styled entirely inline,
- * which cost it three things v2 needs: real `:hover`/`:focus-visible` states
- * without a `useState` per tile, `@media (prefers-reduced-motion)` (design
- * request §8, non-negotiable), and pseudo-elements for the frame's hairlines
- * and the spine's timeline. Every value below is still a `--qa-*` token — the
- * HUD type-hygiene suite scans this file for hex, rgb(), literal durations and
- * numeric font sizes exactly as it scans the components.
+ * WHAT IS AND IS NOT HERE. Chrome and behaviour live in the shared design
+ * layer (src/design/styles.tsx): what a panel is made of, what its controls
+ * look like, the focus ring, the reduced-motion guarantee, the keyframes. This
+ * file owns only what is true of THIS screen — where each panel sits, the map
+ * ground beneath them, and the internals of the four surfaces the play screen
+ * invented (the round spine, the near edge, the action rows, the journal).
  *
- * THE STILL-EQUIVALENT DISCIPLINE. Nothing here animates INTO its resting
- * state from a hidden one via a persistent transform. An element's plain CSS
- * IS the finished state, and the keyframes run FROM a hidden state TO nothing.
- * So the reduced-motion block can simply say `animation: none` and every
- * moving part is left correctly drawn rather than stuck at zero. That is what
- * "design the reduced state" means in practice.
+ * The division is worth keeping honest, because it is what lets an authoring
+ * surface reuse .qa2-panel without inheriting a play screen's absolute
+ * positioning. Chrome is shared; placement is local. If a rule you are about
+ * to add would be equally true of a wizard step or a compendium entry, it
+ * belongs in the design layer, not here.
  *
- * THE MAP IS THE HERO (owner direction, 2026-08-16). An earlier pass ran the
- * surfaces flush to the viewport edges, which turned the HUD into a frame and
- * the map into what was left over — a continuous C down the left, along the
- * bottom and up the right. That reads as chrome, and chrome is the wrong thing
- * to be looking at for three hours.
+ * THE MAP IS THE HERO (owner direction, 2026-08-16). An earlier pass ran these
+ * surfaces flush to the window, which made the HUD a frame — a continuous C
+ * down the left, along the bottom and up the right — and made the map what was
+ * left over. Chrome is the wrong thing to look at for three hours. So the map
+ * is full bleed and every surface is a DISCRETE PANEL floating over it, held
+ * off the window by --qa-hud-inset and off each other by the spacing scale.
  *
- * So every surface is now a DISCRETE PANEL floating over a full-bleed map, held
- * off the edges by `--qa-hud-inset` and off each other by the spacing scale.
- * The map runs edge to edge underneath and shows between them. Nothing touches
- * anything else, and nothing touches the window.
- *
- * WHAT KEEPS SEPARATE PANELS FROM DISAGREEING is the one thing the v1 hub
- * learned the hard way: it was never the merging, it was the SHARED CHROME
- * CONTRACT. Every panel below is built from `.qa2-panel` and nowhere else —
- * one radius, one padding, one internal rhythm, one fill, one border, one
- * shadow. Add a surface through that class and it cannot drift.
- *
- * ONE EDITING HAZARD, paid for twice now: the CSS below is a template literal,
- * so a BACKTICK anywhere inside it — including inside a CSS comment, where
- * quoting a class name is the natural thing to do — closes the string and the
- * whole file stops parsing. Write class names bare in those comments. The
+ * ONE EDITING HAZARD, paid for repeatedly: the CSS below is a template
+ * literal, so a BACKTICK anywhere inside it — including inside a CSS comment,
+ * where quoting a class name is the natural thing to do — closes the string and
+ * the whole file stops parsing. Write class names bare in those comments. The
  * type-hygiene suite asserts this file carries exactly the two backticks that
- * open and close the literal, so the mistake now fails a test instead of a
- * build.
+ * open and close the literal.
  */
 import type { ReactElement } from 'react';
+import { DesignStyles } from '../../design/index.js';
 
 const CSS = `
+/* Every floating panel on this screen is the shared .qa2-panel chrome plus a
+   placement. Positioning is applied here rather than in the design layer so
+   the same chrome can sit in an ordinary document flow elsewhere. */
+.qa2-scene, .qa2-spine, .qa2-journal, .qa2-you, .qa2-act { position: absolute; z-index: 2; }
+.qa2-pill.is-spine, .qa2-pill.is-journal, .qa2-pill.is-act { position: absolute; z-index: 2; }
+
 .qa2-screen {
   --qa2-journal: 336px;
   --qa2-spine: 244px;
@@ -58,23 +52,6 @@ const CSS = `
   min-height: 0;
   overflow: hidden;
   color: var(--qa-ink);
-}
-
-/* THE SHARED CHROME CONTRACT. One radius, one padding, one rhythm, one fill.
-   Every floating surface on this screen is this class plus a position. */
-.qa2-panel {
-  position: absolute;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: var(--qa-s3);
-  padding: var(--qa-s3) var(--qa-s4);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius-lg);
-  background: var(--qa-glass);
-  backdrop-filter: blur(var(--qa-glass-blur));
-  -webkit-backdrop-filter: blur(var(--qa-glass-blur));
-  box-shadow: var(--qa-shadow);
 }
 
 /* ---- the ground: the map is the table surface, full bleed under everything --
@@ -279,38 +256,8 @@ const CSS = `
    middle of it looks like a bug, not like breathing room. The max-height on the
    panel still caps a long initiative order, and then this scrolls. */
 .qa2-cast { flex: 0 1 auto; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 0; scrollbar-width: thin; }
-
-/* Collapsed, a rail becomes a small pill rather than a strip welded to the
-   window edge — a floating HUD should not grow an edge when it shrinks.
-   NAMED qa2-pill, NOT qa2-tab: the folio's tab buttons already own that name,
-   and when these two collided the pill's position:absolute stacked every folio
-   tab on top of the next. */
-.qa2-pill {
-  position: absolute;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: var(--qa-s2);
-  padding: var(--qa-s2) var(--qa-s3);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius-round);
-  background: var(--qa-glass);
-  backdrop-filter: blur(var(--qa-glass-blur));
-  -webkit-backdrop-filter: blur(var(--qa-glass-blur));
-  box-shadow: var(--qa-shadow);
-  color: var(--qa-ink-dim);
-  cursor: pointer;
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  white-space: nowrap;
-  transition: color var(--qa-dur-fast) var(--qa-ease), border-color var(--qa-dur-fast) var(--qa-ease);
-}
-.qa2-pill:hover { color: var(--qa-ink); border-color: var(--qa-accent-line); }
 .qa2-pill.is-spine { top: var(--qa-hud-inset); left: var(--qa-hud-inset); }
 .qa2-pill.is-journal { right: var(--qa-hud-inset); bottom: var(--qa-hud-inset); }
-.qa2-pill-dot { width: 6px; height: 6px; flex: none; border-radius: var(--qa-radius-round); background: var(--qa-accent); }
 
 .qa2-notch {
   position: relative;
@@ -401,19 +348,6 @@ const CSS = `
 .qa2-portrait:hover .qa2-portrait-name { color: var(--qa-accent); }
 .qa2-portrait-name { transition: color var(--qa-dur-fast) var(--qa-ease); }
 
-.qa2-hpwrap { position: relative; height: 10px; border-radius: var(--qa-radius-round); background: var(--qa-chip); overflow: hidden; }
-.qa2-hpfill { position: absolute; inset: 0 auto 0 0; border-radius: var(--qa-radius-round); background: var(--qa-success); transition: width var(--qa-dur-slow) var(--qa-ease); }
-.qa2-hpfill.is-bloodied { background: var(--qa-danger); }
-/* Temporary HP sits ON the bar as a hatched overlay rather than as a second
-   number: it is hit points, so it belongs on the hit-point bar. */
-.qa2-hptemp {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background-image: repeating-linear-gradient(115deg, var(--qa-gold) 0 2px, transparent 2px 6px);
-  background-color: var(--qa-gold-soft);
-}
-
 .qa2-abils { display: flex; gap: var(--qa-s1); }
 .qa2-abil {
   flex: 1;
@@ -470,61 +404,6 @@ const CSS = `
    accessibility bug, not a visual nicety being skipped. */
 .qa2-slots { display: flex; flex-wrap: wrap; gap: var(--qa-s2); row-gap: var(--qa-s2); }
 
-.qa2-tile {
-  position: relative;
-  width: 46px;
-  height: 46px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-  background: var(--qa-chip);
-  cursor: pointer;
-  transition: border-color var(--qa-dur-fast) var(--qa-ease), background var(--qa-dur-fast) var(--qa-ease), transform var(--qa-dur-fast) var(--qa-ease);
-}
-.qa2-tile:hover { border-color: var(--qa-accent-line); background: var(--qa-accent-soft); transform: translateY(-1px); }
-.qa2-tile[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
-.qa2-tile[aria-disabled="true"]:hover { border-color: var(--qa-glass-border); background: var(--qa-chip); transform: none; }
-.qa2-glyph { flex: none; color: var(--qa-ink-dim); }
-.qa2-tile:hover .qa2-glyph { color: var(--qa-accent); }
-/* Uses left, in the corner. The only number that survives onto a tile face —
-   because "have I still got one of these" has to be answerable without hovering. */
-.qa2-tile-badge {
-  position: absolute;
-  right: 3px;
-  bottom: 1px;
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  color: var(--qa-ink-dim);
-  line-height: 1;
-}
-.qa2-tile[aria-disabled="true"] .qa2-tile-badge { color: var(--qa-danger); }
-
-/* The overflow tile: a solid square like any other, never dashed — dashed
-   already means "not yours yet" (the socket, below), and these abilities very
-   much ARE yours, just not on the bar. Text-only, tinted with the accent so it
-   reads as a door rather than a seventh icon competing with the real six. */
-.qa2-tile.is-overflow { color: var(--qa-accent); border-style: solid; }
-.qa2-tile.is-overflow:hover { background: var(--qa-accent-soft); border-color: var(--qa-accent); }
-
-/* A dashed socket is a progression slot, not filler — "room to grow", §4.11. */
-.qa2-socket {
-  width: 46px;
-  height: 46px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border: var(--qa-hairline) dashed var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-  background: transparent;
-  color: var(--qa-ink-faint);
-  cursor: pointer;
-  transition: color var(--qa-dur-fast) var(--qa-ease), border-color var(--qa-dur-fast) var(--qa-ease);
-}
-.qa2-socket:hover { color: var(--qa-accent); border-color: var(--qa-accent-line); }
-
 /* Fixed-height, so nothing above it ever reflows as the mouse sweeps the row. */
 .qa2-detail {
   min-height: 32px;
@@ -534,30 +413,6 @@ const CSS = `
   padding: var(--qa-s1) 0;
   border-top: var(--qa-hairline) solid var(--qa-glass-border);
 }
-
-/* THE OPEN LINE — the app's escape hatch, drawn as the last option in the list. */
-.qa2-open {
-  display: flex;
-  align-items: center;
-  gap: var(--qa-s2);
-  padding: var(--qa-s2) var(--qa-s3);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-  background: transparent;
-  transition: border-color var(--qa-dur-fast) var(--qa-ease), background var(--qa-dur-fast) var(--qa-ease);
-}
-.qa2-open:focus-within { border-color: var(--qa-accent-line); background: var(--qa-chip); }
-.qa2-input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--qa-ink);
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-label);
-}
-.qa2-input::placeholder { color: var(--qa-ink-faint); }
 
 /* ---- where a roll lands ----------------------------------------------------
    A card that rises directly above the panel you rolled from, left-aligned with
@@ -586,18 +441,6 @@ const CSS = `
 .qa2-verdict.is-miss { background: var(--qa-danger-soft); color: var(--qa-danger); }
 .qa2-verdict.is-neutral { background: var(--qa-chip); color: var(--qa-ink-dim); }
 .qa2-total { animation: qa2-land var(--qa-dur) var(--qa-ease-out); }
-
-/* ---- death saves ---------------------------------------------------------- */
-.qa2-pips { display: flex; gap: var(--qa-s2); }
-.qa2-savepip {
-  width: 14px;
-  height: 14px;
-  border-radius: var(--qa-radius-round);
-  border: var(--qa-hairline) solid var(--qa-ink-faint);
-  background: transparent;
-}
-.qa2-savepip.is-success { background: var(--qa-success); border-color: var(--qa-success); }
-.qa2-savepip.is-failure { background: var(--qa-danger); border-color: var(--qa-danger); }
 
 /* ---- journal -------------------------------------------------------------- */
 .qa2-feed { flex: 1; min-height: 0; overflow-y: auto; padding: var(--qa-s3) var(--qa-s4); display: flex; flex-direction: column; gap: var(--qa-s4); scrollbar-width: thin; }
@@ -644,199 +487,6 @@ const CSS = `
 .qa2-reactbtn:hover { background: var(--qa-chip); transform: translateY(-2px); }
 .qa2-compose { display: flex; gap: var(--qa-s2); padding: var(--qa-s3) var(--qa-s4); border-top: var(--qa-hairline) solid var(--qa-glass-border); flex: none; }
 
-/* ---- controls, chips, the explain affordance ------------------------------ */
-.qa2-ctl {
-  width: 36px;
-  height: 36px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-  background: var(--qa-chip);
-  color: var(--qa-ink-dim);
-  cursor: pointer;
-  transition: color var(--qa-dur-fast) var(--qa-ease), border-color var(--qa-dur-fast) var(--qa-ease);
-}
-.qa2-ctl:hover { color: var(--qa-ink); border-color: var(--qa-accent-line); }
-.qa2-ctl.is-on { color: var(--qa-accent); border-color: var(--qa-accent-line); }
-
-/*
- * EVERY NUMBER IS TAPPABLE (§5). v1 hung a "?" circle beside each value; at v2's
- * density that is a field of punctuation. Instead the readout's own LABEL carries
- * a dotted underline — the long-standing "there is more behind this word" mark —
- * and the whole readout is the button. It costs no space, scales to the log's
- * breakdown rows, and reads as annotation rather than chrome.
- */
-.qa2-explain {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  text-align: left;
-  cursor: help;
-}
-.qa2-explain > .qa2-explain-label {
-  border-bottom: var(--qa-hairline) dotted var(--qa-ink-faint);
-  transition: color var(--qa-dur-fast) var(--qa-ease), border-color var(--qa-dur-fast) var(--qa-ease);
-}
-.qa2-explain:hover > .qa2-explain-label { color: var(--qa-accent); border-bottom-color: var(--qa-accent); }
-.qa2-explain.is-row { flex-direction: row; align-items: baseline; gap: var(--qa-s2); }
-
-.qa2-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--qa-s1);
-  padding: 1px var(--qa-s2);
-  border: var(--qa-hairline) solid transparent;
-  border-radius: var(--qa-radius-sm);
-  background: var(--qa-chip);
-  color: var(--qa-ink-dim);
-  cursor: pointer;
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  transition: border-color var(--qa-dur-fast) var(--qa-ease), color var(--qa-dur-fast) var(--qa-ease), background var(--qa-dur-fast) var(--qa-ease);
-}
-.qa2-chip:hover { border-color: var(--qa-accent-line); color: var(--qa-ink); }
-.qa2-chip.is-danger { color: var(--qa-danger); background: var(--qa-danger-soft); }
-.qa2-chip.is-accent { color: var(--qa-accent); background: var(--qa-accent-soft); }
-.qa2-chip.is-static { cursor: default; }
-/* What you are aimed at is the one target chip that is lit. The others sit back
-   as plain text so the choice reads at a glance instead of as two equal boxes. */
-.qa2-chip[aria-pressed] { background: transparent; }
-.qa2-chip.is-selected { background: var(--qa-accent-soft); border-color: var(--qa-accent-line); color: var(--qa-accent); }
-
-/* The turn badge is the only accent-FILLED element in the frame. */
-.qa2-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--qa-s2);
-  padding: var(--qa-s1) var(--qa-s3);
-  border-radius: var(--qa-radius-sm);
-  background: var(--qa-chip);
-  color: var(--qa-ink-dim);
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-}
-.qa2-badge.is-yours { background: var(--qa-accent); color: var(--qa-accent-ink); box-shadow: 0 0 18px -4px var(--qa-accent-glow); }
-
-.qa2-meter { width: 96px; height: 4px; border-radius: var(--qa-radius-round); background: var(--qa-chip); overflow: hidden; }
-.qa2-meter > span { display: block; height: 100%; border-radius: var(--qa-radius-round); background: var(--qa-ink-dim); transition: width var(--qa-dur) var(--qa-ease); }
-
-/* ---- overlays ------------------------------------------------------------- */
-.qa2-scrim { position: absolute; inset: 0; z-index: 5; background: var(--qa-scrim); border: none; padding: 0; cursor: pointer; animation: qa2-fade var(--qa-dur-fast) var(--qa-ease); }
-.qa2-sheet {
-  position: absolute;
-  z-index: 6;
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius-lg);
-  background: var(--qa-glass-solid);
-  box-shadow: var(--qa-shadow-pop);
-  display: flex;
-  flex-direction: column;
-  animation: qa2-rise var(--qa-dur) var(--qa-ease-out);
-}
-.qa2-sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--qa-s3); padding: var(--qa-s4); border-bottom: var(--qa-hairline) solid var(--qa-glass-border); }
-.qa2-sheet-body { padding: var(--qa-s4); overflow-y: auto; display: flex; flex-direction: column; gap: var(--qa-s3); scrollbar-width: thin; }
-.qa2-rowline { display: flex; align-items: baseline; justify-content: space-between; gap: var(--qa-s3); padding-bottom: var(--qa-s1); border-bottom: var(--qa-hairline) solid var(--qa-glass-border); }
-.qa2-rowline.is-sum { border-bottom: none; border-top: var(--qa-hairline) solid var(--qa-ink-faint); padding-top: var(--qa-s2); }
-
-.qa2-tabs { display: flex; gap: var(--qa-s1); padding: 0 var(--qa-s4); border-bottom: var(--qa-hairline) solid var(--qa-glass-border); flex: none; }
-.qa2-tab {
-  padding: var(--qa-s3) var(--qa-s3);
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--qa-ink-faint);
-  cursor: pointer;
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  transition: color var(--qa-dur-fast) var(--qa-ease), border-color var(--qa-dur-fast) var(--qa-ease);
-}
-.qa2-tab:hover { color: var(--qa-ink-dim); }
-.qa2-tab.is-on { color: var(--qa-ink); border-bottom-color: var(--qa-accent); }
-.qa2-tab[aria-disabled="true"] { opacity: 0.4; cursor: default; }
-
-.qa2-menuitem {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  width: 100%;
-  padding: var(--qa-s2) var(--qa-s3);
-  border: var(--qa-hairline) solid transparent;
-  border-radius: var(--qa-radius);
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--qa-dur-fast) var(--qa-ease), border-color var(--qa-dur-fast) var(--qa-ease);
-}
-.qa2-menuitem:hover { background: var(--qa-chip); border-color: var(--qa-glass-border); }
-
-.qa2-seg { display: inline-flex; border: var(--qa-hairline) solid var(--qa-glass-border); border-radius: var(--qa-radius); overflow: hidden; }
-.qa2-seg > button {
-  padding: var(--qa-s2) var(--qa-s3);
-  border: none;
-  background: transparent;
-  color: var(--qa-ink-dim);
-  cursor: pointer;
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  transition: background var(--qa-dur-fast) var(--qa-ease), color var(--qa-dur-fast) var(--qa-ease);
-}
-.qa2-seg > button + button { border-left: var(--qa-hairline) solid var(--qa-glass-border); }
-.qa2-seg > button.is-on { background: var(--qa-accent-soft); color: var(--qa-accent); }
-.qa2-step { display: inline-flex; align-items: center; border: var(--qa-hairline) solid var(--qa-glass-border); border-radius: var(--qa-radius); }
-.qa2-step > button { width: 28px; height: 26px; border: none; background: transparent; color: var(--qa-ink-dim); cursor: pointer; font-family: var(--qa-font-mono); }
-.qa2-step > button:hover { color: var(--qa-accent); }
-
-/* ---- quality floor -------------------------------------------------------- */
-.qa2-screen :focus-visible { outline: 2px solid var(--qa-accent); outline-offset: 2px; border-radius: var(--qa-radius-sm); }
-.qa2-screen button { font: inherit; color: inherit; }
-.qa2-sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-@keyframes qa2-sweep { from { transform: scaleX(0); opacity: 0; } to { transform: none; opacity: 1; } }
-@keyframes qa2-rise { from { transform: translateY(var(--qa-s3)); opacity: 0; } to { transform: none; opacity: 1; } }
-@keyframes qa2-land { from { transform: scale(1.14); opacity: 0.4; } to { transform: none; opacity: 1; } }
-@keyframes qa2-fade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes qa2-breathe { from { box-shadow: 0 0 0 3px var(--qa-accent-soft); } to { box-shadow: 0 0 0 7px var(--qa-accent-soft); } }
-
-/*
- * The still equivalents. Because every rule above describes the FINISHED state
- * and the keyframes run from a hidden state to nothing, switching animation off
- * leaves each moving part correctly drawn — the accent lead is fully swept, the
- * total is at rest, your token keeps its ring. Nothing disappears.
- */
-@media (prefers-reduced-motion: reduce) {
-  .qa2-screen *,
-  .qa2-screen *::before,
-  .qa2-screen *::after {
-    animation: none !important;
-    transition: none !important;
-  }
-  .qa2-tile:hover { transform: none; }
-  .qa2-reactbtn:hover { transform: none; }
-}
-
 /*
  * Below 1280px the frame gives up the spine first (it is the most compressible —
  * the near edge still carries the turn badge), then the journal. Desktop-first
@@ -856,7 +506,16 @@ const CSS = `
 }
 `;
 
-/** Injected once per screen. Idempotent — duplicate <style> tags are harmless. */
+/**
+ * The play screen's styles, on top of the app's shared design layer. Rendering
+ * DesignStyles here rather than expecting the host to remember it means a
+ * screen is always self-sufficient; duplicate style tags are harmless.
+ */
 export function ScreenStyles(): ReactElement {
-  return <style>{CSS}</style>;
+  return (
+    <>
+      <DesignStyles />
+      <style>{CSS}</style>
+    </>
+  );
 }

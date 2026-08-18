@@ -1,21 +1,27 @@
 /**
- * v2/type — the Player View v2 type ramp, expressed as ROLES.
+ * design/type — the app's type ramp, expressed as ROLES.
  *
- * Same discipline as the v1 hub's `hudType.ts` and for the same reason: a
- * component asks for a role and therefore cannot pick a number. What differs
- * is the range. v1 was a bar and got by on three sizes; v2 is a whole screen
- * with a hero moment (a settled dice total) and a dense rail (six combatants
- * down the left edge), so it uses the full existing ramp — whisper 10, label
- * 12, body 16, lg 20, title 28, display 40. Every one of those is already in
- * @questra/theme; nothing here invents a size, because `packages/theme` is
- * byte-identity-guarded against the upstream Design project.
+ * A component asks for a role and therefore cannot pick a number. That
+ * constraint exists because the surface this ramp was first written for drifted
+ * badly without it: four different sizes (8.5px, 9px, 9.5px, 10px) were all
+ * rendering the same "small mono caps label", plus one-off 13px and 22px, and
+ * nothing failed because nothing was looking. `test/hud-type-hygiene.test.ts`
+ * is now looking, and it fails the build on a numeric `fontSize` in any file
+ * on the guard list.
+ *
+ * Six sizes are in play — whisper 10, label 12, body 16, lg 20, title 28,
+ * display 40 — and every one already exists in @questra/theme. Nothing here
+ * invents a size, because `packages/theme` is byte-identity-guarded against
+ * the upstream Claude Design project (ADR-0014): a missing value gets raised,
+ * never fabricated.
  *
  * THE RULE UNDERNEATH (Player View design request §3): **prose is a serif,
- * data is mono.** A player can tell at a glance whether they are reading the
- * story or reading their character. v2 leans on it harder than v1 did: the
+ * data is mono.** A reader can tell at a glance whether they are looking at
+ * the story or at the arithmetic. The play screen leans on it hardest — the
  * round spine sets every combatant's name in the display serif and every
  * initiative number in mono, so the rail reads as a cast list with a running
- * order rather than as a table of rows.
+ * order rather than as a table of rows — but it holds everywhere, which is
+ * why this lives in the shared layer rather than beside one screen.
  */
 import type { CSSProperties } from 'react';
 

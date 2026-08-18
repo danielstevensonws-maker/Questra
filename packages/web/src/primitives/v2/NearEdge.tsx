@@ -51,9 +51,7 @@
 import { useState, type FormEvent, type ReactElement } from 'react';
 import { Avatar, Button } from '@questra/ui';
 import { ActionRows } from './ActionRows.js';
-import { Glyph } from './glyphs.js';
-import { Eyebrow, ExplainValue, HP, Meter, Tag } from './parts.js';
-import { heroName, itemName, narration, prose, rollTotal, statMeta } from './type.js';
+import { ExplainValue, Eyebrow, Glyph, heroName, HP, itemName, Meter, narration, prose, rollTotal, statMeta, Tag } from '../../design/index.js';
 import type { DyingVM, Economy, ExplainVM, HeroVM, ResultVM, TileVM } from './viewModel.js';
 
 export interface NearEdgeTargetVM {

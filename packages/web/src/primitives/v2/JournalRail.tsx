@@ -25,9 +25,7 @@
  */
 import { useState, type FormEvent, type ReactElement } from 'react';
 import { Button } from '@questra/ui';
-import { Glyph } from './glyphs.js';
-import { Eyebrow } from './parts.js';
-import { narration, prose, quote, statMeta, statValue } from './type.js';
+import { Eyebrow, Glyph, narration, prose, quote, statMeta, statValue } from '../../design/index.js';
 import type { LogEntryVM } from './viewModel.js';
 
 const REACTIONS = ['👏', '🔥', '😂', '😮', '✨', '❤️'] as const;

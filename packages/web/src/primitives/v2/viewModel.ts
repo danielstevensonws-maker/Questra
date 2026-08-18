@@ -23,23 +23,16 @@
  */
 import type { ComputedSheet, Intent, Skill } from '@questra/contracts';
 import { greyingReason, type Combatant, type ProjectionState } from '@questra/engine';
-import { glyphFor, type GlyphName } from './glyphs.js';
+import { glyphFor, type ExplainVM, type GlyphName } from '../../design/index.js';
 
-// ---- the shape of an interrogable number ----------------------------------
-
-/** A number plus everything the explain sheet needs to justify it. */
-export interface ExplainVM {
-  id: string;
-  /** the small caps line above the title — what KIND of thing this is. */
-  kicker: string;
-  title: string;
-  value: string;
-  rows: { label: string; value: string }[];
-  /** plain English, the way a person would say it out loud. */
-  rule: string;
-  /** one line of colour. Optional, and never carries information. */
-  flavour?: string;
-}
+/**
+ * Re-exported so this screen's callers keep importing their view-model types
+ * from one place. The SHAPE belongs to the design layer, not here: "a value,
+ * its itemised rows, and a sentence about what it means" is presentational,
+ * and the authoring surfaces need the identical thing for numbers that have
+ * nothing to do with combat.
+ */
+export type { ExplainVM };
 
 type Deriv = { label: string; value: number }[];
 

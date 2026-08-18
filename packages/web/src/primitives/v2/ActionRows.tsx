@@ -42,9 +42,7 @@
  * (law 2: the app never says no, it sometimes says "the rest are over here").
  */
 import { useState, type ReactElement, type ReactNode } from 'react';
-import { Glyph } from './glyphs.js';
-import { Eyebrow } from './parts.js';
-import { prose, statValue } from './type.js';
+import { Eyebrow, Glyph, prose, statValue } from '../../design/index.js';
 import { MAX_SLOTS, type Economy, type ExplainVM, type TileVM } from './viewModel.js';
 
 const ECONOMY_LABEL: Record<Economy, string> = { action: 'Action', bonus: 'Bonus', reaction: 'Reaction' };
