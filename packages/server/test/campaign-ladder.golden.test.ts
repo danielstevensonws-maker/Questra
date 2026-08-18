@@ -1,0 +1,154 @@
+/**
+ * Brief 14 §2 golden — create → join → land in the party view, plus the two DM-only
+ * actions (remove a member, mint a table_display token) and resolveToken picking
+ * both up. Same style as auth-ladder.golden.test.ts: in-memory repo, injected clock
+ * + deterministic ids, every response shape checked against the contracts.
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
+import { CampaignSchema, JoinPreviewSchema, MyCampaignsSchema } from '@questra/contracts';
+import { AuthService, CampaignService, AuthError, InMemoryAuthRepo, LogMailer, makeResolveToken, type TokenConfig } from '../src/auth/index.js';
+
+const SECRET = new TextEncoder().encode('test-secret-please-ignore-32chars!');
+
+function fixedClock(startSec: number) {
+  let t = startSec;
+  return { clock: () => t, advance: (sec: number) => { t += sec; } };
+}
+
+describe('campaign ladder (Brief 14 §2)', () => {
+  let repo: InMemoryAuthRepo;
+  let auth: AuthService;
+  let campaigns: CampaignService;
+  let tokens: TokenConfig;
+  let clk: ReturnType<typeof fixedClock>;
+  let joinCodeSeq: number;
+
+  beforeEach(() => {
+    clk = fixedClock(1_700_000_000);
+    repo = new InMemoryAuthRepo();
+    tokens = { secret: SECRET, clock: clk.clock };
+    let accSeq = 0;
+    auth = new AuthService({
+      repo, mailer: new LogMailer(() => {}), tokens, clock: clk.clock,
+      newAccountId: () => `acc_${['alice', 'bob', 'carol'][accSeq++] ?? accSeq}`,
+    });
+    joinCodeSeq = 0;
+    let campSeq = 0;
+    let psSeq = 0;
+    campaigns = new CampaignService({
+      repo, clock: clk.clock,
+      newCampaignId: () => `camp_${++campSeq}`,
+      newPlaySessionId: () => `ps_${++psSeq}`,
+      newSecret: () => `code-${++joinCodeSeq}`,
+    });
+  });
+
+  async function seat(email: string, name: string) {
+    const { self } = await auth.signup(email, 'a real password', name);
+    return self.id;
+  }
+
+  it('create ⇒ Membership{role:dm} + a play session + a join code, all real shapes', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const { campaign, joinCode, playSessionId } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+
+    expect(() => CampaignSchema.parse(campaign)).not.toThrow();
+    expect(campaign.ownerAccountId).toBe(alice);
+    expect(joinCode).toBe('code-1');
+    expect(playSessionId).toBe('ps_1');
+
+    const dm = await repo.membership(alice, campaign.id);
+    expect(dm).toMatchObject({ role: 'dm', accountId: alice, campaignId: campaign.id });
+    expect(await repo.campaignIdForSession(playSessionId)).toBe(campaign.id);
+  });
+
+  it('the join preview shows the name before sign-in, and rejects a made-up code', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const { joinCode } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+
+    const preview = await campaigns.joinPreview(joinCode);
+    expect(() => JoinPreviewSchema.parse(preview)).not.toThrow();
+    expect(preview.campaignName).toBe('The Sunless Keep');
+
+    await expect(campaigns.joinPreview('not-a-real-code')).rejects.toMatchObject({ status: 404, code: 'bad_code' });
+  });
+
+  it('join ⇒ Membership{role:player}; clicking the same link twice does not duplicate or error', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const bob = await seat('bob@example.com', 'Bob');
+    const { campaign, joinCode } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+
+    const first = await campaigns.join(bob, joinCode);
+    expect(first).toEqual({ campaignId: campaign.id, campaignName: 'The Sunless Keep' });
+    expect(await repo.membership(bob, campaign.id)).toMatchObject({ role: 'player' });
+
+    const second = await campaigns.join(bob, joinCode); // the front-door promise: the link just works
+    expect(second.campaignId).toBe(campaign.id);
+    expect((await repo.membership(bob, campaign.id))!.role).toBe('player'); // still player, not duplicated/upgraded
+  });
+
+  it("Home's two lists split DM'd from playing-in", async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const bob = await seat('bob@example.com', 'Bob');
+    const own = await campaigns.createCampaign(alice, 'The Sunless Keep');
+    const guest = await campaigns.createCampaign(bob, "Bob's One-Shot");
+    await campaigns.join(alice, guest.joinCode);
+
+    const mine = await campaigns.myCampaigns(alice);
+    expect(() => MyCampaignsSchema.parse(mine)).not.toThrow();
+    expect(mine.dming).toEqual([{ campaignId: own.campaign.id, campaignName: 'The Sunless Keep' }]);
+    expect(mine.playing).toEqual([{ campaignId: guest.campaign.id, campaignName: "Bob's One-Shot" }]);
+  });
+
+  it('only the DM can remove a member, and the DM cannot remove themself', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const bob = await seat('bob@example.com', 'Bob');
+    const carol = await seat('carol@example.com', 'Carol');
+    const { campaign, joinCode } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+    await campaigns.join(bob, joinCode);
+
+    await expect(campaigns.removeMember(bob, campaign.id, bob)).rejects.toMatchObject({ status: 403, code: 'not_dm' });
+    await expect(campaigns.removeMember(alice, campaign.id, alice)).rejects.toMatchObject({ status: 409, code: 'cannot_remove_self' });
+    await expect(campaigns.removeMember(alice, campaign.id, carol)).resolves.toBeUndefined(); // not a member — no-op, not an error
+
+    await campaigns.removeMember(alice, campaign.id, bob);
+    expect(await repo.membership(bob, campaign.id)).toBeNull();
+  });
+
+  it('a table_display token resolves to the table_display role for its own campaign, and only that one', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const bob = await seat('bob@example.com', 'Bob');
+    const camp1 = await campaigns.createCampaign(alice, 'The Sunless Keep');
+    const camp2 = await campaigns.createCampaign(bob, "Bob's One-Shot");
+
+    await expect(campaigns.mintTableDisplayToken(bob, camp1.campaign.id)).rejects.toBeInstanceOf(AuthError);
+    const { token } = await campaigns.mintTableDisplayToken(alice, camp1.campaign.id);
+
+    const resolve = makeResolveToken(repo, tokens);
+    const resolved = await resolve(token, camp1.playSessionId);
+    expect(resolved).toEqual({ accountId: `table_display:${camp1.campaign.id}`, role: 'table_display', playSessionId: camp1.playSessionId });
+
+    // the same token does not grant camp2's session — it is scoped to the campaign it was minted for.
+    expect(await resolve(token, camp2.playSessionId)).toBeNull();
+  });
+
+  it('regenerating a table_display token revokes the old one immediately', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const { campaign, playSessionId } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+    const resolve = makeResolveToken(repo, tokens);
+
+    const first = await campaigns.mintTableDisplayToken(alice, campaign.id);
+    expect(await resolve(first.token, playSessionId)).not.toBeNull();
+
+    const second = await campaigns.mintTableDisplayToken(alice, campaign.id);
+    expect(await resolve(first.token, playSessionId)).toBeNull(); // dead the moment the new one exists
+    expect(await resolve(second.token, playSessionId)).not.toBeNull();
+  });
+
+  it('a stranger token resolves to nothing, not an error', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const { playSessionId } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+    const resolve = makeResolveToken(repo, tokens);
+    expect(await resolve('not-a-jwt-and-not-a-table-token', playSessionId)).toBeNull();
+  });
+});

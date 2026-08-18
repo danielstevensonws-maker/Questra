@@ -6,10 +6,15 @@
  * guard, and joins `play_session → campaign` for resolveToken.
  */
 import pg from 'pg';
-import type { Membership } from '@questra/contracts';
+import type { Membership, Campaign } from '@questra/contracts';
 import type { AuthRepo, AccountRow, TokenRow } from './repo.js';
 
 const { Pool } = pg;
+
+type CampaignDb = { id: string; name: string; owner_account_id: string; created_at: Date };
+function toCampaign(r: CampaignDb): Campaign {
+  return { id: r.id, name: r.name, ownerAccountId: r.owner_account_id, createdAt: r.created_at.toISOString() };
+}
 
 type AccountDb = {
   id: string; email: string; email_verified: boolean; display_name: string;
@@ -63,6 +68,29 @@ export class PostgresAuthRepo implements AuthRepo {
     return rowCount ?? 0;
   }
 
+  async createCampaign(c: Campaign): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO campaign (id, name, owner_account_id, created_at) VALUES ($1,$2,$3,$4)`,
+      [c.id, c.name, c.ownerAccountId, c.createdAt],
+    );
+  }
+  async campaignById(id: string): Promise<Campaign | null> {
+    const { rows } = await this.pool.query<CampaignDb>(`SELECT id, name, owner_account_id, created_at FROM campaign WHERE id = $1`, [id]);
+    return rows[0] ? toCampaign(rows[0]) : null;
+  }
+  async setJoinTokenHash(campaignId: string, tokenHash: string): Promise<void> {
+    await this.pool.query(`UPDATE campaign SET join_token_hash = $2 WHERE id = $1`, [campaignId, tokenHash]);
+  }
+  async campaignByJoinTokenHash(tokenHash: string): Promise<Campaign | null> {
+    const { rows } = await this.pool.query<CampaignDb>(
+      `SELECT id, name, owner_account_id, created_at FROM campaign WHERE join_token_hash = $1`, [tokenHash],
+    );
+    return rows[0] ? toCampaign(rows[0]) : null;
+  }
+  async createPlaySession(id: string, campaignId: string, createdAt: string): Promise<void> {
+    await this.pool.query(`INSERT INTO play_session (id, campaign_id, created_at) VALUES ($1,$2,$3)`, [id, campaignId, createdAt]);
+  }
+
   async addMembership(m: Membership): Promise<void> {
     await this.pool.query(
       `INSERT INTO membership (campaign_id, account_id, role, created_at) VALUES ($1,$2,$3,$4)
@@ -77,6 +105,23 @@ export class PostgresAuthRepo implements AuthRepo {
     const r = rows[0];
     return r ? { campaignId: r.campaign_id, accountId: r.account_id, role: r.role, createdAt: r.created_at.toISOString() } : null;
   }
+  async removeMembership(accountId: string, campaignId: string): Promise<void> {
+    await this.pool.query(`DELETE FROM membership WHERE account_id = $1 AND campaign_id = $2`, [accountId, campaignId]);
+  }
+  async membershipsForAccount(accountId: string): Promise<(Membership & { campaignName: string })[]> {
+    const { rows } = await this.pool.query<{
+      campaign_id: string; account_id: string; role: Membership['role']; created_at: Date; campaign_name: string;
+    }>(
+      `SELECT m.campaign_id, m.account_id, m.role, m.created_at, c.name AS campaign_name
+       FROM membership m JOIN campaign c ON c.id = m.campaign_id
+       WHERE m.account_id = $1`,
+      [accountId],
+    );
+    return rows.map((r) => ({
+      campaignId: r.campaign_id, accountId: r.account_id, role: r.role,
+      createdAt: r.created_at.toISOString(), campaignName: r.campaign_name,
+    }));
+  }
   async ownedCampaigns(accountId: string): Promise<{ id: string; name: string }[]> {
     const { rows } = await this.pool.query<{ id: string; name: string }>(
       `SELECT id, name FROM campaign WHERE owner_account_id = $1`, [accountId],
@@ -88,6 +133,24 @@ export class PostgresAuthRepo implements AuthRepo {
       `SELECT campaign_id FROM play_session WHERE id = $1`, [playSessionId],
     );
     return rows[0]?.campaign_id ?? null;
+  }
+
+  async putTableDisplayToken(t: { tokenHash: string; campaignId: string; createdAt: string }): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO table_display_token (token_hash, campaign_id, created_at) VALUES ($1,$2,$3)`,
+      [t.tokenHash, t.campaignId, t.createdAt],
+    );
+  }
+  async tableDisplayCampaignId(tokenHash: string): Promise<string | null> {
+    const { rows } = await this.pool.query<{ campaign_id: string }>(
+      `SELECT campaign_id FROM table_display_token WHERE token_hash = $1 AND revoked_at IS NULL`, [tokenHash],
+    );
+    return rows[0]?.campaign_id ?? null;
+  }
+  async revokeTableDisplayTokens(campaignId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE table_display_token SET revoked_at = now() WHERE campaign_id = $1 AND revoked_at IS NULL`, [campaignId],
+    );
   }
 
   async putVerification(t: TokenRow): Promise<void> {

@@ -21,7 +21,8 @@ import { SyncCore, type IntentResolver, type ResolvedToken } from './sync-core.j
 import { InMemoryEventStore, type EventStore } from './store/event-store.js';
 import { PostgresEventStore } from './store/postgres-event-store.js';
 import {
-  AuthService, InMemoryAuthRepo, LogMailer, makeResolveToken, registerAuthRoutes,
+  AuthService, CampaignService, InMemoryAuthRepo, LogMailer, makeResolveToken,
+  registerAuthRoutes, registerCampaignRoutes,
   verifySession, secretFromEnv, type AuthRepo, type TokenConfig,
 } from './auth/index.js';
 import { PostgresAuthRepo } from './auth/postgres-repo.js';
@@ -36,6 +37,8 @@ export interface App {
 }
 
 let accountSeq = 0;
+let campaignSeq = 0;
+let playSessionSeq = 0;
 
 /** Build the wired application from config. Does not start the HTTP server (main.ts does). */
 export function createApp(config: ServerConfig): App {
@@ -58,6 +61,11 @@ export function createApp(config: ServerConfig): App {
     repo, mailer: new LogMailer(), tokens,
     newAccountId: () => `acc_${Date.now().toString(36)}_${(accountSeq++).toString(36)}`,
   });
+  const campaigns = new CampaignService({
+    repo,
+    newCampaignId: () => `camp_${Date.now().toString(36)}_${(campaignSeq++).toString(36)}`,
+    newPlaySessionId: () => `ps_${Date.now().toString(36)}_${(playSessionSeq++).toString(36)}`,
+  });
 
   // --- SyncCore with the REAL resolveToken (stub is dead) + the slice resolver ---
   const core = new SyncCore({
@@ -66,13 +74,16 @@ export function createApp(config: ServerConfig): App {
     store: eventStore,
   });
 
+  const currentAccountId = async (authorization: string | undefined): Promise<string | null> => {
+    const bearer = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
+    if (!bearer) return null;
+    const claims = await verifySession(bearer, tokens);
+    return claims?.sub ?? null;
+  };
+
   const mountAuth = (fastify: FastifyInstance): void => {
-    registerAuthRoutes(fastify, auth, async (authorization) => {
-      const bearer = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
-      if (!bearer) return null;
-      const claims = await verifySession(bearer, tokens);
-      return claims?.sub ?? null;
-    });
+    registerAuthRoutes(fastify, auth, currentAccountId);
+    registerCampaignRoutes(fastify, campaigns, currentAccountId);
   };
 
   return {
