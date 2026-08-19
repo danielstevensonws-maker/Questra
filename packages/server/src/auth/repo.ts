@@ -56,6 +56,14 @@ export interface AuthRepo {
   /** Campaigns this account OWNS (blocks deletion) — via campaign.owner_account_id. */
   ownedCampaigns(accountId: string): Promise<{ id: string; name: string }[]>;
   campaignIdForSession(playSessionId: string): Promise<string | null>;
+  /** The live play session for a campaign — the reverse of campaignIdForSession.
+   *  The sync protocol's hello requires a playSessionId and nothing surfaced one. */
+  sessionIdForCampaign(campaignId: string): Promise<string | null>;
+  /** Everyone who belongs at a campaign's table, with the names a lobby renders.
+   *  Narrower than Membership[role] on purpose: table_display is a credential
+   *  with no account behind it, so it is never a row here.
+   *  Presence answers who is connected; this answers who belongs. */
+  membersOfCampaign(campaignId: string): Promise<{ accountId: string; displayName: string; role: 'dm' | 'player' }[]>;
 
   // table_display credentials (Brief 14 §2) — a shared screen, not a signed-in person,
   // so this is its own token table rather than a fake account (see the migration doc).
@@ -174,6 +182,21 @@ export class InMemoryAuthRepo implements AuthRepo {
   }
   async campaignIdForSession(playSessionId: string): Promise<string | null> {
     return this.sessions.get(playSessionId) ?? null;
+  }
+  async sessionIdForCampaign(campaignId: string): Promise<string | null> {
+    for (const [sessionId, cid] of this.sessions) if (cid === campaignId) return sessionId;
+    return null;
+  }
+  async membersOfCampaign(campaignId: string): Promise<{ accountId: string; displayName: string; role: 'dm' | 'player' }[]> {
+    return [...this.memberships.values()]
+      .filter((m) => m.campaignId === campaignId)
+      .flatMap((m) => (m.role === 'dm' || m.role === 'player'
+        ? [{
+            accountId: m.accountId,
+            displayName: this.accounts.get(m.accountId)?.displayName ?? '(removed)',
+            role: m.role,
+          }]
+        : []));
   }
 
   async putTableDisplayToken(t: { tokenHash: string; campaignId: string }): Promise<void> {

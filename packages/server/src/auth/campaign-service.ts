@@ -6,7 +6,7 @@
  * pools, bonds web, promotions) — that is M4. This is only what M3's shell needs to
  * make "create → join → land in the party view" real.
  */
-import type { Campaign, MyCampaigns } from '@questra/contracts';
+import type { Campaign, CampaignSession, MyCampaigns } from '@questra/contracts';
 import type { AuthRepo } from './repo.js';
 import { hashToken, newRefreshToken, type Clock, systemClock } from './tokens.js';
 import { AuthError } from './service.js';
@@ -104,6 +104,39 @@ export class CampaignService {
       throw new AuthError('cannot_remove_self', "You can't remove yourself as DM — hand off or archive the campaign instead.", 409);
     }
     await this.deps.repo.removeMembership(targetAccountId, campaignId);
+  }
+
+  /**
+   * What a member needs to open a campaign: the play session to sync against
+   * and who else belongs at the table.
+   *
+   * Gated on MEMBERSHIP, not on being the DM — every player needs this to say
+   * hello on the socket. But it is gated: a campaign's roster is not public,
+   * and the unauthenticated join preview deliberately exposes only the name.
+   */
+  async session(callerAccountId: string, campaignId: string): Promise<CampaignSession> {
+    const me = await this.deps.repo.membership(callerAccountId, campaignId);
+    if (!me) throw new AuthError('not_member', 'You are not part of this campaign.', 403);
+
+    const campaign = await this.deps.repo.campaignById(campaignId);
+    if (!campaign) throw new AuthError('no_campaign', 'That campaign no longer exists.', 404);
+
+    const playSessionId = await this.deps.repo.sessionIdForCampaign(campaignId);
+    /* Every campaign gets a play session at creation, so a missing one is a
+       broken invariant rather than an expected state — say so plainly instead
+       of returning a half-populated session the client cannot use. */
+    if (!playSessionId) throw new AuthError('no_session', 'This campaign has no play session yet.', 409);
+
+    return {
+      campaignId,
+      campaignName: campaign.name,
+      playSessionId,
+      members: await this.deps.repo.membersOfCampaign(campaignId),
+      /* A membership row's role is typed with the full ViewerRole union, but a
+         table_display credential never has one — it is not an account. Narrow
+         here rather than widening the contract to admit a case that cannot occur. */
+      yourRole: me.role === 'dm' ? 'dm' : 'player',
+    };
   }
 
   /**

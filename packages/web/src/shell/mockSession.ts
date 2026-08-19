@@ -20,6 +20,8 @@ export function mockSession(overrides: Partial<SessionApi> = {}): SessionApi {
     login: async () => {},
     logout: async () => {},
     authedRequest: async () => { throw new Error('mockSession: authedRequest not stubbed for this story'); },
+    /* Stories never open a real socket; a lobby story stubs presence directly. */
+    accessToken: () => null,
     ...overrides,
   };
 }

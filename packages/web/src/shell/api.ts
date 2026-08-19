@@ -22,14 +22,21 @@ export async function apiRequest<T>(
   path: string,
   opts: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown; token?: string | null } = {},
 ): Promise<T> {
+  /* The content-type header is sent ONLY when there is a body to describe.
+     Declaring application/json on a bodyless POST makes Fastify reject the
+     request with FST_ERR_CTP_EMPTY_JSON_BODY (400) before any handler runs —
+     which is exactly what POST /auth/refresh does, since the refresh token
+     rides in an httpOnly cookie rather than the body. Every page load was
+     firing two failing refresh calls because of this. */
+  const hasBody = opts.body !== undefined;
   const res = await fetch(API_BASE + path, {
     method: opts.method ?? 'GET',
     credentials: 'include',
     headers: {
-      'content-type': 'application/json',
+      ...(hasBody ? { 'content-type': 'application/json' } : {}),
       ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}),
     },
-    ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
+    ...(hasBody ? { body: JSON.stringify(opts.body) } : {}),
   });
   const json = (await res.json().catch(() => ({}))) as T & ErrorBody;
   if (!res.ok) {

@@ -5,7 +5,7 @@
  * + deterministic ids, every response shape checked against the contracts.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CampaignSchema, JoinPreviewSchema, MyCampaignsSchema } from '@questra/contracts';
+import { CampaignSchema, CampaignSessionSchema, JoinPreviewSchema, MyCampaignsSchema } from '@questra/contracts';
 import { AuthService, CampaignService, AuthError, InMemoryAuthRepo, LogMailer, makeResolveToken, type TokenConfig } from '../src/auth/index.js';
 
 const SECRET = new TextEncoder().encode('test-secret-please-ignore-32chars!');
@@ -143,6 +143,52 @@ describe('campaign ladder (Brief 14 §2)', () => {
     const second = await campaigns.mintTableDisplayToken(alice, campaign.id);
     expect(await resolve(first.token, playSessionId)).toBeNull(); // dead the moment the new one exists
     expect(await resolve(second.token, playSessionId)).not.toBeNull();
+  });
+
+  it('a member can read the play session and the roster; a stranger cannot', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const bob = await seat('bob@example.com', 'Bob');
+    const carol = await seat('carol@example.com', 'Carol');
+    const { campaign, joinCode, playSessionId } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+    await campaigns.join(bob, joinCode);
+
+    const session = await campaigns.session(alice, campaign.id);
+    expect(() => CampaignSessionSchema.parse(session)).not.toThrow();
+
+    /* The whole reason this endpoint exists: the sync protocol's hello needs a
+       playSessionId and nothing else surfaced one. */
+    expect(session.playSessionId).toBe(playSessionId);
+    expect(session.campaignName).toBe('The Sunless Keep');
+    expect(session.yourRole).toBe('dm');
+
+    /* Names, not ids — presence carries accountId only, so a lobby resolves
+       them from here. */
+    expect(session.members).toHaveLength(2);
+    expect(session.members.map((m) => m.displayName).sort()).toEqual(['Alice', 'Bob']);
+    expect(session.members.find((m) => m.accountId === alice)?.role).toBe('dm');
+    expect(session.members.find((m) => m.accountId === bob)?.role).toBe('player');
+
+    /* A player sees the same roster — everyone needs it to open the socket —
+       but their own role is reported correctly. */
+    const asBob = await campaigns.session(bob, campaign.id);
+    expect(asBob.yourRole).toBe('player');
+    expect(asBob.members).toHaveLength(2);
+
+    /* Gated on membership: a campaign's roster is not public, unlike the
+       join preview which deliberately shows only the name. */
+    await expect(campaigns.session(carol, campaign.id)).rejects.toBeInstanceOf(AuthError);
+  });
+
+  it('a removed member loses the roster, and the roster loses them', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const bob = await seat('bob@example.com', 'Bob');
+    const { campaign, joinCode } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+    await campaigns.join(bob, joinCode);
+    await campaigns.removeMember(alice, campaign.id, bob);
+
+    const session = await campaigns.session(alice, campaign.id);
+    expect(session.members.map((m) => m.displayName)).toEqual(['Alice']);
+    await expect(campaigns.session(bob, campaign.id)).rejects.toBeInstanceOf(AuthError);
   });
 
   it('a stranger token resolves to nothing, not an error', async () => {

@@ -13,6 +13,8 @@ import { Home } from './Home.js';
 import { JoinFlow } from './JoinFlow.js';
 import { CreateCampaign } from './CreateCampaign.js';
 import { CampaignPlaceholder } from './CampaignPlaceholder.js';
+import { Lobby } from './Lobby.js';
+import { Attribution } from './Attribution.js';
 import { Nav } from './Nav.js';
 import { ShellStyles } from './ShellStyles.js';
 import { ShellLoading } from './ShellStates.js';
@@ -26,7 +28,7 @@ function SignedInLayout({ children }: { children: ReactElement }): ReactElement 
   return (
     <>
       <ShellStyles />
-      <Nav session={session} onHome={() => navigate('/home')} />
+      <Nav session={session} onHome={() => navigate('/home')} onLegal={() => navigate('/legal')} />
       {children}
     </>
   );
@@ -37,7 +39,7 @@ function LandingRoute(): ReactElement {
   const navigate = useNavigate();
   if (session.loading) return <ShellLoading label="Finding your seat…" />;
   if (session.account) return <Navigate to="/home" replace />;
-  return <Landing session={session} onEntered={() => navigate('/home')} />;
+  return <Landing session={session} onEntered={() => navigate('/home')} onLegal={() => navigate('/legal')} />;
 }
 
 function HomeRoute(): ReactElement {
@@ -79,15 +81,41 @@ function CreateCampaignRoute(): ReactElement {
   );
 }
 
+/* Joining and creating both land here. The lobby is the campaign's front room:
+   it opens the sync socket, shows who has arrived, and the DM starts from it. */
 function CampaignRoute(): ReactElement {
+  const { id } = useParams<{ id: string }>();
   const session = useSession();
   const navigate = useNavigate();
   if (session.loading) return <ShellLoading label="Finding your seat…" />;
   if (!session.account) return <Navigate to="/" replace />;
-  // Where joining and campaign creation both land once they have a real id —
-  // the actual campaign-scoped screens (Session Planner, the play screen)
-  // are M4/M2's measurement gate, not this brief.
+  if (!id) return <Navigate to="/home" replace />;
+  return (
+    <Lobby
+      campaignId={id}
+      session={session}
+      onBegin={() => navigate(`/campaign/${id}/play`)}
+      onLeave={() => navigate('/home')}
+    />
+  );
+}
+
+/* The play surface itself is still M2/M4 work — the Player View renders from
+   fixtures and has no live campaign data path yet. Saying so beats pretending. */
+function PlayRoute(): ReactElement {
+  const session = useSession();
+  const navigate = useNavigate();
+  if (session.loading) return <ShellLoading label="Finding your seat…" />;
+  if (!session.account) return <Navigate to="/" replace />;
   return <CampaignPlaceholder onHome={() => navigate('/home')} />;
+}
+
+/* Public and ungated on purpose: ADR-0010 wants the attribution ACCESSIBLE,
+   and a licence notice you must create an account to read is not accessible.
+   It is also the one page reachable from both signed-out and signed-in shells. */
+function AttributionRoute(): ReactElement {
+  const navigate = useNavigate();
+  return <Attribution onBack={() => navigate(-1)} />;
 }
 
 function Shell(): ReactElement {
@@ -98,6 +126,8 @@ function Shell(): ReactElement {
       <Route path="/join/:code" element={<JoinRoute />} />
       <Route path="/campaign/new" element={<CreateCampaignRoute />} />
       <Route path="/campaign/:id" element={<CampaignRoute />} />
+      <Route path="/campaign/:id/play" element={<PlayRoute />} />
+      <Route path="/legal" element={<AttributionRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

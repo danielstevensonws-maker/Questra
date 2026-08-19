@@ -135,6 +135,32 @@ export class PostgresAuthRepo implements AuthRepo {
     return rows[0]?.campaign_id ?? null;
   }
 
+  /* Oldest first, so a campaign that somehow has more than one play session
+     resolves to the original rather than to whichever row the planner returns.
+     Campaign creation mints exactly one today; this makes the choice
+     deterministic rather than relying on that staying true. */
+  async sessionIdForCampaign(campaignId: string): Promise<string | null> {
+    const { rows } = await this.pool.query<{ id: string }>(
+      `SELECT id FROM play_session WHERE campaign_id = $1 ORDER BY created_at ASC, id ASC LIMIT 1`, [campaignId],
+    );
+    return rows[0]?.id ?? null;
+  }
+
+  async membersOfCampaign(campaignId: string): Promise<{ accountId: string; displayName: string; role: 'dm' | 'player' }[]> {
+    /* Joined against account so the lobby gets names in one round trip. DMs
+       first, then alphabetical — a stable order beats insertion order for a
+       list people read repeatedly. */
+    const { rows } = await this.pool.query<{ account_id: string; display_name: string; role: 'dm' | 'player' }>(
+      `SELECT m.account_id, a.display_name, m.role
+         FROM membership m
+         JOIN account a ON a.id = m.account_id
+        WHERE m.campaign_id = $1 AND a.deleted_at IS NULL
+        ORDER BY (m.role = 'dm') DESC, a.display_name ASC`,
+      [campaignId],
+    );
+    return rows.map((r) => ({ accountId: r.account_id, displayName: r.display_name, role: r.role }));
+  }
+
   async putTableDisplayToken(t: { tokenHash: string; campaignId: string; createdAt: string }): Promise<void> {
     await this.pool.query(
       `INSERT INTO table_display_token (token_hash, campaign_id, created_at) VALUES ($1,$2,$3)`,

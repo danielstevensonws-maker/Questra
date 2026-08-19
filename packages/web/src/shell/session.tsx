@@ -21,6 +21,17 @@ export interface SessionApi {
   signup: (email: string, password: string, displayName: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /**
+   * The current access token, for the ONE consumer that cannot use
+   * authedRequest: the sync socket, whose hello carries the token in the
+   * message body rather than an Authorization header.
+   *
+   * Deliberately a getter rather than a value: the token is held in a ref and
+   * rotates on refresh, so a snapshot handed out at render time would go stale.
+   * Returns null while the session is still resolving — not an error, just not
+   * ready yet. Nothing else should call this; use authedRequest.
+   */
+  accessToken: () => string | null;
   /** For Home/Join/Nav: an authenticated call that refreshes once on a 401. */
   authedRequest: <T>(path: string, opts?: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown }) => Promise<T>;
 }
@@ -37,6 +48,9 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactEle
   const [account, setAccount] = useState<SelfAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const tokenRef = useRef<string | null>(null);
+  /* The single in-flight page-load refresh, shared by every caller — see the
+     mount effect for why sharing it is load-bearing rather than an optimisation. */
+  const bootstrapRef = useRef<Promise<{ access: string; exp: number } | null> | null>(null);
 
   /** GET /auth/me — the one source of the display name, everywhere a session starts. */
   const fetchSelf = useCallback(async (token: string): Promise<SelfAccount> => {
@@ -87,21 +101,48 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactEle
     }
   }, []);
 
-  // On mount: try the refresh cookie silently. A visitor with no cookie (or an
-  // expired one) just lands on Landing — this is not an error state.
+  /**
+   * On mount: try the refresh cookie silently. A visitor with no cookie (or an
+   * expired one) just lands on Landing — that is not an error state.
+   *
+   * THE PROMISE IS SHARED ACROSS CALLS, AND THAT IS LOAD-BEARING. Refresh
+   * tokens ROTATE — service.ts revokes the old one the moment it is redeemed —
+   * and React StrictMode deliberately double-invokes mount effects in
+   * development. The naive version fired two refreshes: the first rotated the
+   * cookie, the second presented the now-dead token, got a 401, and left
+   * `account` null. The visitor was then bounced from /home to Landing despite
+   * holding a perfectly good session, and only on a reload, which made it look
+   * like a routing bug rather than an auth one.
+   *
+   * A `cancelled` flag cannot fix this — it guards the state update, not the
+   * duplicate request that already burned the token. So the in-flight promise
+   * is memoised on a ref: both invocations await the same single redemption.
+   * This is also correct outside StrictMode, where any two concurrent callers
+   * would race the same way.
+   */
   useEffect(() => {
     let cancelled = false;
-    apiRequest<{ access: string; exp: number }>('/auth/refresh', { method: 'POST' })
+    bootstrapRef.current ??= apiRequest<{ access: string; exp: number }>('/auth/refresh', { method: 'POST' })
+      .catch(() => null);
+
+    void bootstrapRef.current
       .then(async (r) => {
-        if (cancelled) return;
+        if (cancelled || !r) return;
         await applyToken(r.access);
       })
-      .catch(() => { /* no valid refresh cookie — stay signed out, not an error */ })
       .finally(() => { if (!cancelled) setLoading(false); });
+
     return () => { cancelled = true; };
   }, [applyToken]);
 
-  const value = useMemo<SessionApi>(() => ({ account, loading, signup, login, logout, authedRequest }), [account, loading, signup, login, logout, authedRequest]);
+  /* A getter, not a snapshot: the token rotates on refresh, so anything that
+     captured a value at render time would hold a stale one. */
+  const accessToken = useCallback((): string | null => tokenRef.current, []);
+
+  const value = useMemo<SessionApi>(
+    () => ({ account, loading, signup, login, logout, authedRequest, accessToken }),
+    [account, loading, signup, login, logout, authedRequest, accessToken],
+  );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

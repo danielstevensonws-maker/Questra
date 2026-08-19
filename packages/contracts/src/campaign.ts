@@ -40,3 +40,43 @@ export const MyCampaignsSchema = z.object({
   playing: z.array(MyCampaignSchema),
 });
 export type MyCampaigns = z.infer<typeof MyCampaignsSchema>;
+
+/**
+ * One person at a campaign's table.
+ *
+ * `displayName` exists here because the sync protocol's `presence` message
+ * carries `accountId` and nothing else, by design — presence is broadcast on
+ * every connect and disconnect and has no business shipping profile data. So a
+ * lobby resolves ids to names ONCE from this list rather than fattening a hot
+ * message. Anything that needs a name for an accountId looks it up here.
+ */
+export const CampaignMemberSchema = z.object({
+  accountId: AccountIdSchema,
+  displayName: z.string().min(1),
+  role: z.enum(['dm', 'player']),
+});
+export type CampaignMember = z.infer<typeof CampaignMemberSchema>;
+
+/**
+ * What a member needs to actually open a campaign: which play session to sync
+ * against, and who else belongs at the table.
+ *
+ * `playSessionId` is minted alongside the campaign (campaign-service creates
+ * Membership + play session + join code in one call) but was previously not
+ * surfaced anywhere, which meant the web app had no way to say `hello` on the
+ * sync socket — the protocol requires it. This is the endpoint that closes
+ * that gap.
+ *
+ * Members are everyone with a Membership, NOT everyone currently connected.
+ * Presence answers "who is here right now"; this answers "who belongs". A
+ * lobby needs both: the roster to render, presence to light it up.
+ */
+export const CampaignSessionSchema = z.object({
+  campaignId: z.string().min(1),
+  campaignName: z.string(),
+  playSessionId: z.string().min(1),
+  members: z.array(CampaignMemberSchema),
+  /** The caller's own role, so a client need not scan `members` to find itself. */
+  yourRole: z.enum(['dm', 'player']),
+});
+export type CampaignSession = z.infer<typeof CampaignSessionSchema>;

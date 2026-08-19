@@ -71,6 +71,17 @@ export function registerCampaignRoutes(
     }),
   );
 
+  /* Membership-gated, not DM-gated: every player needs the playSessionId to
+     open the sync socket. */
+  app.get<{ Params: { campaignId: string } }>(
+    '/campaigns/:campaignId/session',
+    async (req, reply) => handle(reply, async () => {
+      const callerId = await requireAccount(req, reply);
+      if (!callerId) return { error: 'auth', reason: 'Please sign in.' };
+      return service.session(callerId, req.params.campaignId);
+    }),
+  );
+
   app.post<{ Params: { campaignId: string } }>(
     '/campaigns/:campaignId/table-display-token',
     async (req, reply) => handle(reply, async () => {
