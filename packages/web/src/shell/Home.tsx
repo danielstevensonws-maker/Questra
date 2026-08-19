@@ -1,24 +1,29 @@
 /**
- * Home (Brief 14 §3, M3 minimal) — signed in: "Your campaigns" split DM'd vs
- * playing-in, and a resume-last-session card. The near-empty "let's make your
- * first scene" state for a brand-new account is Brief 13's Floor 0 (M7) — out
- * of scope here; this file's empty state is the plainer M3 one: create or
- * join, nothing to resume yet.
+ * Home (Brief 14 §3) — signed in: the campaigns you run and the ones you play
+ * in.
  *
- * QUIETER THAN LANDING, ON PURPOSE. Same ground, same material, but the
- * boldness was already spent at the door — this is camp between sessions, not
- * the threshold. Glass panels at rest; nothing scales up, nothing glows except
- * the one "Create a campaign" action, because a returning player opens this
- * screen far more often than they open Landing, and a screen you see daily
- * should not perform for you every time (CLAUDE.md law 4: screen time is a
- * cost, not a goal — the same law that keeps play screens quiet applies here).
+ * THE WORLD, NONE OF THE RITUAL. This is the screen a returning DM opens most
+ * often, and the mechanic that makes Landing work — slow typing, withheld
+ * information, a one-time reveal — is exactly wrong here. A conversation with
+ * a stranger does not survive being had twice a week. So Home keeps the road,
+ * the voice and the ember and drops the ceremony entirely: no typing, no
+ * gating, nothing to sit through. Content is on screen immediately.
+ *
+ * Instead the CAMERA moves. Road distance is "camp" rather than "near": the
+ * horizon drops, the road narrows to a far detail and the sky warms toward
+ * dawn. Same world, seen from the fire rather than from the edge of town —
+ * which is the escalate-at-the-door ladder doing its job without a single
+ * animation. (CLAUDE.md law 4: screen time is a cost, not a goal. A screen you
+ * open daily must not perform for you every time.)
+ *
+ * Second person is kept, because that costs nothing and is most of the voice:
+ * "Four are already out" over "3 members".
  */
 import { useEffect, useState, type ReactElement } from 'react';
 import type { MyCampaigns } from '@questra/contracts';
-import { heroTitle, eyebrow, sceneName, prose, micro } from '../design/index.js';
 import { ShellStyles } from './ShellStyles.js';
-import { Room } from './Room.js';
-import { ShellLoading } from './ShellStates.js';
+import { Road } from './road/Road.js';
+import { usePrefersReducedMotion } from './shared.js';
 import type { SessionApi } from './session.js';
 
 export interface HomeProps {
@@ -28,6 +33,7 @@ export interface HomeProps {
 }
 
 export function Home({ session, onOpenCampaign, onCreateCampaign }: HomeProps): ReactElement {
+  const reduced = usePrefersReducedMotion();
   const [mine, setMine] = useState<MyCampaigns | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,72 +45,76 @@ export function Home({ session, onOpenCampaign, onCreateCampaign }: HomeProps): 
     return () => { cancelled = true; };
   }, [session]);
 
-  const name = session.account?.displayName ?? 'Adventurer';
+  const name = session.account?.displayName ?? 'you';
+  const total = mine ? mine.dming.length + mine.playing.length : 0;
+  const nothing = mine !== null && total === 0;
 
   return (
-    <div className="qa-home">
+    <div className={'rd qa-home' + (reduced ? ' is-still' : '')}>
       <ShellStyles />
-      <Room />
+      <Road distance="camp" />
+
       <div className="qa-home-content">
-        <div className="qa-home-head">
+        <header className="qa-home-head">
           <div>
-            <p style={eyebrow}>Welcome back</p>
-            <h1 style={heroTitle}>{name}</h1>
+            <p className="rd-label">Back at the fire</p>
+            <h1 className="rd-title">{name}</h1>
           </div>
-          <button type="button" className="qa2-cta" onClick={onCreateCampaign}>Create a campaign</button>
-        </div>
+          <button type="button" className="qa2-cta" onClick={onCreateCampaign}>Start something new</button>
+        </header>
 
-        {error && <p className="qa-shell-error qa2-sheet" style={micro}>{error}</p>}
+        {error && <p className="rd-error qa-home-notice">{error}</p>}
 
-        {!error && !mine && <ShellLoading label="Finding your table…" />}
+        {!error && !mine && <p className="rd-micro qa-home-notice">Finding your table…</p>}
 
-        {mine && (
+        {nothing && (
+          /* An empty screen is an invitation to act, not a mood. It says what
+             to do next and both routes to doing it. */
+          <div className="rd-panel qa-home-empty">
+            <p className="rd-prose is-scene">Nothing on the road yet.</p>
+            <p className="rd-detail">
+              Start a campaign and send the join link to your friends, or ask whoever is
+              running yours for theirs.
+            </p>
+          </div>
+        )}
+
+        {mine && !nothing && (
           <>
-            <section className="qa-home-section">
-              <p style={eyebrow}>Campaigns you run</p>
-              {mine.dming.length === 0 ? (
-                <EmptyRow text="No campaigns yet — create one and send the join link to your table." />
-              ) : (
-                <div className="qa-home-grid">
+            {mine.dming.length > 0 && (
+              <section className="qa-home-section">
+                <p className="rd-label">Yours to run</p>
+                <ul className="qa-home-grid">
                   {mine.dming.map((c) => (
-                    <button key={c.campaignId} type="button" className="qa2-card qa-camp-card" onClick={() => onOpenCampaign(c.campaignId)}>
-                      <span className="qa2-badge is-yours">DM</span>
-                      <span style={sceneName}>{c.campaignName}</span>
-                    </button>
+                    <li key={c.campaignId}>
+                      <button type="button" className="rd-panel qa-camp is-yours" onClick={() => onOpenCampaign(c.campaignId)}>
+                        <span className="qa-camp-role rd-micro">You run this</span>
+                        <span className="qa-camp-name">{c.campaignName}</span>
+                      </button>
+                    </li>
                   ))}
-                </div>
-              )}
-            </section>
+                </ul>
+              </section>
+            )}
 
-            <section className="qa-home-section">
-              <p style={eyebrow}>Campaigns you play in</p>
-              {mine.playing.length === 0 ? (
-                <EmptyRow text="Nothing yet — ask your DM for the join link." />
-              ) : (
-                <div className="qa-home-grid">
+            {mine.playing.length > 0 && (
+              <section className="qa-home-section">
+                <p className="rd-label">Yours to play</p>
+                <ul className="qa-home-grid">
                   {mine.playing.map((c) => (
-                    <button key={c.campaignId} type="button" className="qa2-card qa-camp-card" onClick={() => onOpenCampaign(c.campaignId)}>
-                      <span className="qa2-badge">Player</span>
-                      <span style={sceneName}>{c.campaignName}</span>
-                    </button>
+                    <li key={c.campaignId}>
+                      <button type="button" className="rd-panel qa-camp" onClick={() => onOpenCampaign(c.campaignId)}>
+                        <span className="qa-camp-role rd-micro">You play in this</span>
+                        <span className="qa-camp-name">{c.campaignName}</span>
+                      </button>
+                    </li>
                   ))}
-                </div>
-              )}
-            </section>
-
-            {mine.dming.length === 0 && mine.playing.length === 0 && (
-              <div className="qa-home-empty">
-                <p style={{ ...heroTitle, fontSize: 'var(--qa-text-lg)' }}>Nothing on the table yet</p>
-                <p style={prose}>Create a campaign to run, or ask a friend for their join link.</p>
-              </div>
+                </ul>
+              </section>
             )}
           </>
         )}
       </div>
     </div>
   );
-}
-
-function EmptyRow({ text }: { text: string }): ReactElement {
-  return <p className="qa2-help" style={prose}>{text}</p>;
 }

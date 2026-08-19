@@ -1,8 +1,10 @@
 /**
- * Home, judged whole — deliberately quieter than Landing: the same ground at
- * rest, no seam, no scale. Things to judge: whether the DM'd/playing-in split
- * reads at a glance, whether the empty state invites rather than apologises,
- * and whether it's genuinely calmer than Landing (spend the boldness once).
+ * Home — the world, none of the ritual.
+ *
+ * Judge the register, not the drama: this is the screen a returning DM opens
+ * most often, so the question is whether it still belongs to the same world as
+ * Landing while getting out of the way immediately. Nothing here types, waits,
+ * or performs.
  */
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Home } from './Home.js';
@@ -12,38 +14,35 @@ const meta: Meta<typeof Home> = { title: 'Shell/Home', component: Home, paramete
 export default meta;
 type Story = StoryObj<typeof Home>;
 
-export const WithCampaigns: Story = {
+const withCampaigns = (dming: string[], playing: string[]) =>
+  mockSession({
+    account: MOCK_ACCOUNT,
+    authedRequest: (async () => ({
+      dming: dming.map((n, i) => ({ campaignId: 'd' + String(i), campaignName: n })),
+      playing: playing.map((n, i) => ({ campaignId: 'p' + String(i), campaignName: n })),
+    })) as never,
+  });
+
+export const Both: Story = {
   args: {
-    session: mockSession({
-      account: MOCK_ACCOUNT,
-      authedRequest: async () => ({
-        dming: [{ campaignId: 'camp_1', campaignName: 'The Sunless Keep' }],
-        playing: [{ campaignId: 'camp_2', campaignName: "Bob's One-Shot" }, { campaignId: 'camp_3', campaignName: 'The Long Road North' }],
-      }) as never,
-    }),
-    onOpenCampaign: (id: string) => console.log('open', id),
-    onCreateCampaign: () => console.log('create'),
+    session: withCampaigns(['The Ash Moor'], ['Vane Bay', 'The Long Shoal']),
+    onOpenCampaign: () => {},
+    onCreateCampaign: () => {},
   },
 };
 
+/** A brand-new account. An empty screen is an invitation to act, not a mood. */
 export const Empty: Story = {
-  args: {
-    session: mockSession({
-      account: MOCK_ACCOUNT,
-      authedRequest: async () => ({ dming: [], playing: [] }) as never,
-    }),
-    onOpenCampaign: (id: string) => console.log('open', id),
-    onCreateCampaign: () => console.log('create'),
-  },
+  args: { session: withCampaigns([], []), onOpenCampaign: () => {}, onCreateCampaign: () => {} },
 };
 
-export const LoadFailed: Story = {
+export const Failed: Story = {
   args: {
     session: mockSession({
       account: MOCK_ACCOUNT,
-      authedRequest: async () => { throw new Error('Could not reach the server.'); },
+      authedRequest: (async () => { throw new Error('Could not reach the server. Check your connection and try again.'); }) as never,
     }),
-    onOpenCampaign: (id: string) => console.log('open', id),
-    onCreateCampaign: () => console.log('create'),
+    onOpenCampaign: () => {},
+    onCreateCampaign: () => {},
   },
 };

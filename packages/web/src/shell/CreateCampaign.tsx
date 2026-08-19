@@ -1,18 +1,24 @@
 /**
- * CreateCampaign (Brief 14 §2/§3) — the one form Home's "Create a campaign"
- * CTA leads to. Calls the real POST /campaigns (createCampaign mints the
- * Membership{role:dm}, the play session, and the join code in one call — see
- * campaign-service.ts) and, critically, SURFACES the join code afterward:
- * brief-14 §2 makes creating a campaign inseparable from getting a link to
- * hand out, so a screen that created the campaign but never showed the code
- * would leave the DM with nobody to invite.
+ * CreateCampaign (Brief 14 §2/§3) — where "Start something new" leads.
+ *
+ * Calls the real POST /campaigns (which mints the Membership{role:dm}, the
+ * play session and the join code in one call) and, critically, SURFACES THE
+ * JOIN CODE afterward: brief-14 §2 makes creating a campaign inseparable from
+ * getting a link to hand out, so a screen that created the campaign and never
+ * showed the code would leave the DM with nobody to invite.
+ *
+ * The world, none of the ritual — same rule as Home. This is a DM doing
+ * setup, and setup should be fast. What it keeps is the voice: the second
+ * step is not "Campaign created" but a road with people about to be on it,
+ * and the link is framed as the thing you send rather than as a field you
+ * copy. Road distance is "camp", matching Home, because you have not gone
+ * anywhere — you are still at the fire, making plans.
  */
-import { useState, type FormEvent, type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import type { Campaign } from '@questra/contracts';
-import { heroTitle, eyebrow, narration, micro } from '../design/index.js';
 import { ShellStyles } from './ShellStyles.js';
-import { Room } from './Room.js';
-import { AuthField } from './AuthField.js';
+import { Road } from './road/Road.js';
+import { usePrefersReducedMotion } from './shared.js';
 import type { SessionApi } from './session.js';
 
 export interface CreateCampaignProps {
@@ -24,6 +30,7 @@ export interface CreateCampaignProps {
 interface CreateResult { campaign: Campaign; joinCode: string; playSessionId: string }
 
 export function CreateCampaign({ session, onCreated, onCancel }: CreateCampaignProps): ReactElement {
+  const reduced = usePrefersReducedMotion();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,65 +39,82 @@ export function CreateCampaign({ session, onCreated, onCancel }: CreateCampaignP
 
   const joinUrl = result ? `${window.location.origin}/join/${result.joinCode}` : '';
 
-  const submit = async (e: FormEvent): Promise<void> => {
+  const submit = (e: { preventDefault: () => void }): void => {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    try {
-      const r = await session.authedRequest<CreateResult>('/campaigns', { method: 'POST', body: { name } });
-      setResult(r);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Try again.');
-    } finally {
-      setBusy(false);
-    }
+    void (async () => {
+      try {
+        setResult(await session.authedRequest<CreateResult>('/campaigns', { method: 'POST', body: { name } }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'That did not go through. Try again.');
+      } finally {
+        setBusy(false);
+      }
+    })();
   };
 
-  const copyLink = async (): Promise<void> => {
-    await navigator.clipboard.writeText(joinUrl).catch(() => {});
+  const copyLink = (): void => {
+    void navigator.clipboard.writeText(joinUrl).catch(() => {});
     setCopied(true);
   };
 
   return (
-    <div className="qa-join">
+    <div className={'rd qa-make' + (reduced ? ' is-still' : '')}>
       <ShellStyles />
-      <Room />
-      <div className="qa2-sheet qa-join-card" style={{ position: 'static' }}>
-        <div className="qa2-sheet-body">
-          {!result ? (
-            <>
-              <p style={eyebrow}>Name your campaign</p>
-              <h1 style={heroTitle}>New table</h1>
-              <form className="qa-auth-form" onSubmit={submit}>
-                <AuthField id="campaign-name" label="Campaign name" type="text" value={name} onChangeText={setName} />
-                {error && <p className="qa-auth-error" style={micro}>{error}</p>}
-                <div style={{ display: 'flex', gap: 'var(--qa-s3)' }}>
-                  <button type="button" className="qa2-quiet-link" onClick={onCancel}>Cancel</button>
-                  <button type="submit" className="qa2-cta" aria-disabled={busy}>{busy ? 'Creating…' : 'Create'}</button>
-                </div>
-              </form>
-            </>
-          ) : (
-            <>
-              <p style={eyebrow}>{result.campaign.name} is ready</p>
-              <h1 style={heroTitle}>Send this to your table</h1>
-              <p style={narration}>
-                Anyone with this link can join as a player. It stays live until you regenerate it.
-              </p>
-              <div className="qa2-field-box">
-                <span style={eyebrow}>Join link</span>
-                <span style={{ ...micro, wordBreak: 'break-all' }}>{joinUrl}</span>
-              </div>
-              <div style={{ display: 'flex', gap: 'var(--qa-s3)' }}>
-                <button type="button" className="qa2-quiet-link" onClick={() => { void copyLink(); }}>
-                  {copied ? 'Copied' : 'Copy link'}
+      <Road distance="camp" />
+
+      <main className="rd-panel qa-make-panel">
+        {!result ? (
+          <>
+            <p className="rd-label">Somewhere none of them have been</p>
+            <h1 className="rd-title">Name it</h1>
+            <p className="rd-detail">
+              This is what your friends will see when they open the link. You can change it later.
+            </p>
+            <form className="rd-form" onSubmit={submit}>
+              <label className="rd-field">
+                <span>Campaign</span>
+                <input
+                  type="text"
+                  value={name}
+                  placeholder="The Ash Moor"
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </label>
+              {error && <p className="rd-error">{error}</p>}
+              <div className="rd-actions">
+                <button type="submit" className="qa2-cta" disabled={busy || name.trim().length === 0}>
+                  {busy ? 'One moment' : 'Create it'}
                 </button>
-                <button type="button" className="qa2-cta" onClick={() => onCreated(result.campaign.id)}>Continue</button>
+                <button type="button" className="qa2-quiet-link" onClick={onCancel}>Not now</button>
               </div>
-            </>
-          )}
-        </div>
-      </div>
+            </form>
+          </>
+        ) : (
+          <>
+            <p className="rd-label">{result.campaign.name} is ready</p>
+            <h1 className="rd-title">Now send for the others</h1>
+            <p className="rd-detail">
+              Anyone with this link can take a seat. It keeps working until you replace it.
+            </p>
+
+            <div className="qa-make-link">
+              <span className="rd-label">Join link</span>
+              <span className="qa-make-link-url">{joinUrl}</span>
+            </div>
+
+            <div className="rd-actions">
+              <button type="button" className="qa2-cta" onClick={copyLink}>
+                {copied ? 'Copied' : 'Copy the link'}
+              </button>
+              <button type="button" className="qa2-quiet-link" onClick={() => onCreated(result.campaign.id)}>
+                Go to the campaign
+              </button>
+            </div>
+          </>
+        )}
+      </main>
     </div>
   );
 }

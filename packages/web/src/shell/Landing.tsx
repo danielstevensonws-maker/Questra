@@ -1,109 +1,152 @@
 /**
- * Landing (Brief 14 §3, M3 minimal) — the pitch + sign in / create account.
- * Public; a signed-in visitor never sees this (the app shell redirects to Home).
+ * Landing (Brief 14 §3) — the front door.
  *
- * THE SIGNATURE IDEA. This isn't a picture of the game, it's the room. The
- * backdrop is `.qa2-map.is-fill` — the exact class the real Player View draws
- * combatants on — at rest, empty, no token placed yet. Pressing Enter doesn't
- * navigate to a form page; the same glass the play screen uses for a held
- * prompt rises up over the same ground, because you're not leaving the
- * threshold to sign up, you're stepping further through it.
+ * One of the two screens in the shell that holds a conversation, because it is
+ * one of the two a person meets once, as a stranger. The scene is the edge of
+ * town with the road in front of you: a player reads it as somewhere to be
+ * taken, a DM reads it as somewhere to build, and neither has to be asked
+ * which they are before they have felt anything.
  *
- * Marketing copy here is owner-supplied content in the brief (§3: "structure
- * ships with a placeholder") — the wordmark and the one line of scene-setting
- * prose below are written to match CLAUDE.md's own framing of the product
- * ("a session, start to finish," not a toolbox), not invented ad copy.
+ * THE PAYOFF IS THE ONE PIECE OF CHOREOGRAPHY HERE. The road is completely
+ * still while you are deciding. The moment you answer, the ruts flow toward
+ * you, the light at the end brightens and the town behind you dims. You do not
+ * read about setting out; the page sets out, because you told it to. Everything
+ * else on the screen stays quiet so that lands — see road/RoadStyles for why
+ * this ritual is confined to Landing and Join and appears nowhere else.
  */
-import { useState, type FormEvent, type ReactElement } from 'react';
-import { Button } from '@questra/ui';
-import { heroTitle, eyebrow, narration, micro } from '../design/index.js';
+import { useState, type ReactElement } from 'react';
 import { ShellStyles } from './ShellStyles.js';
-import { Room } from './Room.js';
-import { AuthField } from './AuthField.js';
+import { Road } from './road/Road.js';
+import { Spoken, Turn, useSpokenText, type Phase, type Seg } from './road/Scene.js';
+import { useAuth, usePrefersReducedMotion } from './shared.js';
 import type { SessionApi } from './session.js';
 
 export interface LandingProps {
   session: SessionApi;
-  /** Called once sign-in/signup succeeds — the host decides where "in" goes. */
   onEntered: () => void;
+  /** ADR-0010: the licence screen must be reachable without an account. */
+  onLegal?: () => void;
 }
 
-type Panel = 'closed' | 'signup' | 'login';
+/**
+ * The scene had to be rewritten when the ground changed. It used to describe a
+ * road running north, which was fine over a horizon and nonsense over a
+ * top-down battle map — the words and the picture have to be the same place.
+ * What it keeps is the hook: four people are already here, none of them know
+ * the rules either, and the fifth chair is the one you are looking at.
+ */
+const SCENE: Seg[] = [
+  { t: 'Five chairs, four of them taken, and a map somebody has already started marking.' },
+  { t: '\n\nNobody at this table has played before either. That is rather the point.' },
+];
 
-export function Landing({ session, onEntered }: LandingProps): ReactElement {
-  const [panel, setPanel] = useState<Panel>('closed');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+/**
+ * Three jobs, in this order: confirm you are in, make the table real, and state
+ * the product's actual promise in the fiction's own voice — the rules are
+ * handled, you only have to say what you do. That last line is the play
+ * screen's prompt, described.
+ */
+const REPLY: Seg[] = [
+  { t: 'Room is made.' },
+  { t: '\n\nSomeone slides the dice across to you, and the map turns so it is the right way round from where you are sitting.' },
+  { t: '\n\nThe rules are handled. You only have to say what you ' },
+  { t: 'do', em: true },
+  { t: '.' },
+];
 
-  const submit = async (e: FormEvent): Promise<void> => {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      if (panel === 'signup') await session.signup(email, password, displayName);
-      else await session.login(email, password);
-      onEntered();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Try again.');
-    } finally {
-      setBusy(false);
-    }
+export function Landing({ session, onEntered, onLegal }: LandingProps): ReactElement {
+  const reduced = usePrefersReducedMotion();
+  const auth = useAuth(session, onEntered);
+  const [phase, setPhase] = useState<Phase>('telling');
+  const [answer, setAnswer] = useState('');
+  const [spokenAnswer, setSpokenAnswer] = useState('');
+
+  const sceneN = useSpokenText(SCENE, true, reduced, () => setPhase((p) => (p === 'telling' ? 'asking' : p)));
+  const replyN = useSpokenText(REPLY, phase === 'replying', reduced, () => {
+    window.setTimeout(() => setPhase((p) => (p === 'replying' ? 'entering' : p)), 700);
+  });
+
+  /* The road answers the keystroke, not the end of the reply — motion that
+     trails the thing that caused it reads as unrelated. */
+  const moving = phase === 'replying' || phase === 'entering';
+
+  const setOut = (): void => {
+    setSpokenAnswer(answer.trim() || 'sit down');
+    setPhase('replying');
   };
 
   return (
-    <div className="qa-landing">
+    <div className={'rd qa-landing' + (moving ? ' is-moving' : '') + (reduced ? ' is-still' : '')}>
       <ShellStyles />
-      {/* Landing is the one screen that gets the doorway light. */}
-      <Room beam />
+      <Road distance="near" moving={moving} />
 
-      <div className="qa-landing-content">
-        {panel === 'closed' ? (
-          <>
-            <p className="qa-landing-eyebrow" style={eyebrow}>A session, start to finish</p>
-            <h1 className="qa-landing-wordmark" style={heroTitle}>Questra</h1>
-            <span className="qa-landing-rule" />
-            <p className="qa-landing-tagline" style={narration}>
-              Five friends who&rsquo;ve never played before, finishing a real night of
-              D&amp;D together &mdash; tonight, in a browser, no install.
-            </p>
-            <div className="qa-landing-actions">
-              <button type="button" className="qa2-cta" onClick={() => setPanel('signup')}>
-                Enter
-              </button>
-              <button type="button" className="qa2-quiet-link" onClick={() => setPanel('login')}>
-                Already playing? Sign in
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="qa2-sheet qa-auth-sheet" style={{ position: 'static' }}>
-            <div className="qa2-sheet-head">
-              <h1 style={heroTitle}>{panel === 'signup' ? 'Begin' : 'Welcome back'}</h1>
-              <button type="button" className="qa2-mini" aria-label="Back" onClick={() => setPanel('closed')}>&larr;</button>
-            </div>
-            <div className="qa2-sheet-body">
-              <div className="qa2-tabs" style={{ padding: 0, border: 'none' }}>
-                <button type="button" className={panel === 'signup' ? 'qa2-tab is-on' : 'qa2-tab'} onClick={() => setPanel('signup')}>New here</button>
-                <button type="button" className={panel === 'login' ? 'qa2-tab is-on' : 'qa2-tab'} onClick={() => setPanel('login')}>Returning</button>
-              </div>
-              <form className="qa-auth-form" onSubmit={submit}>
-                {panel === 'signup' && (
-                  <AuthField id="displayName" label="What should we call you" type="text" value={displayName} onChangeText={setDisplayName} autoComplete="nickname" />
-                )}
-                <AuthField id="email" label="Email" type="email" value={email} onChangeText={setEmail} autoComplete="email" />
-                <AuthField id="password" label="Password" type="password" value={password} onChangeText={setPassword} autoComplete={panel === 'signup' ? 'new-password' : 'current-password'} />
-                {error && <p className="qa-auth-error" style={micro}>{error}</p>}
-                <Button type="submit" variant="primary" disabled={busy} aria-disabled={busy}>
-                  {busy ? 'One moment…' : panel === 'signup' ? 'Create account' : 'Sign in'}
-                </Button>
-              </form>
-            </div>
-          </div>
+      <button
+        type="button"
+        className="qa-landing-skip"
+        onClick={() => { auth.setMode('login'); setPhase('entering'); }}
+      >
+        Sign in
+      </button>
+
+      <main className="rd-panel qa-scene-panel">
+        <p className="rd-prose is-scene"><Spoken segs={SCENE} n={sceneN} /></p>
+
+        {phase !== 'telling' && (
+          <Turn
+            phase={phase}
+            answer={answer}
+            setAnswer={setAnswer}
+            spokenAnswer={spokenAnswer}
+            placeholder="say hello, or ask what this is, or sit down"
+            onAnswer={setOut}
+            reduced={reduced}
+          />
         )}
-      </div>
+
+        {moving && <p className="rd-prose is-scene is-reply"><Spoken segs={REPLY} n={replyN} /></p>}
+
+        {phase === 'entering' && (
+          <form className="rd-form is-entering" onSubmit={auth.submit}>
+            <p className="rd-label">{auth.mode === 'signup' ? 'Before you go further' : 'Welcome back'}</p>
+            {auth.mode === 'signup' && (
+              <label className="rd-field">
+                <span>Name</span>
+                <input type="text" value={auth.displayName} autoComplete="nickname" placeholder="what the others will call you" onChange={(e) => auth.setDisplayName(e.target.value)} />
+              </label>
+            )}
+            <label className="rd-field">
+              <span>Email</span>
+              <input type="email" value={auth.email} autoComplete="email" onChange={(e) => auth.setEmail(e.target.value)} />
+            </label>
+            <label className="rd-field">
+              <span>Password</span>
+              <input type="password" value={auth.password} autoComplete={auth.mode === 'signup' ? 'new-password' : 'current-password'} onChange={(e) => auth.setPassword(e.target.value)} />
+            </label>
+            {auth.error && <p className="rd-error">{auth.error}</p>}
+            <div className="rd-actions">
+              <button type="submit" className="qa2-cta" disabled={auth.busy}>
+                {auth.busy ? 'One moment' : auth.mode === 'signup' ? 'Set out' : 'Sign in'}
+              </button>
+              <button type="button" className="qa2-quiet-link" onClick={() => auth.setMode(auth.mode === 'signup' ? 'login' : 'signup')}>
+                {auth.mode === 'signup' ? 'I have an account' : 'I am new here'}
+              </button>
+            </div>
+          </form>
+        )}
+      </main>
+
+      {/* A page this diegetic owes a newcomer one literal answer to "what is
+          this", and it should never be dressed up as part of the fiction. */}
+      <footer className="qa-landing-foot">
+        <b>Questra</b> is Dungeons &amp; Dragons for people who have never played it.
+        Five friends, one browser, one evening — the rules, the dice and the bookkeeping run themselves.
+        {onLegal && (
+          <>
+            {' '}
+            <button type="button" className="qa-legal-link" onClick={onLegal}>Credits and licences</button>
+          </>
+        )}
+      </footer>
     </div>
   );
 }
