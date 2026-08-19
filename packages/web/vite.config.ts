@@ -14,6 +14,8 @@ export default defineConfig(({ command }) => ({
   },
   test: {
     environment: 'jsdom',
+    // jsdom lacks matchMedia, which every shell screen calls — see test/setup.ts
+    setupFiles: ['./test/setup.ts'],
     globals: false,
     alias: [contractsSrcAlias, engineSrcAlias],
   },
