@@ -12,9 +12,9 @@ import { Landing } from './Landing.js';
 import { Home } from './Home.js';
 import { JoinFlow } from './JoinFlow.js';
 import { CreateCampaign } from './CreateCampaign.js';
-import { CampaignPlaceholder } from './CampaignPlaceholder.js';
 import { Lobby } from './Lobby.js';
 import { CharacterWizardRoute } from '../wizard/CharacterWizardRoute.js';
+import { PlayRoute as PlaySurface } from '../play/PlayRoute.js';
 import { Attribution } from './Attribution.js';
 import { Nav } from './Nav.js';
 import { ShellStyles } from './ShellStyles.js';
@@ -122,14 +122,16 @@ function CharacterRoute(): ReactElement {
   );
 }
 
-/* The play surface itself is still M2/M4 work — the Player View renders from
-   fixtures and has no live campaign data path yet. Saying so beats pretending. */
+/* The table itself: the map, the cast, the log, and your own character —
+   everything the rest of the app exists to get somebody to. */
 function PlayRoute(): ReactElement {
+  const { id } = useParams<{ id: string }>();
   const session = useSession();
   const navigate = useNavigate();
   if (session.loading) return <ShellLoading label="Finding your seat…" />;
   if (!session.account) return <Navigate to="/" replace />;
-  return <CampaignPlaceholder onHome={() => navigate('/home')} />;
+  if (!id) return <Navigate to="/home" replace />;
+  return <PlaySurface campaignId={id} session={session} onLeave={() => navigate(`/campaign/${id}`)} />;
 }
 
 /* Public and ungated on purpose: ADR-0010 wants the attribution ACCESSIBLE,

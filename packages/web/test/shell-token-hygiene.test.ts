@@ -40,10 +40,11 @@ const SCREENS = [
   'shell/JoinFlow.tsx',
   'shell/Home.tsx',
   'shell/CreateCampaign.tsx',
-  'shell/CampaignPlaceholder.tsx',
   'shell/Nav.tsx',
   'shell/ShellStates.tsx',
   'shell/road/Scene.tsx',
+  'shell/Lobby.tsx',
+  'play/PlayRoute.tsx',
 ];
 
 /** The stylesheets, whose CSS lives in a template literal (see the backtick test). */
