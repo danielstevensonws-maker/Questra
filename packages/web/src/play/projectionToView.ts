@@ -68,6 +68,8 @@ export interface ViewInput {
   role: ViewerRole;
   events: readonly PlayEvent[];
   campaignName: string;
+  /** Character id → current name, so a rebuilt character is not shown stale. */
+  rosterNames?: Record<string, string>;
 }
 
 const mod = (score: number): number => Math.floor((score - 10) / 2);
@@ -152,8 +154,18 @@ export function heroFrom(c: Combatant, me: MyCharacter): HeroVM {
 
   return {
     id: c.id,
-    name: c.name,
-    initial: c.name.slice(0, 1).toUpperCase(),
+    /**
+     * The ROSTER's name, not the combatant's.
+     *
+     * A combatant is seated into the projection when the play session first
+     * starts, and it keeps whatever it was seated with. Rebuild your character
+     * and the database is right immediately while the live session still holds
+     * the old one — which showed a player their previous character's name
+     * beside their new character's class (owner, 2026-08-20). The roster is
+     * re-read from storage, so it is the one that can be trusted to be current.
+     */
+    name: me.name,
+    initial: me.name.slice(0, 1).toUpperCase(),
     /* "Human Fighter" — from the roster, which computed it from the stored
        choices. The projection carries combatants, not classes, so without this
        the panel could only say a name. */
@@ -237,7 +249,14 @@ function abilitiesOf(sheet: ComputedSheet): AbilityVM[] {
  * name so a pre-combat table still reads as a stable list rather than
  * reshuffling on every render.
  */
-export function castFrom(projection: Projection, myCreatureId: string | null): SpineEntryVM[] {
+export function castFrom(
+  projection: Projection,
+  myCreatureId: string | null,
+  /* Character id → current name, from the roster. The projection's combatants
+     keep whatever they were seated with when the session started, so a rebuilt
+     character shows its old name there; the roster is re-read and is current. */
+  names: Record<string, string> = {},
+): SpineEntryVM[] {
   return Object.values(projection.combatants)
     .map((c): SpineEntryVM => {
       const you = c.id === myCreatureId;
@@ -250,7 +269,7 @@ export function castFrom(projection: Projection, myCreatureId: string | null): S
       return {
         id: c.id,
         initiative: 0,
-        name: c.name,
+        name: names[c.id] ?? c.name,
         kind,
         /* Allies show real hit points; enemies show a word. */
         ...(c.isPlayer ? { hp: { current: c.hp, max: c.maxHp } } : { hurt: hurtOf(c) }),
@@ -293,7 +312,7 @@ export interface PlayView {
 }
 
 export function projectionToView(input: ViewInput): PlayView {
-  const { projection, room, myCharacter, events, campaignName } = input;
+  const { projection, room, myCharacter, events, campaignName, rosterNames = {} } = input;
   const me = myCharacter ? projection.combatants[myCharacter.id] : undefined;
   const active = projection.activeCreatureId
     ? projection.combatants[projection.activeCreatureId]
@@ -312,7 +331,7 @@ export function projectionToView(input: ViewInput): PlayView {
       elapsed: '',
     },
     hero: me && myCharacter ? heroFrom(me, myCharacter) : null,
-    cast: castFrom(projection, myCharacter?.id ?? null),
+    cast: castFrom(projection, myCharacter?.id ?? null, rosterNames),
     room,
     entries: logFrom(events),
     turn: {

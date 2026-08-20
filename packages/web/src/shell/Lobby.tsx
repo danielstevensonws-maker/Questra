@@ -41,12 +41,25 @@ export function Lobby({ campaignId, session, onBegin, onLeave, onMakeCharacter }
   const [table, setTable] = useState<CampaignSession | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  /* Reloaded when the tab comes back into view as well as on mount: somebody
+     who makes or rebuilds a character in another tab should see it here, and a
+     roster fetched once is a snapshot of a moment that has since passed. */
   useEffect(() => {
     let cancelled = false;
-    session.authedRequest<CampaignSession>(`/campaigns/${campaignId}/session`)
-      .then((r) => { if (!cancelled) setTable(r); })
-      .catch((e) => { if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Could not open this campaign.'); });
-    return () => { cancelled = true; };
+    const load = (): void => {
+      session.authedRequest<CampaignSession>(`/campaigns/${campaignId}/session`)
+        .then((r) => { if (!cancelled) setTable(r); })
+        .catch((e) => { if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Could not open this campaign.'); });
+    };
+    load();
+    const onFocus = (): void => { if (document.visibilityState === 'visible') load(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
   }, [campaignId, session]);
 
   /* The socket only opens once the roster has told us which play session to

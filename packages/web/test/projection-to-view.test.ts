@@ -97,6 +97,37 @@ describe('the play view', () => {
     expect(goblin.hurt).toBe('Bloodied');
   });
 
+  /**
+   * REBUILDING A CHARACTER (found by playing, 2026-08-20).
+   *
+   * Combatants are seated into the projection when the play session starts and
+   * keep whatever they were seated with. Rebuild your character and storage is
+   * right immediately while the live session still holds the old one — which
+   * showed a player their PREVIOUS character's name beside their NEW
+   * character's class. The roster is re-read, so it wins.
+   */
+  it('shows the current name, not the one the session was seated with', () => {
+    const hero = heroFrom(
+      combatant({ id: 'ch1', name: 'Torvald' }),
+      { ...myCharacter('ch1', 'Daniel'), summary: 'Orc Monk' },
+    );
+    expect(hero.name, 'the stale combatant name must not win').toBe('Daniel');
+    expect(hero.initial).toBe('D');
+    expect(hero.className).toBe('Orc Monk');
+  });
+
+  it('uses current names in the cast list too', () => {
+    const cast = castFrom(
+      projection([combatant({ id: 'ch1', name: 'Torvald' }), combatant({ id: 'ch2', name: 'Bren' })]),
+      'ch1',
+      { ch1: 'Daniel' },
+    );
+    expect(cast.find((c) => c.id === 'ch1')!.name).toBe('Daniel');
+    /* A character nobody renamed keeps the projection's name rather than
+       vanishing — the map is a fallback, not a filter. */
+    expect(cast.find((c) => c.id === 'ch2')!.name).toBe('Bren');
+  });
+
   it('knows which one is you', () => {
     const cast = castFrom(
       projection([

@@ -40,17 +40,50 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
   const [room, setRoom] = useState<Room | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  /* The roster and the map, in parallel — neither depends on the other, and
-     serialising them would double the wait before the table appears. */
+  /**
+   * The roster and the map, in parallel — neither depends on the other, and
+   * serialising them would double the wait before the table appears.
+   *
+   * REFETCHED WHEN THE PAGE COMES BACK INTO VIEW, not only on mount. A player
+   * who rebuilds their character in another tab, or leaves this one open
+   * overnight, was otherwise looking at a snapshot taken when the page first
+   * loaded — showing a character that no longer exists, with no way to tell
+   * that was what had happened (owner, 2026-08-20: rebuilt as an Orc Monk and
+   * the table still showed the Goliath Fighter it replaced).
+   *
+   * Focus rather than a poll: the roster changes when a PERSON does something,
+   * and coming back to the tab is exactly when that has just happened.
+   */
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      session.authedRequest<CampaignSession>(`/campaigns/${campaignId}/session`),
-      session.authedRequest<Room>(`/campaigns/${campaignId}/room`),
-    ])
-      .then(([t, r]) => { if (!cancelled) { setTable(t); setRoom(r); } })
-      .catch((e) => { if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Could not open this table.'); });
-    return () => { cancelled = true; };
+
+    const load = (): void => {
+      Promise.all([
+        session.authedRequest<CampaignSession>(`/campaigns/${campaignId}/session`),
+        session.authedRequest<Room>(`/campaigns/${campaignId}/room`),
+      ])
+        .then(([t, r]) => { if (!cancelled) { setTable(t); setRoom(r); setLoadError(null); } })
+        .catch((e) => {
+          /* Only surface a failure if there is nothing on screen yet. A refetch
+             that fails while the table is already rendered should leave the
+             table alone rather than replacing it with an error. */
+          if (!cancelled && !table) setLoadError(e instanceof Error ? e.message : 'Could not open this table.');
+        });
+    };
+
+    load();
+    const onFocus = (): void => { if (document.visibilityState === 'visible') load(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+    /* `table` is deliberately not a dependency: it is read only inside the
+       error branch, and depending on it would restart the listeners on every
+       successful load. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignId, session]);
 
   const sync = useSync({
@@ -66,6 +99,15 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
     return me?.character ?? null;
   }, [table, session.account?.id]);
 
+  /* Every character's CURRENT name, so the cast list is not stale for the same
+     reason the hero panel was — see projectionToView's note on rebuilt
+     characters. */
+  const rosterNames = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const m of table?.members ?? []) if (m.character) out[m.character.id] = m.character.name;
+    return out;
+  }, [table]);
+
   const view = useMemo(() => {
     /* The snapshot is the engine's projection, opaque to contracts — the sync
        client deliberately does not fold it, so this is where it becomes a
@@ -78,8 +120,9 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
       role: table?.yourRole ?? 'player',
       events: sync.events,
       campaignName: table?.campaignName ?? '',
+      rosterNames,
     });
-  }, [sync.snapshot, sync.events, room, myCharacter, table]);
+  }, [sync.snapshot, sync.events, room, myCharacter, table, rosterNames]);
 
   if (loadError) {
     return (
