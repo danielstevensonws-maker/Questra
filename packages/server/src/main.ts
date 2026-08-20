@@ -24,12 +24,19 @@ export interface StartOptions {
    * ⇒ a bare sync server (dev without accounts, tests).
    */
   auth?: (app: FastifyInstance) => void;
+  /**
+   * Load a campaign's characters before its play session is created, so the
+   * session can seat them. Optional: a bare sync server (tests, dev without
+   * accounts) has no roster to load and seats nobody.
+   */
+  primeCampaignRoster?: (playSessionId: string) => Promise<void>;
   /** The web app's origin (undefined ⇒ no CORS registered — tests hit the app directly). */
   corsOrigin?: string;
 }
 
 /** Start the HTTP (Fastify) + WebSocket (ws) server. Returns a stop() handle. */
 export async function start(opts: StartOptions): Promise<{ port: number; stop: () => Promise<void> }> {
+  const primeRoster = opts.primeCampaignRoster ?? (async () => { /* no accounts wired */ });
   const app = Fastify({ logger: false });
   if (opts.corsOrigin) {
     // credentialed (the refresh cookie) — `*` can't carry credentials, so this is a
@@ -61,6 +68,18 @@ export async function start(opts: StartOptions): Promise<{ port: number; stop: (
       try { json = JSON.parse(String(data)); } catch { return conn.send({ m: 'error', code: 'bad_message' }); }
       const parsed = ClientMsgSchema.safeParse(json);
       if (!parsed.success) return conn.send({ m: 'error', code: 'bad_message' });
+
+      /* A session seats its characters when it is first created, and creation
+         happens inside onMessage's hello path, which cannot await. So the
+         roster is loaded HERE — before the message is handed on — and cached
+         for the synchronous seam to read. Only hello needs it; every other
+         message goes straight through. */
+      if (parsed.data.m === 'hello') {
+        void primeRoster(parsed.data.playSessionId)
+          .catch(() => { /* an unprimed session seats nobody; the next hello retries */ })
+          .then(() => opts.core.onMessage(conn, parsed.data));
+        return;
+      }
       opts.core.onMessage(conn, parsed.data);
     });
     socket.on('close', () => opts.core.onDisconnect(conn));
@@ -90,7 +109,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   loadDotEnvLocal();
   const config = readConfig();
   const built = createApp(config);
-  const { port } = await start({ core: built.core, auth: built.auth, port: config.port, corsOrigin: config.webOrigin });
+  const { port } = await start({ core: built.core, auth: built.auth, primeCampaignRoster: built.primeCampaignRoster, port: config.port, corsOrigin: config.webOrigin });
   const where = config.databaseUrl ? 'Postgres (durable)' : 'in-memory (no DATABASE_URL)';
   console.log(`[questra] server on http://0.0.0.0:${port} — store: ${where}`);
   const shutdown = async () => { await built.close(); process.exit(0); };

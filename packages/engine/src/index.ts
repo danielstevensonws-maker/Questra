@@ -30,6 +30,7 @@ export * from './sim/projection.js';
 export * from './sim/pipeline.js';
 export * from './sim/cascade.js';
 export * from './sim/sheet.js';
+export * from './sim/combatant-from-character.js';
 export * from './sim/narration.js';
 export * from './sim/duration.js';
 export * from './sim/dying.js';

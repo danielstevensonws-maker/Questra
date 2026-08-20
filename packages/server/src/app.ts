@@ -21,6 +21,11 @@ import { SyncCore, type IntentResolver, type ResolvedToken } from './sync-core.j
 import { InMemoryEventStore, type EventStore } from './store/event-store.js';
 import { PostgresEventStore } from './store/postgres-event-store.js';
 import {
+  CLASSES, DRAFT_ITEMS, DRAFT_SPELLS,
+  buildSheetRulesData, combatantFromCharacter, speciesSpeedFt,
+} from '@questra/engine';
+import { CharacterChoicesSchema } from '@questra/contracts';
+import {
   AuthService, CampaignService, InMemoryAuthRepo, LogMailer, makeResolveToken,
   registerAuthRoutes, registerCampaignRoutes,
   verifySession, secretFromEnv, type AuthRepo, type TokenConfig,
@@ -31,6 +36,8 @@ import type { FastifyInstance } from 'fastify';
 
 export interface App {
   core: SyncCore;
+  /** Load a campaign's characters so the session can seat them (see below). */
+  primeCampaignRoster: (playSessionId: string) => Promise<void>;
   auth: (app: FastifyInstance) => void;
   /** Release DB pools (if any). */
   close: () => Promise<void>;
@@ -69,11 +76,50 @@ export function createApp(config: ServerConfig): App {
     newCharacterId: () => `char_${Date.now().toString(36)}_${(characterSeq++).toString(36)}`,
   });
 
+  /**
+   * Seat the campaign's characters at the table.
+   *
+   * SyncCore takes `initialCombatants` as the base a session's event log folds
+   * on top of, and nothing was supplying it — so every play session started
+   * empty no matter who had made a character. This is the join between the
+   * wizard's output and the engine's projection.
+   *
+   * Synchronous by necessity: the seam is called during session creation,
+   * which is inside the hello path and cannot await. So the roster is loaded
+   * ahead of time by `primeCampaignRoster` (below) and read from a cache
+   * here. A session whose roster has not been primed yet seats nobody, which
+   * is the same thing that happened before and is recoverable — the next
+   * connection primes it.
+   *
+   * A character that fails validation is SKIPPED rather than thrown: one
+   * corrupt row should cost that player their seat, not take the whole
+   * table's session down with it.
+   */
+  const seatedByCampaign = new Map<string, Combatant[]>();
+
+  const primeCampaignRoster = async (playSessionId: string): Promise<void> => {
+    const campaignId = await repo.campaignIdForSession(playSessionId);
+    if (!campaignId) return;
+    const characters = await repo.charactersOfCampaign(campaignId);
+    const seated: Combatant[] = [];
+    for (const row of characters) {
+      const parsed = CharacterChoicesSchema.safeParse(row.choices);
+      if (!parsed.success) continue;
+      const rules = buildSheetRulesData(
+        [...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS],
+        speciesSpeedFt(parsed.data.speciesId),
+      );
+      seated.push(combatantFromCharacter({ id: row.id, choices: parsed.data }, rules));
+    }
+    seatedByCampaign.set(playSessionId, seated);
+  };
+
   // --- SyncCore with the REAL resolveToken (stub is dead) + the slice resolver ---
   const core = new SyncCore({
     resolveToken: makeResolveToken(repo, tokens),
     resolveIntent: makeSliceResolver(),
     store: eventStore,
+    initialCombatants: (playSessionId) => seatedByCampaign.get(playSessionId) ?? [],
   });
 
   const currentAccountId = async (authorization: string | undefined): Promise<string | null> => {
@@ -90,6 +136,7 @@ export function createApp(config: ServerConfig): App {
 
   return {
     core,
+    primeCampaignRoster,
     auth: mountAuth,
     close: async () => {
       await eventStore.close();
