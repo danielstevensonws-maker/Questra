@@ -47,6 +47,7 @@ let accountSeq = 0;
 let campaignSeq = 0;
 let playSessionSeq = 0;
 let characterSeq = 0;
+let roomSeq = 0;
 
 /** Build the wired application from config. Does not start the HTTP server (main.ts does). */
 export function createApp(config: ServerConfig): App {
@@ -74,6 +75,7 @@ export function createApp(config: ServerConfig): App {
     newCampaignId: () => `camp_${Date.now().toString(36)}_${(campaignSeq++).toString(36)}`,
     newPlaySessionId: () => `ps_${Date.now().toString(36)}_${(playSessionSeq++).toString(36)}`,
     newCharacterId: () => `char_${Date.now().toString(36)}_${(characterSeq++).toString(36)}`,
+    newRoomId: () => `room_${Date.now().toString(36)}_${(roomSeq++).toString(36)}`,
   });
 
   /**

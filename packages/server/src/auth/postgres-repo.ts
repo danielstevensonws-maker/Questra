@@ -7,7 +7,7 @@
  */
 import pg from 'pg';
 import type { Membership, Campaign } from '@questra/contracts';
-import type { AuthRepo, AccountRow, CharacterRow, TokenRow } from './repo.js';
+import type { AuthRepo, AccountRow, CharacterRow, RoomRow, TokenRow } from './repo.js';
 
 const { Pool } = pg;
 
@@ -39,6 +39,17 @@ function toCharacter(r: CharacterDb): CharacterRow {
   return {
     id: r.id, campaignId: r.campaign_id, accountId: r.account_id,
     name: r.name, choices: r.choices, createdAt: r.created_at.toISOString(),
+  };
+}
+
+type RoomDb = {
+  id: string; campaign_id: string; name: string;
+  body: unknown; is_current: boolean; created_at: Date;
+};
+function toRoom(r: RoomDb): RoomRow {
+  return {
+    id: r.id, campaignId: r.campaign_id, name: r.name,
+    body: r.body, isCurrent: r.is_current, createdAt: r.created_at.toISOString(),
   };
 }
 
@@ -197,6 +208,41 @@ export class PostgresAuthRepo implements AuthRepo {
       `SELECT * FROM character WHERE campaign_id = $1`, [campaignId],
     );
     return rows.map(toCharacter);
+  }
+
+  /* Demote-then-insert in one transaction: the partial unique index would
+     reject two current rooms, and doing it in two statements outside a
+     transaction would leave a window where a concurrent read sees none. */
+  async putRoom(r: RoomRow): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (r.isCurrent) {
+        await client.query(
+          `UPDATE room SET is_current = false WHERE campaign_id = $1 AND id <> $2 AND is_current`,
+          [r.campaignId, r.id],
+        );
+      }
+      await client.query(
+        `INSERT INTO room (id, campaign_id, name, body, is_current, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, body = EXCLUDED.body, is_current = EXCLUDED.is_current`,
+        [r.id, r.campaignId, r.name, JSON.stringify(r.body), r.isCurrent, r.createdAt],
+      );
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async currentRoom(campaignId: string): Promise<RoomRow | null> {
+    const { rows } = await this.pool.query<RoomDb>(
+      `SELECT * FROM room WHERE campaign_id = $1 AND is_current LIMIT 1`, [campaignId],
+    );
+    return rows[0] ? toRoom(rows[0]) : null;
   }
 
   async putTableDisplayToken(t: { tokenHash: string; campaignId: string; createdAt: string }): Promise<void> {

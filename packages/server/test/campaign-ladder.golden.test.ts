@@ -5,7 +5,7 @@
  * + deterministic ids, every response shape checked against the contracts.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CampaignSchema, CampaignSessionSchema, CharacterSchema, JoinPreviewSchema, MyCampaignsSchema } from '@questra/contracts';
+import { CampaignSchema, CampaignSessionSchema, CharacterSchema, JoinPreviewSchema, MyCampaignsSchema, RoomSchema } from '@questra/contracts';
 import { AuthService, CampaignService, AuthError, InMemoryAuthRepo, LogMailer, makeResolveToken, type TokenConfig } from '../src/auth/index.js';
 
 const SECRET = new TextEncoder().encode('test-secret-please-ignore-32chars!');
@@ -36,11 +36,13 @@ describe('campaign ladder (Brief 14 §2)', () => {
     let campSeq = 0;
     let psSeq = 0;
     let charSeq = 0;
+    let roomSeq = 0;
     campaigns = new CampaignService({
       repo, clock: clk.clock,
       newCampaignId: () => `camp_${++campSeq}`,
       newPlaySessionId: () => `ps_${++psSeq}`,
       newCharacterId: () => `char_${++charSeq}`,
+      newRoomId: () => `room_${++roomSeq}`,
       newSecret: () => `code-${++joinCodeSeq}`,
     });
   });
@@ -278,6 +280,38 @@ describe('campaign ladder (Brief 14 §2)', () => {
     const alice = await seat('alice@example.com', 'Alice');
     const { campaign } = await campaigns.createCampaign(alice, 'The Sunless Keep');
     expect(await campaigns.myCharacter(alice, campaign.id)).toBeNull();
+  });
+
+  it('mints a map on first open, and seats whoever has a character', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const bob = await seat('bob@example.com', 'Bob');
+    const { campaign, joinCode } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+    await campaigns.join(bob, joinCode);
+    const bobChar = await campaigns.saveCharacter(bob, campaign.id, fighterChoices('Torvald'));
+
+    const room = await campaigns.currentRoom(bob, campaign.id);
+    expect(() => RoomSchema.parse(room)).not.toThrow();
+
+    /* Lazy creation is the point: the room is minted when the table is first
+       opened, so it can seat the character Bob made AFTER the campaign was
+       created. A room minted at creation time would have been empty. */
+    expect(room.tokens.map((t) => t.creatureRef)).toEqual([bobChar.id]);
+  });
+
+  it('returns the same map on every open rather than minting a new one', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const { campaign } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+
+    const first = await campaigns.currentRoom(alice, campaign.id);
+    const second = await campaigns.currentRoom(alice, campaign.id);
+    expect(second.id, 'a second open must not mint a second map').toBe(first.id);
+  });
+
+  it('will not show the map to somebody who is not at the table', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const carol = await seat('carol@example.com', 'Carol');
+    const { campaign } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+    await expect(campaigns.currentRoom(carol, campaign.id)).rejects.toBeInstanceOf(AuthError);
   });
 
   it('a stranger token resolves to nothing, not an error', async () => {

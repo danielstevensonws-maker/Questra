@@ -6,8 +6,9 @@
  * pools, bonds web, promotions) — that is M4. This is only what M3's shell needs to
  * make "create → join → land in the party view" real.
  */
-import { CharacterChoicesSchema, CharacterSchema } from '@questra/contracts';
-import type { Campaign, CampaignMember, CampaignSession, Character, MyCampaigns } from '@questra/contracts';
+import { CharacterChoicesSchema, CharacterSchema, RoomSchema } from '@questra/contracts';
+import { starterRoom } from '@questra/engine';
+import type { Campaign, CampaignMember, CampaignSession, Character, MyCampaigns, Room } from '@questra/contracts';
 import type { AuthRepo } from './repo.js';
 import { hashToken, newRefreshToken, type Clock, systemClock } from './tokens.js';
 import { AuthError } from './service.js';
@@ -27,6 +28,7 @@ export interface CampaignDeps {
   newCampaignId: () => string;
   newPlaySessionId: () => string;
   newCharacterId: () => string;
+  newRoomId: () => string;
   /** Raw code/token generator. Defaults to a CSPRNG; tests inject a fixed sequence. */
   newSecret?: () => string;
 }
@@ -139,6 +141,43 @@ export class CampaignService {
          here rather than widening the contract to admit a case that cannot occur. */
       yourRole: me.role === 'dm' ? 'dm' : 'player',
     };
+  }
+
+  /**
+   * The map this campaign plays on, created on first open if it has none.
+   *
+   * LAZY RATHER THAN AT CREATION TIME, deliberately. A starter room seats the
+   * party, and at the moment a campaign is created nobody has made a character
+   * yet — so a room minted then would be empty and would need rebuilding
+   * anyway. Creating it when the table is first opened means it can seat
+   * whoever actually turned up.
+   *
+   * Membership-gated: a map is not public, and its unrevealed cells are the
+   * DM's to give away. Filtering per viewer happens at the payload boundary
+   * (filterRoomForViewer), not here — this returns the whole truth and the
+   * caller decides who may see what.
+   */
+  async currentRoom(callerAccountId: string, campaignId: string): Promise<Room> {
+    const me = await this.deps.repo.membership(callerAccountId, campaignId);
+    if (!me) throw new AuthError('not_member', 'You are not part of this campaign.', 403);
+
+    const existing = await this.deps.repo.currentRoom(campaignId);
+    if (existing) return RoomSchema.parse(existing.body);
+
+    const characters = await this.deps.repo.charactersOfCampaign(campaignId);
+    const room = starterRoom({
+      roomId: this.deps.newRoomId(),
+      creatureIds: characters.map((c) => c.id),
+    });
+    await this.deps.repo.putRoom({
+      id: room.id,
+      campaignId,
+      name: 'The room you start in',
+      body: room,
+      isCurrent: true,
+      createdAt: this.nowIso(),
+    });
+    return room;
   }
 
   /**

@@ -82,6 +82,17 @@ export function registerCampaignRoutes(
     }),
   );
 
+  /* The map the play screen opens onto. Created on first open, so it can
+     seat whoever has actually made a character. */
+  app.get<{ Params: { campaignId: string } }>(
+    '/campaigns/:campaignId/room',
+    async (req, reply) => handle(reply, async () => {
+      const callerId = await requireAccount(req, reply);
+      if (!callerId) return { error: 'auth', reason: 'Please sign in.' };
+      return service.currentRoom(callerId, req.params.campaignId);
+    }),
+  );
+
   /* The wizard's destination. Membership-gated, and it replaces rather than
      duplicates — see saveCharacter. */
   app.put<{ Params: { campaignId: string }; Body: { choices: unknown } }>(

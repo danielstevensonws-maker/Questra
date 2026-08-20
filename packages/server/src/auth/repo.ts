@@ -43,6 +43,20 @@ export interface CharacterRow {
   createdAt: string;
 }
 
+/**
+ * A stored map. `body` is the whole Room shape, kept opaque here — contracts
+ * owns it (RoomSchema) and validates on the way in and out, so the repo does
+ * not fork that schema into the data layer.
+ */
+export interface RoomRow {
+  id: string;
+  campaignId: string;
+  name: string;
+  body: unknown;
+  isCurrent: boolean;
+  createdAt: string;
+}
+
 export interface AuthRepo {
   // accounts
   createAccount(a: Omit<AccountRow, 'createdAt' | 'deletedAt'> & { createdAt: string }): Promise<void>;
@@ -86,6 +100,11 @@ export interface AuthRepo {
   /** Every character at a campaign's table, for the lobby roster. */
   charactersOfCampaign(campaignId: string): Promise<CharacterRow[]>;
 
+  // rooms (the maps a campaign plays on)
+  putRoom(r: RoomRow): Promise<void>;
+  /** The map a session opens into, or null if the campaign has none yet. */
+  currentRoom(campaignId: string): Promise<RoomRow | null>;
+
   // table_display credentials (Brief 14 §2) — a shared screen, not a signed-in person,
   // so this is its own token table rather than a fake account (see the migration doc).
   putTableDisplayToken(t: { tokenHash: string; campaignId: string; createdAt: string }): Promise<void>;
@@ -113,6 +132,8 @@ export class InMemoryAuthRepo implements AuthRepo {
   /* Same composite key as memberships: one character per person per campaign,
      which is the unique constraint the migration enforces in Postgres. */
   private characters = new Map<string, CharacterRow>();
+  /** Keyed by room id — a campaign has many rooms, one of them current. */
+  private rooms = new Map<string, RoomRow>();
   private campaigns = new Map<string, Campaign>();
   private joinTokens = new Map<string, string>(); // tokenHash → campaignId
   private sessions = new Map<string, string>(); // playSessionId → campaignId
@@ -231,6 +252,23 @@ export class InMemoryAuthRepo implements AuthRepo {
   }
   async charactersOfCampaign(campaignId: string): Promise<CharacterRow[]> {
     return [...this.characters.values()].filter((c) => c.campaignId === campaignId);
+  }
+
+  async putRoom(r: RoomRow): Promise<void> {
+    /* Setting a room current demotes the others, mirroring the partial unique
+       index in Postgres: "which map are we on" is one answer, not a race. */
+    if (r.isCurrent) {
+      for (const [key, existing] of this.rooms) {
+        if (existing.campaignId === r.campaignId && existing.id !== r.id) {
+          this.rooms.set(key, { ...existing, isCurrent: false });
+        }
+      }
+    }
+    this.rooms.set(r.id, r);
+  }
+  async currentRoom(campaignId: string): Promise<RoomRow | null> {
+    for (const r of this.rooms.values()) if (r.campaignId === campaignId && r.isCurrent) return r;
+    return null;
   }
 
   async putTableDisplayToken(t: { tokenHash: string; campaignId: string }): Promise<void> {
