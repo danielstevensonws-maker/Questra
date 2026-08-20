@@ -175,7 +175,15 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
             here: sync.present.some((p) => p.accountId === m.accountId),
           }))}
         onLeave={onLeave}
-        onSay={(text) => { console.log('say', text); }}
+        onSay={(text) => {
+          /* Straight onto the shared log, where every connected player sees it.
+             The DM narrating and a player describing an action take the SAME
+             path — one composer, one event, no separate chat to keep in sync. */
+          sync.sendIntent({
+            idempotencyKey: 'say-' + String(Date.now()) + '-' + String(Math.random()).slice(2, 8),
+            intent: { kind: 'free_text', creatureId: table.members.find((m) => m.role === 'dm')?.character?.id ?? 'dm', text },
+          });
+        }}
       />
     );
   }

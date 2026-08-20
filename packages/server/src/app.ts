@@ -154,13 +154,89 @@ export function createApp(config: ServerConfig): App {
  * else rejects with a plain-language reason (the greying string). The full
  * per-intent resolver is play-slice scope.
  */
-function makeSliceResolver(): IntentResolver {
+/** Exported so its behaviour can be asserted directly — the alternative is
+    driving a socket to observe a pure function. */
+export function makeSliceResolver(): IntentResolver {
   const rules: RulesData = buildRulesData(CONDITIONS.map((c) => RulesEntitySchema.parse(c)));
   // a deterministic-enough rng for a dev server (not a golden; real rolls in play)
   const rng = () => 0.5;
   let n = 0;
+
   return (envelope, state) => {
-    const intent = envelope.intent as { kind?: string; attackerId?: string; targetId?: string; actionName?: string };
+    const intent = envelope.intent as {
+      kind?: string;
+      attackerId?: string; targetId?: string; actionName?: string;
+      creatureId?: string; text?: string;
+      tokenId?: string; path?: { x: number; y: number }[];
+    };
+    const seq = state.nextSeq;
+    const stamp = (i = 0) => ({
+      seq: seq + i,
+      id: `e-${n}-${String(i)}`,
+      at: new Date().toISOString(),
+    });
+
+    /**
+     * FREE TEXT IS THE ESCAPE HATCH THE WHOLE PRODUCT RESTS ON (Law 2, Brief 10
+     * §4.1). A player who cannot find the right button types what they want to
+     * do, and it becomes part of the table's record rather than being refused.
+     * A DM narrating uses the same path — one composer, one event, no separate
+     * chat channel to keep in sync.
+     *
+     * It resolves to narration rather than escalating to a Ruling because the
+     * AI ruling tier is not wired to this server yet; saying the words out loud
+     * to everybody is the honest subset of that behaviour, and it is what makes
+     * a table feel live today.
+     */
+    if (intent.kind === 'free_text' && intent.text) {
+      n++;
+      return {
+        ok: true,
+        events: [{
+          ...stamp(),
+          causeId: `cause-say-${n}`,
+          /* The envelope carries no account — SyncCore knows who sent it, the
+             resolver does not. Attributing to the creature is both what the event
+             body records and what a reader of the log actually wants. */
+          actor: { kind: 'player', accountId: intent.creatureId ?? 'table', creatureId: intent.creatureId },
+          visibility: 'public',
+          body: { t: 'narration', text: intent.text, from: 'dm' },
+        }] as PlayEvent[],
+      };
+    }
+
+    /**
+     * Moving a token. The path is trusted as declared for now — legality
+     * (movement budget, difficult terrain, opportunity attacks) is checkIntent's
+     * job and wiring it is the next piece. What matters here is that a move
+     * REACHES EVERYONE: a table where one person drags a token and nobody else
+     * sees it move is not a shared table.
+     */
+    if (intent.kind === 'move' && intent.tokenId && intent.path?.length) {
+      const to = intent.path[intent.path.length - 1]!;
+      const from = intent.path[0] ?? to;
+      n++;
+      return {
+        ok: true,
+        events: [{
+          ...stamp(),
+          causeId: `cause-move-${n}`,
+          actor: { kind: 'player', accountId: intent.tokenId ?? 'table' },
+          visibility: 'public',
+          body: {
+            t: 'token_moved',
+            tokenId: intent.tokenId,
+            from, to,
+            path: intent.path,
+            forced: false,
+            /* Chebyshev, five feet a square (ADR-0012) — the same metric the
+               engine's own geometry uses. */
+            costFt: 5 * Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y)),
+          },
+        }] as PlayEvent[],
+      };
+    }
+
     if (intent.kind !== 'attack' || !intent.attackerId || !intent.targetId) {
       return { ok: false, reason: 'That action is not available yet.' };
     }

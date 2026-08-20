@@ -96,12 +96,49 @@ export function Lobby({ campaignId, session, onBegin, onLeave, onMakeCharacter }
   }, [unknownPresent, campaignId, session]);
 
   const isDm = table?.yourRole === 'dm';
+
+  /**
+   * EVERYONE GOES IN WHEN THE DM BEGINS.
+   *
+   * "Begin the session" used to be local navigation: it moved the DM's own
+   * browser to the table and told nobody, so players sat in the lobby with no
+   * way through and no sign anything had happened (owner, 2026-08-20 — "i
+   * thought when the dm presses start everyone goes to the view?"). Starting a
+   * session is something that happens to the TABLE, so it travels the way
+   * everything else at the table does: as an event on the shared log.
+   *
+   * ANY event means play has started. The log is empty until somebody acts, and
+   * the DM's first act on arriving is what fills it — so the log being non-empty
+   * is the same fact as "the session is under way", without inventing a
+   * session-state field the protocol does not have. A player who arrives late
+   * is carried in immediately for that same reason, which is what you want.
+   */
+  useEffect(() => {
+    if (isDm || sync.events.length === 0) return;
+    onBegin();
+  }, [sync.events.length, isDm, onBegin]);
+
   const me = table?.members.find((m) => m.accountId === session.account?.id);
   /* A DM does not play a character, so they are never "missing" one. */
   const needCharacter = table?.members.filter((m) => m.role === 'player' && !m.character) ?? [];
   const iNeedCharacter = me?.role === 'player' && !me.character;
   const dm = table?.members.find((m) => m.role === 'dm');
   const waitingOn = table?.members.filter((m) => !here.has(m.accountId)) ?? [];
+
+  /**
+   * The DM beginning is a thing they SAY, not a page they navigate to. Sending
+   * it first means the log carries the moment the session opened, every
+   * connected player is carried in by the effect above, and the DM's own
+   * navigation is just what happens next rather than the whole mechanism.
+   */
+  const begin = (): void => {
+    sync.sendIntent({
+      idempotencyKey: 'begin-' + campaignId + '-' + String(Date.now()),
+      intent: { kind: 'free_text', creatureId: 'dm', text: 'The session begins.' },
+    });
+    onBegin();
+  };
+
 
   if (loadError) {
     return (
@@ -163,7 +200,7 @@ export function Lobby({ campaignId, session, onBegin, onLeave, onMakeCharacter }
                     : 'Everyone is here and ready. Begin whenever you like.'}
               </p>
               <div className="rd-actions">
-                <button type="button" className="qa2-cta" onClick={onBegin}>Begin the session</button>
+                <button type="button" className="qa2-cta" onClick={begin}>Begin the session</button>
                 <button type="button" className="qa2-quiet-link" onClick={onLeave}>Back to your campaigns</button>
               </div>
             </>
