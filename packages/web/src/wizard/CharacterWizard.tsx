@@ -27,7 +27,10 @@ import { ShellStyles } from '../shell/ShellStyles.js';
 import { Road } from '../shell/road/Road.js';
 import { usePrefersReducedMotion } from '../shell/shared.js';
 import { CharacterPanel } from './CharacterPanel.js';
-import { BACKGROUND_OPTIONS, CLASS_OPTIONS, SPECIES_OPTIONS, backgroundById, sheetFor } from './rules.js';
+import {
+  BACKGROUND_OPTIONS, CLASS_OPTIONS, SPECIES_OPTIONS,
+  backgroundById, classById, sheetFor, type ClassOption,
+} from './rules.js';
 import {
   ABILITY_LABEL, ABILITY_ORDER, ABILITY_PLAIN, STANDARD_ARRAY,
   bonusTotal, useCharacterDraft, type StepId,
@@ -40,6 +43,21 @@ export interface CharacterWizardProps {
   busy?: boolean;
   onFinish: (choices: CharacterChoices) => void;
   onCancel: () => void;
+}
+
+/**
+ * The one ability the randomiser should favour.
+ *
+ * A few classes declare "str_or_dex" — genuinely either, and the SRD means it.
+ * Choosing Dexterity there is not arbitrary: it also drives armour class and
+ * initiative, so somebody who does not yet know the difference gets the more
+ * forgiving character.
+ */
+function primaryAbilityOf(klass: ClassOption | undefined): Ability | undefined {
+  if (!klass) return undefined;
+  const raw = klass.primaryAbility;
+  if (raw === 'str_or_dex') return 'dex';
+  return (ABILITY_ORDER as string[]).includes(raw) ? (raw as Ability) : undefined;
 }
 
 const COMPLEXITY_LABEL: Record<string, string> = {
@@ -58,6 +76,7 @@ export function CharacterWizard({ campaignName, busy = false, onFinish, onCancel
      panel shows its empty shape — the engine is never handed a half-character. */
   const sheet = useMemo(() => (choices ? sheetFor(choices) : null), [choices]);
 
+  const klass = classById(draft.classId);
   const background = backgroundById(draft.backgroundId);
   const spent = bonusTotal(draft.backgroundBonuses);
   const blockers = steps.filter((s) => !s.done);
@@ -205,10 +224,24 @@ export function CharacterWizard({ campaignName, busy = false, onFinish, onCancel
 
                     {step.id === 'abilities' && (
                       <>
-                        <p className="rd-detail">
-                          Six numbers, six abilities. Put the big ones where your class
-                          will use them — tap a number to move it.
-                        </p>
+                        <div className="qa-assign-head">
+                          <p className="rd-detail">
+                            Six numbers, six abilities. Put the big ones where your class
+                            will use them — tap a number to move it, or tap it again to
+                            take it back off.
+                          </p>
+                          {/* The way out for anyone who does not yet know what a good
+                              spread looks like. It favours the class's own ability, so
+                              it hands back something playable rather than a random mess
+                              a beginner could not tell was bad. */}
+                          <button
+                            type="button"
+                            className="qa2-quiet-link qa-roll"
+                            onClick={() => api.rollAbilities(primaryAbilityOf(klass))}
+                          >
+                            Choose for me
+                          </button>
+                        </div>
                         <div className="qa-assign">
                           {ABILITY_ORDER.map((a) => (
                             <div key={a} className="qa-assign-row">

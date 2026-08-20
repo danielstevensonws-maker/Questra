@@ -23,6 +23,8 @@ export interface ClassOption {
   id: string;
   name: string;
   plain: string;
+  /** What the class leans on — the randomiser gives it the highest score. */
+  primaryAbility: string;
   complexity: 'low' | 'average' | 'high';
   hitDie: string;
   casterType: 'none' | 'third' | 'half' | 'full' | 'pact';
@@ -60,8 +62,8 @@ function metaOf<T>(e: RulesEntity): T {
 const COMPLEXITY_RANK: Record<string, number> = { low: 0, average: 1, high: 2 };
 
 export const CLASS_OPTIONS: ClassOption[] = CLASSES.map((c) => {
-  const m = metaOf<{ complexity: ClassOption['complexity']; hitDie: string; casterType: ClassOption['casterType'] }>(c);
-  return { id: c.id, name: c.name, plain: c.plain, complexity: m.complexity, hitDie: m.hitDie, casterType: m.casterType };
+  const m = metaOf<{ complexity: ClassOption['complexity']; hitDie: string; casterType: ClassOption['casterType']; primaryAbility: string }>(c);
+  return { id: c.id, name: c.name, plain: c.plain, complexity: m.complexity, hitDie: m.hitDie, casterType: m.casterType, primaryAbility: m.primaryAbility };
 }).sort((a, b) => (COMPLEXITY_RANK[a.complexity]! - COMPLEXITY_RANK[b.complexity]!) || a.name.localeCompare(b.name));
 
 export const SPECIES_OPTIONS: SpeciesOption[] = VERIFIED_SPECIES.map((s) => {

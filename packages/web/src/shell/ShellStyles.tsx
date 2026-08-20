@@ -358,6 +358,11 @@ const CSS = `
 
 /* ---- the background spend and the ability assignment ---- */
 .qa-spend, .qa-assign { display: flex; flex-direction: column; gap: var(--qa-s3); padding-top: var(--qa-s2); }
+/* The instruction and its escape hatch share a line: the button belongs
+   beside the sentence it is an alternative to, not stranded below the list. */
+.qa-assign-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--qa-s4); flex-wrap: wrap; }
+.qa-assign-head .rd-detail { flex: 1; min-width: 240px; }
+.qa-roll { flex: none; white-space: nowrap; }
 .qa-spend-rows { display: flex; flex-direction: column; gap: var(--qa-s2); }
 .qa-spend-row, .qa-assign-row {
   display: flex;

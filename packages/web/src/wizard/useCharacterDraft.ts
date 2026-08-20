@@ -84,6 +84,8 @@ export interface DraftApi {
   chooseBackground: (id: string, abilityOptions: Ability[]) => void;
   chooseSpecies: (id: string) => void;
   assign: (ability: Ability, value: number) => void;
+  /** Place a legal spread at random, favouring the class's primary ability. */
+  rollAbilities: (primary?: Ability) => void;
   spendBonus: (ability: Ability, amount: number) => void;
   reset: () => void;
 }
@@ -120,12 +122,60 @@ export function useCharacterDraft(): DraftApi {
       const next = { ...d.assignment };
       const holder = ABILITY_ORDER.find((a) => next[a] === value && a !== ability);
       const displaced = next[ability];
+
+      /* Tapping the value an ability already holds takes it back off, so a
+         mistake is undoable by tapping the same chip again rather than by
+         hunting for somewhere else to put it. */
+      if (displaced === value) {
+        delete next[ability];
+        return { ...d, assignment: next };
+      }
+
       next[ability] = value;
+
       if (holder) {
-        if (displaced === undefined) delete next[holder];
-        else next[holder] = displaced;
+        if (displaced === undefined) {
+          /* The value moved off an ability that had one and onto an empty one.
+             The array has six values for six abilities, so the number this
+             ability did NOT have has to go somewhere — it goes to the ability
+             that just lost its own. Deleting instead (the original bug) put a
+             value beyond reach: every chip looked used while an ability sat
+             empty, and the wizard could never be finished. */
+          const unplaced = STANDARD_ARRAY.find((v) => !Object.values(next).includes(v));
+          if (unplaced === undefined) delete next[holder];
+          else next[holder] = unplaced;
+        } else {
+          next[holder] = displaced;
+        }
       }
       return { ...d, assignment: next };
+    });
+  }, []);
+
+  /**
+   * Roll the party up at random — a legal spread, placed sensibly.
+   *
+   * Not truly random placement: the highest score goes to whatever the class
+   * actually uses, because a Wizard with 15 Strength and 8 Intelligence is a
+   * character nobody wants and a beginner would not know to avoid. This is the
+   * "surprise me" button, and it owes you something playable.
+   */
+  const rollAbilities = useCallback((primary?: Ability) => {
+    setDraft((d) => {
+      const order = [...ABILITY_ORDER];
+      /* Shuffle, then pull the class's primary ability to the front so it
+         takes the 15. Everything after it is genuinely random. */
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j]!, order[i]!];
+      }
+      if (primary) {
+        const at = order.indexOf(primary);
+        if (at > 0) { order.splice(at, 1); order.unshift(primary); }
+      }
+      const assignment: Partial<Record<Ability, number>> = {};
+      order.forEach((a, i) => { assignment[a] = STANDARD_ARRAY[i]!; });
+      return { ...d, assignment };
     });
   }, []);
 
@@ -200,5 +250,5 @@ export function useCharacterDraft(): DraftApi {
     };
   }, [draft, steps]);
 
-  return { draft, steps, choices, setName, chooseClass, chooseBackground, chooseSpecies, assign, spendBonus, reset };
+  return { draft, steps, choices, setName, chooseClass, chooseBackground, chooseSpecies, assign, rollAbilities, spendBonus, reset };
 }

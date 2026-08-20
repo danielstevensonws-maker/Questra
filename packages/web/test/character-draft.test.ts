@@ -48,16 +48,64 @@ describe('the wizard draft', () => {
     expect(result.current.draft.assignment.str, 'the displaced value moved, it did not vanish').toBe(14);
   });
 
-  /** Moving a value onto an empty ability leaves the source empty, not stale. */
-  it('moves a value onto an unassigned ability without duplicating it', () => {
+  /**
+   * THE BUG THIS SUITE ORIGINALLY BLESSED (found by playing, 2026-08-20).
+   *
+   * Moving a value onto an empty ability used to DELETE it from its old holder,
+   * so the number of placed values could never grow past that point. Every chip
+   * read as used while an ability sat empty, and the wizard could not be
+   * finished — the player was stuck with no way out. The old test asserted
+   * exactly that behaviour, which is why it passed.
+   *
+   * Six values exist for six abilities, so a move must always leave six
+   * placements once six have been made: the value the destination did not have
+   * goes back to the ability that just lost its own.
+   */
+  it('never strands a value out of reach when one is moved to an empty ability', () => {
+    const { result } = renderHook(() => useCharacterDraft());
+    const vals = [15, 14, 13, 12, 10, 8] as const;
+    const abils = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
+    abils.forEach((a, i) => act(() => { result.current.assign(a, vals[i]!); }));
+    expect(Object.keys(result.current.draft.assignment)).toHaveLength(6);
+
+    /* Take Charisma's 8 and give it to Strength — the move that used to strand
+       a number. Every ability must still hold one afterwards. */
+    act(() => { result.current.assign('str', 8); });
+
+    const after = result.current.draft.assignment;
+    expect(Object.keys(after), 'an ability was left with nothing').toHaveLength(6);
+    expect(new Set(Object.values(after)).size, 'a value was duplicated').toBe(6);
+    expect(new Set(Object.values(after))).toEqual(new Set(vals));
+    expect(result.current.choices, 'and the character can still be finished').not.toBeNull;
+  });
+
+  /** Tapping the value an ability already holds takes it back off. */
+  it('lets a tap undo itself', () => {
     const { result } = renderHook(() => useCharacterDraft());
     act(() => { result.current.assign('str', 15); });
-    act(() => { result.current.assign('con', 15); });
-
-    expect(result.current.draft.assignment.con).toBe(15);
+    act(() => { result.current.assign('str', 15); });
     expect(result.current.draft.assignment.str).toBeUndefined();
-    const used = Object.values(result.current.draft.assignment);
-    expect(new Set(used).size, 'no value appears twice').toBe(used.length);
+  });
+
+  /**
+   * The way out for somebody who does not yet know what a good spread looks
+   * like. It must produce a LEGAL one — all six values, each used once — and
+   * put the best score where the class will actually use it.
+   */
+  it('rolls a legal spread and favours the class ability', () => {
+    const { result } = renderHook(() => useCharacterDraft());
+    act(() => { result.current.rollAbilities('int'); });
+
+    const rolled = result.current.draft.assignment;
+    expect(Object.keys(rolled)).toHaveLength(6);
+    expect(new Set(Object.values(rolled))).toEqual(new Set([15, 14, 13, 12, 10, 8]));
+    expect(rolled.int, 'a Wizard should not be handed 8 Intelligence').toBe(15);
+  });
+
+  it('rolls a legal spread even with no class chosen yet', () => {
+    const { result } = renderHook(() => useCharacterDraft());
+    act(() => { result.current.rollAbilities(); });
+    expect(new Set(Object.values(result.current.draft.assignment))).toEqual(new Set([15, 14, 13, 12, 10, 8]));
   });
 
   /** 2024 rules: +2/+1 across two abilities, or +1/+1/+1 across three. */
