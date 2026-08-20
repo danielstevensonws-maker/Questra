@@ -270,6 +270,161 @@ const CSS = `
 .qa-seat-you { color: var(--qa-accent); }
 .qa-seat-role { flex: none; color: var(--qa-ink-faint); text-transform: uppercase; }
 
+/* ---- The character wizard --------------------------------------------------
+   Two columns: the steps you work through, and the character filling in beside
+   them. The panel is STICKY rather than scrolling away — its whole job is to
+   show consequence, and a payoff you have to scroll back to see is not one. */
+.qa-wiz { display: block; padding: var(--qa-hud-inset); }
+.qa-wiz-frame {
+  position: relative;
+  z-index: 2;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--qa-s6) 0 var(--qa-s8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s6);
+}
+.qa-wiz-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--qa-s5); flex-wrap: wrap; }
+.qa-wiz-head > div { display: flex; flex-direction: column; gap: var(--qa-s2); }
+.qa-wiz-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--qa-s5); align-items: start; }
+.qa-wiz-steps { display: flex; flex-direction: column; gap: var(--qa-s3); min-width: 0; }
+.qa-wiz-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--qa-s4); flex-wrap: wrap; }
+.qa-wiz-left { margin-right: auto; max-width: none; }
+
+/* ---- one step ---- */
+.qa-step {
+  background: var(--qa-glass);
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-radius: var(--qa-radius-lg);
+  backdrop-filter: blur(var(--qa-glass-blur));
+  -webkit-backdrop-filter: blur(var(--qa-glass-blur));
+  overflow: hidden;
+}
+.qa-step.is-open { border-color: var(--qa-accent-line); }
+.qa-step-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--qa-s3);
+  padding: var(--qa-s4);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+/* The number is a step count, and the sequence is real — a background bonus
+   cannot be spent before a background exists. It carries a state, not just an
+   index: lit once the step is the one being worked on. */
+.qa-step-n {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--qa-radius-round);
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  color: var(--qa-ink-faint);
+}
+.qa-step.is-open .qa-step-n { border-color: var(--qa-accent-line); color: var(--qa-accent); }
+.qa-step-label { flex: 1; font-family: var(--qa-font-display); font-size: var(--qa-text-lg); color: var(--qa-ink); }
+.qa-step-state { flex: none; color: var(--qa-ink-faint); text-transform: uppercase; }
+.qa-step-body { display: flex; flex-direction: column; gap: var(--qa-s3); padding: 0 var(--qa-s4) var(--qa-s4); }
+
+/* ---- the pick grids ---- */
+.qa-pick-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: var(--qa-s2); }
+.qa-pick {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s1);
+  padding: var(--qa-s3);
+  text-align: left;
+  cursor: pointer;
+  background: var(--qa-chip);
+  border: var(--qa-hairline) solid transparent;
+  border-radius: var(--qa-radius);
+  transition: border-color var(--qa-dur) var(--qa-ease), background var(--qa-dur) var(--qa-ease);
+}
+.qa-pick:hover { border-color: var(--qa-glass-border); }
+.qa-pick.is-picked { background: var(--qa-accent-soft); border-color: var(--qa-accent-line); }
+.qa-pick-name { font-family: var(--qa-font-display); font-size: var(--qa-text-body); color: var(--qa-ink); }
+.qa-pick-plain { font-family: var(--qa-font-body); font-size: var(--qa-text-label); line-height: 1.45; color: var(--qa-ink-dim); }
+.qa-pick-meta { color: var(--qa-ink-faint); text-transform: uppercase; }
+.qa-pick.is-picked .qa-pick-meta { color: var(--qa-accent); }
+
+/* ---- the background spend and the ability assignment ---- */
+.qa-spend, .qa-assign { display: flex; flex-direction: column; gap: var(--qa-s3); padding-top: var(--qa-s2); }
+.qa-spend-rows { display: flex; flex-direction: column; gap: var(--qa-s2); }
+.qa-spend-row, .qa-assign-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--qa-s4);
+  flex-wrap: wrap;
+  padding-bottom: var(--qa-s2);
+  border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
+}
+.qa-spend-name, .qa-assign-name { font-family: var(--qa-font-body); font-size: var(--qa-text-body); color: var(--qa-ink); }
+.qa-assign-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.qa-assign-plain { color: var(--qa-ink-faint); text-transform: none; letter-spacing: normal; }
+.qa-spend-opts, .qa-assign-opts { display: flex; gap: var(--qa-s1); flex: none; }
+.qa-assign-opts .qa2-chip, .qa-spend-opts .qa2-chip { min-width: 38px; justify-content: center; padding: var(--qa-s2); }
+.qa-assign-opts .qa2-chip:disabled, .qa-spend-opts .qa2-chip:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ---- the character panel ---- */
+.qa-cp {
+  position: sticky;
+  top: var(--qa-hud-inset);
+  padding: var(--qa-s5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s4);
+}
+.qa-cp-head { display: flex; flex-direction: column; gap: var(--qa-s1); }
+.qa-cp-name { margin: 0; font-family: var(--qa-font-display); font-size: var(--qa-text-title); line-height: 1.1; color: var(--qa-ink); }
+.qa-cp-line { margin: 0; font-family: var(--qa-font-body); font-size: var(--qa-text-label); color: var(--qa-ink-dim); }
+
+.qa-cp-vitals { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qa-s3); }
+.qa-cp-stat { display: flex; flex-direction: column; gap: 2px; }
+.qa-cp-stat-label { font-family: var(--qa-font-mono); font-size: var(--qa-text-whisper); letter-spacing: var(--qa-tracking-caps); text-transform: uppercase; color: var(--qa-ink-faint); }
+.qa-cp-stat-value { font-family: var(--qa-font-mono); font-size: var(--qa-text-lg); color: var(--qa-ink); }
+.qa-cp-stat.is-empty .qa-cp-stat-value { color: var(--qa-ink-faint); }
+/* The arithmetic under a number is the point of this panel, not a footnote —
+   it is how a first-time player learns where 12 hit points came from. */
+.qa-cp-why { font-family: var(--qa-font-mono); font-size: var(--qa-text-whisper); line-height: 1.5; color: var(--qa-ink-faint); }
+.qa-cp-plus { padding: 0 3px; }
+
+.qa-cp-abilities { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--qa-s2); }
+.qa-cp-ab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: var(--qa-s2);
+  background: var(--qa-chip);
+  border-radius: var(--qa-radius);
+}
+.qa-cp-ab-name { font-family: var(--qa-font-mono); font-size: var(--qa-text-whisper); letter-spacing: var(--qa-tracking-caps); color: var(--qa-ink-faint); }
+.qa-cp-ab-score { font-family: var(--qa-font-mono); font-size: var(--qa-text-body); color: var(--qa-ink); }
+.qa-cp-ab-mod { font-family: var(--qa-font-mono); font-size: var(--qa-text-whisper); color: var(--qa-accent); }
+.qa-cp-ab.is-empty .qa-cp-ab-score { color: var(--qa-ink-faint); }
+
+.qa-cp-block { display: flex; flex-direction: column; gap: var(--qa-s1); }
+.qa-cp-list { margin: 0; font-family: var(--qa-font-body); font-size: var(--qa-text-label); line-height: 1.5; color: var(--qa-ink-dim); }
+
+@media (max-width: 900px) {
+  /* The panel stops being sticky and moves ABOVE the steps: on a narrow screen
+     a sticky sidebar would eat the room the choices need, and the summary is
+     more useful as a running header than as a column. */
+  .qa-wiz-body { grid-template-columns: minmax(0, 1fr); }
+  .qa-cp { position: static; order: -1; }
+  .qa-wiz-frame { padding-top: var(--qa-s4); }
+}
+
 /* ---- shell states ---------------------------------------------------------- */
 .qa-shell-loading { display: flex; align-items: center; justify-content: center; min-height: 40vh; }
 .qa-shell-error { display: flex; flex-direction: column; gap: var(--qa-s3); }
