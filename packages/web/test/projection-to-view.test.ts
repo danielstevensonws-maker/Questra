@@ -29,6 +29,49 @@ function combatant(over: Partial<Combatant> & { id: string; name: string }): Com
   };
 }
 
+const derived = (value: number, rows: { label: string; value: number }[]) => ({ value, derivation: rows });
+
+/**
+ * A sheet as the server would send it. Hand-built rather than computed so the
+ * adapter is tested in isolation — whether computeSheet is correct is the
+ * engine's golden suite's job, not this one's.
+ */
+function sheetStub() {
+  return {
+    abilities: {
+      str: derived(16, [{ label: 'Base', value: 14 }, { label: 'Background', value: 2 }]),
+      dex: derived(14, [{ label: 'Base', value: 14 }]),
+      con: derived(14, [{ label: 'Base', value: 13 }, { label: 'Background', value: 1 }]),
+      int: derived(10, [{ label: 'Base', value: 10 }]),
+      wis: derived(12, [{ label: 'Base', value: 12 }]),
+      cha: derived(8, [{ label: 'Base', value: 8 }]),
+    },
+    profBonus: derived(2, [{ label: 'Level 1', value: 2 }]),
+    hp: { value: { max: 12, hitDie: 'd10', hitDiceMax: 1 }, derivation: [{ label: 'Hit die', value: 10 }, { label: 'CON', value: 2 }] },
+    acOptions: [derived(16, [{ label: 'Chain mail', value: 16 }])],
+    acDefault: 0,
+    initiative: derived(2, [{ label: 'DEX', value: 2 }]),
+    saves: {
+      str: derived(5, [{ label: 'STR', value: 3 }, { label: 'Proficiency', value: 2 }]),
+      dex: derived(2, [{ label: 'DEX', value: 2 }]),
+      con: derived(4, [{ label: 'CON', value: 2 }, { label: 'Proficiency', value: 2 }]),
+      int: derived(0, [{ label: 'INT', value: 0 }]),
+      wis: derived(1, [{ label: 'WIS', value: 1 }]),
+      cha: derived(-1, [{ label: 'CHA', value: -1 }]),
+    },
+    skills: { athletics: derived(5, [{ label: 'STR', value: 3 }, { label: 'Proficiency', value: 2 }]) },
+    passives: { perception: derived(11, [{ label: 'Base', value: 10 }, { label: 'WIS', value: 1 }]) },
+    speedFt: derived(30, [{ label: 'Species', value: 30 }]),
+    attacks: [],
+    features: [],
+    coins: { cp: 0 },
+  } as never;
+}
+
+const myCharacter = (id: string, name: string) => ({
+  id, name, summary: 'Human Fighter', sheet: sheetStub(),
+});
+
 const projection = (combatants: Combatant[], over: Partial<Projection> = {}): Projection => ({
   combatants: Object.fromEntries(combatants.map((c) => [c.id, c])),
   round: 1,
@@ -100,16 +143,32 @@ describe('the play view', () => {
     expect(cast.find((c) => c.id === 'mira')!.acting).toBe(false);
   });
 
-  it('carries the arithmetic behind every number', () => {
-    const hero = heroFrom(combatant({ id: 'mira', name: 'Mira' }), 'The Ash Moor');
-    /* +2 DEX from a 14. The derivation is the info layer a new player needs. */
+  /**
+   * The learn-while-playing mechanic, asserted: every number the hero panel
+   * shows arrives with the arithmetic that produced it, taken off the sheet
+   * rather than recalculated here. A recalculation could disagree with the
+   * character sheet the player is looking at; a passthrough cannot.
+   */
+  it('carries the arithmetic behind every number, from the sheet', () => {
+    const hero = heroFrom(combatant({ id: 'mira', name: 'Mira' }), myCharacter('mira', 'Mira'));
+
+    expect(hero.className, 'what they ARE, not the campaign name').toBe('Human Fighter');
+    expect(hero.ac.value).toBe('16');
+    expect(hero.ac.rows).toEqual([{ label: 'Chain mail', value: '+16' }]);
     expect(hero.initiative.value).toBe('+2');
-    const str = hero.abilities.find((a) => a.key === 'str')!;
-    expect(str.score).toBe(16);
-    expect(str.mod).toBe(3);
-    /* A Fighter is proficient in STR and CON saves: +3 STR and +2 proficiency. */
-    expect(hero.saves.find((s) => s.key === 'str')!.mod).toBe(5);
+    expect(hero.hitDice).toEqual({ die: 'd10', max: 1 });
+
+    /* A Fighter is proficient in STR and CON saves — and the derivation says
+       so out loud rather than just showing a bigger number. */
+    const str = hero.saves.find((s) => s.key === 'str')!;
+    expect(str.mod).toBe(5);
+    expect(str.explain.rows.map((r) => r.label)).toContain('Proficiency');
     expect(hero.saves.find((s) => s.key === 'dex')!.mod).toBe(2);
+
+    /* The sheet keys skills by the trained ones, so the list IS what this
+       character is good at — the same thing a character sheet shows. */
+    expect(hero.skills.map((s) => s.key)).toEqual(['athletics']);
+    expect(hero.skills[0]!.mod).toBe(5);
   });
 
   /**
@@ -129,7 +188,7 @@ describe('the play view', () => {
   it('says the table is exploring when nobody has rolled initiative', () => {
     const view = projectionToView({
       projection: projection([combatant({ id: 'mira', name: 'Mira' })]),
-      room: null, myCreatureId: 'mira', role: 'player', events: [], campaignName: 'The Ash Moor',
+      room: null, myCharacter: myCharacter('mira', 'Mira'), role: 'player', events: [], campaignName: 'The Ash Moor',
     });
     expect(view.turn.exploring).toBe(true);
     expect(view.scene.subtitle).toBe('Not in a fight');
@@ -138,7 +197,7 @@ describe('the play view', () => {
   it('gives a DM no hero of their own', () => {
     const view = projectionToView({
       projection: projection([combatant({ id: 'mira', name: 'Mira' })]),
-      room: null, myCreatureId: null, role: 'dm', events: [], campaignName: 'The Ash Moor',
+      room: null, myCharacter: null, role: 'dm', events: [], campaignName: 'The Ash Moor',
     });
     expect(view.hero, 'a DM plays nobody').toBeNull();
     expect(view.cast, 'but still sees the table').toHaveLength(1);

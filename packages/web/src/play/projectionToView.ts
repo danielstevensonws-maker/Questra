@@ -21,7 +21,7 @@
  * as a word rather than a number. That is presentation, not permission — the
  * numbers for a hidden creature never reached the client at all.
  */
-import type { PlayEvent, Room, ViewerRole } from '@questra/contracts';
+import type { ComputedSheet, PlayEvent, Room, ViewerRole } from '@questra/contracts';
 import type { ExplainVM } from '../design/explain.js';
 import type {
   AbilityKey, AbilityVM, ConditionVM, HeroVM, Hurt, LogEntryVM, SpineEntryVM,
@@ -51,11 +51,20 @@ export interface Projection {
   nextSeq: number;
 }
 
+/** What the roster knows about the character a viewer plays. */
+export interface MyCharacter {
+  id: string;
+  name: string;
+  /** "Human Fighter" — what they ARE, as a table would say it. */
+  summary: string;
+  sheet: ComputedSheet;
+}
+
 export interface ViewInput {
   projection: Projection;
   room: Room | null;
   /** The character this viewer plays, if any. A DM has none. */
-  myCreatureId: string | null;
+  myCharacter: MyCharacter | null;
   role: ViewerRole;
   events: readonly PlayEvent[];
   campaignName: string;
@@ -112,42 +121,62 @@ function hurtOf(c: Combatant): Hurt {
   return 'Unhurt';
 }
 
-export function heroFrom(c: Combatant, campaignName: string): HeroVM {
-  const dex = mod(c.abilities.dex ?? 10);
-  const wis = mod(c.abilities.wis ?? 10);
-  const perceptionProficient = (c.proficientSkills ?? []).includes('perception');
+/**
+ * Turn one of the sheet's Derived values into the shared readout.
+ *
+ * The sheet already carries the arithmetic — this only dresses it. That is the
+ * whole learn-while-playing mechanic: a new player taps armour class and reads
+ * where it came from rather than being told to trust a number.
+ */
+function fromDerived(
+  id: string,
+  kicker: string,
+  title: string,
+  derived: { value: number; derivation: readonly { label: string; value: number }[] },
+  rule: string,
+  asSign = true,
+): ExplainVM {
+  return {
+    id,
+    kicker,
+    title,
+    value: asSign ? sign(derived.value) : String(derived.value),
+    rows: derived.derivation.map((d) => ({ label: d.label, value: sign(d.value) })),
+    rule,
+  };
+}
+
+export function heroFrom(c: Combatant, me: MyCharacter): HeroVM {
+  const sheet = me.sheet;
+  const ac = sheet.acOptions[sheet.acDefault];
 
   return {
     id: c.id,
     name: c.name,
     initial: c.name.slice(0, 1).toUpperCase(),
-    /* The projection carries no class or level — those live on the character's
-       choices, not on a combatant. Rather than invent them, the campaign
-       stands in as the subtitle until the sheet is threaded through. */
-    className: campaignName,
+    /* "Human Fighter" — from the roster, which computed it from the stored
+       choices. The projection carries combatants, not classes, so without this
+       the panel could only say a name. */
+    className: me.summary,
     level: 1,
     hp: { current: c.hp, max: c.maxHp, temp: c.tempHp },
     bloodied: isBloodied(c),
-    ac: explain('ac', 'Defence', 'Armour class', c.ac,
-      [{ label: 'Armour class', value: c.ac }],
-      'How hard you are to hit. An attack has to meet or beat it.', false),
-    speed: explain('speed', 'Movement', 'Speed', 30,
-      [{ label: 'Species', value: 30 }],
+    /* Every one of these comes off the sheet with its derivation attached —
+       none is recalculated here, so none can disagree with the character sheet
+       the player is looking at. */
+    ac: ac
+      ? fromDerived('ac', 'Defence', 'Armour class', ac, 'How hard you are to hit. An attack has to meet or beat it.', false)
+      : explain('ac', 'Defence', 'Armour class', c.ac, [{ label: 'Armour class', value: c.ac }],
+          'How hard you are to hit. An attack has to meet or beat it.', false),
+    speed: fromDerived('speed', 'Movement', 'Speed', sheet.speedFt,
       'How far you can move on your turn, in feet.', false),
-    passivePerception: explain('passive-perception', 'Awareness', 'Passive perception',
-      10 + wis + (perceptionProficient ? c.profBonus : 0),
-      [
-        { label: 'Base', value: 10 },
-        { label: 'WIS', value: wis },
-        ...(perceptionProficient ? [{ label: 'Proficiency', value: c.profBonus }] : []),
-      ],
-      'What you notice without looking for it.', false),
-    initiative: explain('initiative', 'Turn order', 'Initiative', dex,
-      [{ label: 'DEX', value: dex }],
+    passivePerception: fromDerived('passive-perception', 'Awareness', 'Passive perception',
+      sheet.passives.perception, 'What you notice without looking for it.', false),
+    initiative: fromDerived('initiative', 'Turn order', 'Initiative', sheet.initiative,
       'Rolled at the start of a fight to decide who goes when.'),
-    hitDice: { die: 'd8', max: 1 },
+    hitDice: { die: sheet.hp.value.hitDie, max: sheet.hp.value.hitDiceMax },
     coins: '0 gp',
-    abilities: abilitiesOf(c),
+    abilities: abilitiesOf(sheet),
     /* The projection carries condition ids; naming them plainly is the
        compendium's job and it is not wired here yet, so the id stands in
        rather than a guessed label. */
@@ -157,24 +186,23 @@ export function heroFrom(c: Combatant, campaignName: string): HeroVM {
       explain: explain(x.conditionId, 'Condition', x.conditionId.replace(/^condition\./, ''), 0, [],
         'Something is affecting you. Tap for what it does.', false),
     })),
-    saves: ABILITY_KEYS.map((key) => {
-      const base = mod(c.abilities[key] ?? 10);
-      const proficient = (c.proficientSaves ?? []).includes(key);
-      const total = base + (proficient ? c.profBonus : 0);
-      return {
-        key,
-        label: ABILITY_LABEL[key],
-        mod: total,
-        explain: explain(`save-${key}`, 'Saving throw', ABILITY_LABEL[key], total, [
-          { label: key.toUpperCase(), value: base },
-          ...(proficient ? [{ label: 'Proficiency', value: c.profBonus }] : []),
-        ], 'Rolled to resist something happening to you.'),
-      };
-    }),
-    /* Skills need the contracts skill vocabulary and the character's sheet,
-       neither of which the projection carries. Empty rather than invented —
-       an empty list reads as "not wired yet", a wrong one reads as a bug. */
-    skills: [],
+    saves: ABILITY_KEYS.map((key) => ({
+      key,
+      label: ABILITY_LABEL[key],
+      mod: sheet.saves[key].value,
+      explain: fromDerived(`save-${key}`, 'Saving throw', ABILITY_LABEL[key], sheet.saves[key],
+        'Rolled to resist something happening to you.'),
+    })),
+    /* The sheet keys `skills` by the ones this character is trained in, so the
+       list is exactly what they are good at — no entry for the rest, which is
+       what a character sheet shows too. */
+    skills: Object.entries(sheet.skills).map(([key, derived]) => ({
+      key: key as never,
+      label: key.replace(/-/g, ' ').replace(/^./, (ch) => ch.toUpperCase()),
+      mod: derived.value,
+      explain: fromDerived(`skill-${key}`, 'Skill', key.replace(/-/g, ' '), derived,
+        'Added when you try something this covers.'),
+    })),
   };
 }
 
@@ -185,17 +213,18 @@ const ABILITY_LABEL: Record<AbilityKey, string> = {
   int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma',
 };
 
-function abilitiesOf(c: Combatant): AbilityVM[] {
+function abilitiesOf(sheet: ComputedSheet): AbilityVM[] {
   return ABILITY_KEYS.map((key) => {
-    const score = c.abilities[key] ?? 10;
-    const m = mod(score);
+    const score = sheet.abilities[key].value;
     return {
       key,
       short: key.toUpperCase(),
       score,
-      mod: m,
-      explain: explain(`ability-${key}`, 'Ability', ABILITY_LABEL[key], m,
-        [{ label: 'Score', value: score }],
+      mod: mod(score),
+      /* The derivation shows where the SCORE came from (base plus background),
+         which is the question a player actually asks at this point. */
+      explain: fromDerived(`ability-${key}`, 'Ability', ABILITY_LABEL[key],
+        { value: mod(score), derivation: sheet.abilities[key].derivation },
         'Added to anything you try that leans on it.'),
     };
   });
@@ -264,8 +293,8 @@ export interface PlayView {
 }
 
 export function projectionToView(input: ViewInput): PlayView {
-  const { projection, room, myCreatureId, events, campaignName } = input;
-  const me = myCreatureId ? projection.combatants[myCreatureId] : undefined;
+  const { projection, room, myCharacter, events, campaignName } = input;
+  const me = myCharacter ? projection.combatants[myCharacter.id] : undefined;
   const active = projection.activeCreatureId
     ? projection.combatants[projection.activeCreatureId]
     : undefined;
@@ -282,8 +311,8 @@ export function projectionToView(input: ViewInput): PlayView {
       round: projection.round,
       elapsed: '',
     },
-    hero: me ? heroFrom(me, campaignName) : null,
-    cast: castFrom(projection, myCreatureId),
+    hero: me && myCharacter ? heroFrom(me, myCharacter) : null,
+    cast: castFrom(projection, myCharacter?.id ?? null),
     room,
     entries: logFrom(events),
     turn: {

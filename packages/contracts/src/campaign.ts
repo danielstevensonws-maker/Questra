@@ -9,6 +9,7 @@
  */
 import { z } from 'zod';
 import { AccountIdSchema } from './identity.js';
+import { ComputedSheetSchema } from './rules/sheet.js';
 
 export const CampaignSchema = z.object({
   id: z.string().min(1),
@@ -88,7 +89,29 @@ export const CampaignMemberSchema = z.object({
    * just followed a join link has a seat and no character, and the lobby's job
    * is to show exactly that. A DM legitimately never has one.
    */
-  character: z.object({ id: z.string().min(1), name: z.string().min(1) }).nullable(),
+  character: z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    /**
+     * What the character IS, in the words a table uses — "Human Fighter".
+     *
+     * Denormalised rather than derived on the client because a lobby roster
+     * should not have to load the rules engine to render a list, and the play
+     * screen should not have to guess. The projection carries combatants, not
+     * classes; without this the hero panel could only say a name.
+     */
+    summary: z.string().min(1),
+    /**
+     * The computed sheet, sent so every number on the play screen can explain
+     * itself — each value arrives with the arithmetic that produced it.
+     *
+     * This is the learn-while-playing mechanic made concrete: a new player taps
+     * their armour class and reads "11 base + 2 Dex + 3 shield" rather than
+     * being told to trust 16. Recomputed server-side from the stored choices,
+     * never stored, so it cannot go stale against a rules correction.
+     */
+    sheet: ComputedSheetSchema,
+  }).nullable(),
 });
 export type CampaignMember = z.infer<typeof CampaignMemberSchema>;
 

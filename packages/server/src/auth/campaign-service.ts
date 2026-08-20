@@ -7,8 +7,14 @@
  * make "create → join → land in the party view" real.
  */
 import { CharacterChoicesSchema, CharacterSchema, RoomSchema } from '@questra/contracts';
-import { starterRoom } from '@questra/engine';
-import type { Campaign, CampaignMember, CampaignSession, Character, MyCampaigns, Room } from '@questra/contracts';
+import {
+  CLASSES, DRAFT_ITEMS, DRAFT_SPELLS, VERIFIED_SPECIES,
+  buildSheetRulesData, computeSheet, speciesSpeedFt, starterRoom,
+} from '@questra/engine';
+import type {
+  Campaign, CampaignMember, CampaignSession, Character, CharacterChoices,
+  ComputedSheet, MyCampaigns, Room,
+} from '@questra/contracts';
 import type { AuthRepo } from './repo.js';
 import { hashToken, newRefreshToken, type Clock, systemClock } from './tokens.js';
 import { AuthError } from './service.js';
@@ -31,6 +37,35 @@ export interface CampaignDeps {
   newRoomId: () => string;
   /** Raw code/token generator. Defaults to a CSPRNG; tests inject a fixed sequence. */
   newSecret?: () => string;
+}
+
+/**
+ * "Human Fighter" — what a character IS, in the words a table uses.
+ *
+ * Built from the verified species and class data rather than from the ids, so
+ * it reads as English rather than as "species.human class.fighter". A missing
+ * entity degrades to the id rather than to an empty string: a reader can act on
+ * a strange-looking name, but not on a blank.
+ */
+function summarise(choices: CharacterChoices): string {
+  const species = VERIFIED_SPECIES.find((s) => s.id === choices.speciesId)?.name ?? choices.speciesId;
+  const klass = CLASSES.find((c) => c.id === choices.classId)?.name ?? choices.classId;
+  return `${species} ${klass}`;
+}
+
+/**
+ * The sheet, recomputed from the stored choices on every read.
+ *
+ * Never cached and never stored: computeSheet is pure, and a stored sheet would
+ * go stale the moment a rules table is corrected. The rules bundle is rebuilt
+ * per character because speciesSpeedFt is baked into it — the Goliath's 35 feet
+ * is the case that proves a shared bundle would be wrong.
+ */
+function sheetFor(choices: CharacterChoices): ComputedSheet {
+  return computeSheet(
+    choices,
+    buildSheetRulesData([...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS], speciesSpeedFt(choices.speciesId)),
+  );
 }
 
 export class CampaignService {
@@ -242,8 +277,25 @@ export class CampaignService {
     ]);
     const byAccount = new Map(characters.map((c) => [c.accountId, c]));
     return members.map((m) => {
-      const c = byAccount.get(m.accountId);
-      return { ...m, character: c ? { id: c.id, name: c.name } : null };
+      const row = byAccount.get(m.accountId);
+      if (!row) return { ...m, character: null };
+
+      const parsed = CharacterChoicesSchema.safeParse(row.choices);
+      /* A character whose stored choices no longer validate is reported as
+         having none rather than taking the roster down. The player sees an
+         empty seat and can rebuild — which is recoverable, unlike a 500 that
+         stops the whole table opening. */
+      if (!parsed.success) return { ...m, character: null };
+
+      return {
+        ...m,
+        character: {
+          id: row.id,
+          name: row.name,
+          summary: summarise(parsed.data),
+          sheet: sheetFor(parsed.data),
+        },
+      };
     });
   }
 
