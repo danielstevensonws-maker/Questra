@@ -21,6 +21,7 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import type { CampaignSession, Room } from '@questra/contracts';
 import { PlayerViewV2 } from '../primitives/v2/PlayerViewV2.js';
+import { DmScreen } from './DmScreen.js';
 import { ShellStyles } from '../shell/ShellStyles.js';
 import { Road } from '../shell/road/Road.js';
 import { usePrefersReducedMotion } from '../shell/shared.js';
@@ -155,9 +156,33 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
   }
 
   /**
-   * A DM has no character, so the near edge has nobody to be. Until the DM
-   * screen's own panels exist, they get the table without a hero rather than a
-   * fabricated one — saying so plainly beats inventing a character for them.
+   * The DM runs the game rather than playing a character, so they get their own
+   * screen: everybody's numbers instead of one character's, and the composer
+   * they narrate from. Same map, same glass, same corners.
+   */
+  if (table.yourRole === 'dm') {
+    return (
+      <DmScreen
+        view={view}
+        room={room}
+        campaignName={table.campaignName}
+        seats={table.members
+          .filter((m) => m.role === 'player')
+          .map((m) => ({
+            accountId: m.accountId,
+            displayName: m.displayName,
+            characterName: m.character?.name ?? null,
+            here: sync.present.some((p) => p.accountId === m.accountId),
+          }))}
+        onLeave={onLeave}
+        onSay={(text) => { console.log('say', text); }}
+      />
+    );
+  }
+
+  /**
+   * A player who has not made a character has nobody for the near edge to be.
+   * Saying so plainly beats inventing one, and the lobby is where they fix it.
    */
   if (!view.hero) {
     return (
@@ -168,9 +193,7 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
           <p className="rd-label">{table.campaignName}</p>
           <h1 className="rd-title">The table is set</h1>
           <p className="rd-detail">
-            {table.yourRole === 'dm'
-              ? 'The screen you run the game from is still being built. Everyone who has made a character is seated and connected.'
-              : 'You have not made a character yet, so there is nobody for you to play.'}
+            You have not made a character yet, so there is nobody for you to play.
           </p>
           <ul className="qa-lobby-list">
             {view.cast.map((c) => (

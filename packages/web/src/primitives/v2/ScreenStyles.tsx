@@ -495,6 +495,209 @@ const CSS = `
   .qa2-you { width: 212px; }
   .qa2-spine { max-height: calc(100% - var(--qa-hud-inset) * 2 - 268px); }
 }
+
+/* ---- The DM screen ----------------------------------------------------------
+   Same map, same glass, same anchors as the player screen — a DM glancing
+   between two devices should find the same things in the same places. What
+   differs is what the panels HOLD.
+
+   Two panels, not five. The obvious build gives the DM a box per concern
+   (combatants, secrets, prompts, effects) and produces a wall nobody can read
+   under time pressure. Everything about the creatures lives on the creatures;
+   everything about the story lives in the journal. */
+.qa-dm { position: relative; height: 100vh; overflow: hidden; }
+
+.qa-dm-scene-name {
+  font-family: var(--qa-font-display);
+  font-size: var(--qa-text-lg);
+  color: var(--qa-ink);
+  line-height: 1.1;
+}
+.qa-dm-scene-state {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+}
+
+/* The table sits where the round spine sits on a player's screen: same corner,
+   same width, because it answers the same question — who is here and in what
+   order — for somebody who needs more of the answer. */
+.qa-dm-table {
+  position: absolute;
+  z-index: 2;
+  top: var(--qa-hud-inset);
+  left: var(--qa-hud-inset);
+  width: 300px;
+  max-height: calc(100% - var(--qa-hud-inset) * 2);
+  padding: var(--qa-s3) 0;
+  gap: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.qa-dm-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--qa-s3);
+  padding: 0 var(--qa-s4) var(--qa-s3);
+  border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
+}
+.qa-dm-kicker {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+}
+.qa-dm-away {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  color: var(--qa-ink-faint);
+}
+
+.qa-dm-list { list-style: none; margin: 0; padding: var(--qa-s2) var(--qa-s2) 0; display: flex; flex-direction: column; gap: 2px; }
+
+/* A row is a button because it spotlights — tap somebody to bring them forward
+   on the map. Two lines: who they are and how they are, then whose they are. */
+.qa-dm-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--qa-s2) var(--qa-s3);
+  text-align: left;
+  background: none;
+  border: var(--qa-hairline) solid transparent;
+  border-left: 2px solid transparent;
+  border-radius: var(--qa-radius);
+  cursor: pointer;
+  transition: background var(--qa-dur) var(--qa-ease), border-color var(--qa-dur) var(--qa-ease);
+}
+.qa-dm-row:hover { background: var(--qa-chip); }
+.qa-dm-row.is-spotlit { background: var(--qa-chip); border-color: var(--qa-glass-border); }
+/* THE ACCENT MEANS "NEEDS YOU" ON THIS SCREEN. A player's screen spends it on
+   YOU; a DM has no token, so it marks the thing waiting on a decision. */
+.qa-dm-row.is-acting { border-left-color: var(--qa-accent); background: var(--qa-accent-soft); }
+
+.qa-dm-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--qa-s3); }
+.qa-dm-name { font-family: var(--qa-font-display); font-size: var(--qa-text-body); color: var(--qa-ink); }
+/* Exact numbers for everyone — the difference between this screen and a
+   player's, where an enemy is only ever a word. */
+.qa-dm-hp {
+  flex: none;
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-label);
+  color: var(--qa-ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+.qa-dm-row.is-acting .qa-dm-hp { color: var(--qa-accent); }
+
+.qa-dm-row-bottom { display: flex; align-items: baseline; gap: var(--qa-s2); flex-wrap: wrap; }
+.qa-dm-who, .qa-dm-status, .qa-dm-away-tag {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+}
+.qa-dm-who { color: var(--qa-ink-faint); }
+.qa-dm-status { color: var(--qa-danger); }
+.qa-dm-away-tag { color: var(--qa-ink-faint); opacity: 0.7; }
+
+.qa-dm-empty {
+  margin: 0;
+  padding: var(--qa-s4);
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-label);
+  line-height: 1.5;
+  color: var(--qa-ink-faint);
+}
+
+/* The journal takes the same corner and width as a player's, for the same
+   reason the table does — muscle memory across two screens is worth more than
+   a novel layout. */
+.qa-dm-journal {
+  position: absolute;
+  z-index: 2;
+  right: var(--qa-hud-inset);
+  bottom: var(--qa-hud-inset);
+  width: 380px;
+  height: min(620px, calc(100% - var(--qa-hud-inset) * 2));
+  padding: var(--qa-s3) 0 0;
+  gap: 0;
+  display: flex;
+  flex-direction: column;
+}
+.qa-dm-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: var(--qa-s3) var(--qa-s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s3);
+}
+.qa-dm-line {
+  margin: 0;
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-label);
+  line-height: 1.55;
+  color: var(--qa-ink);
+}
+.qa-dm-line-who {
+  display: block;
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+}
+
+/* One composer, three jobs: narrate, speak in character, ask the assistant.
+   There is no separate chat box, so a DM never has to decide which field a
+   sentence belongs in. */
+.qa-dm-compose {
+  flex: none;
+  display: flex;
+  gap: var(--qa-s2);
+  padding: var(--qa-s3) var(--qa-s4);
+  border-top: var(--qa-hairline) solid var(--qa-glass-border);
+}
+.qa-dm-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-label);
+  padding: var(--qa-s2) var(--qa-s3);
+  color: var(--qa-ink);
+  background: var(--qa-chip);
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-radius: var(--qa-radius);
+}
+.qa-dm-input::placeholder { color: var(--qa-ink-faint); }
+.qa-dm-input:focus { outline: none; border-color: var(--qa-accent-line); }
+.qa-dm-send { flex: none; }
+.qa-dm-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+@media (max-width: 900px) {
+  /* Stacked rather than floating: two overlapping panels on a phone is two
+     panels you cannot read. */
+  .qa-dm { height: auto; overflow: visible; }
+  .qa-dm-table, .qa-dm-journal {
+    position: static;
+    width: auto;
+    max-height: none;
+    height: auto;
+    margin: var(--qa-s3);
+  }
+  .qa-dm-log { max-height: 320px; }
+}
+
+
 `;
 
 /**
