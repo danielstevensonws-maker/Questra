@@ -33,7 +33,7 @@ export interface SessionApi {
    */
   accessToken: () => string | null;
   /** For Home/Join/Nav: an authenticated call that refreshes once on a 401. */
-  authedRequest: <T>(path: string, opts?: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown }) => Promise<T>;
+  authedRequest: <T>(path: string, opts?: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown }) => Promise<T>;
 }
 
 const SessionContext = createContext<SessionApi | null>(null);
@@ -84,7 +84,7 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactEle
     setAccount(null);
   }, []);
 
-  const authedRequest = useCallback(async <T,>(path: string, opts: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown } = {}): Promise<T> => {
+  const authedRequest = useCallback(async <T,>(path: string, opts: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown } = {}): Promise<T> => {
     try {
       return await apiRequest<T>(path, { ...opts, token: tokenRef.current });
     } catch (err) {

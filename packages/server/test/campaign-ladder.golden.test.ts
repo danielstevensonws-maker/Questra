@@ -5,7 +5,7 @@
  * + deterministic ids, every response shape checked against the contracts.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CampaignSchema, CampaignSessionSchema, JoinPreviewSchema, MyCampaignsSchema } from '@questra/contracts';
+import { CampaignSchema, CampaignSessionSchema, CharacterSchema, JoinPreviewSchema, MyCampaignsSchema } from '@questra/contracts';
 import { AuthService, CampaignService, AuthError, InMemoryAuthRepo, LogMailer, makeResolveToken, type TokenConfig } from '../src/auth/index.js';
 
 const SECRET = new TextEncoder().encode('test-secret-please-ignore-32chars!');
@@ -35,10 +35,12 @@ describe('campaign ladder (Brief 14 §2)', () => {
     joinCodeSeq = 0;
     let campSeq = 0;
     let psSeq = 0;
+    let charSeq = 0;
     campaigns = new CampaignService({
       repo, clock: clk.clock,
       newCampaignId: () => `camp_${++campSeq}`,
       newPlaySessionId: () => `ps_${++psSeq}`,
+      newCharacterId: () => `char_${++charSeq}`,
       newSecret: () => `code-${++joinCodeSeq}`,
     });
   });
@@ -189,6 +191,93 @@ describe('campaign ladder (Brief 14 §2)', () => {
     const session = await campaigns.session(alice, campaign.id);
     expect(session.members.map((m) => m.displayName)).toEqual(['Alice']);
     await expect(campaigns.session(bob, campaign.id)).rejects.toBeInstanceOf(AuthError);
+  });
+
+  /** A finished level-1 Fighter, as the wizard would hand it over. */
+  function fighterChoices(name: string) {
+    return {
+      classId: 'class.fighter', level: 1,
+      backgroundId: 'background.soldier', speciesId: 'species.human',
+      abilityMethod: 'standard_array' as const,
+      baseScores: { str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8 },
+      backgroundBonuses: { str: 2, con: 1 },
+      skillChoices: [], languageChoices: ['Common'], equipment: [],
+      featChoices: {},
+      identity: { name, personality: [], bonds: [], appearanceTokens: [] },
+    };
+  }
+
+  it('a member saves a character, and it comes back on the roster', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const bob = await seat('bob@example.com', 'Bob');
+    const { campaign, joinCode } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+    await campaigns.join(bob, joinCode);
+
+    const saved = await campaigns.saveCharacter(bob, campaign.id, fighterChoices('Torvald'));
+    expect(() => CharacterSchema.parse(saved)).not.toThrow();
+    expect(saved.name).toBe('Torvald');
+    expect(saved.accountId).toBe(bob);
+
+    /* The lobby's whole gate: who has a character and who does not. */
+    const session = await campaigns.session(alice, campaign.id);
+    expect(session.members.find((m) => m.accountId === bob)?.character).toMatchObject({ name: 'Torvald' });
+    expect(session.members.find((m) => m.accountId === alice)?.character, 'the DM has not made one').toBeNull();
+  });
+
+  /**
+   * Re-running the wizard replaces rather than duplicates, and KEEPS THE ID:
+   * play events reference characterId, so minting a new one would orphan
+   * anything already recorded against it.
+   */
+  it('rebuilding a character replaces it and keeps its id', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const { campaign } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+
+    const first = await campaigns.saveCharacter(alice, campaign.id, fighterChoices('Torvald'));
+    const second = await campaigns.saveCharacter(alice, campaign.id, fighterChoices('Torvald the Second'));
+
+    expect(second.id, 'the id survives a rebuild').toBe(first.id);
+    expect(second.name).toBe('Torvald the Second');
+    expect(second.createdAt, 'and so does the original creation time').toBe(first.createdAt);
+
+    const session = await campaigns.session(alice, campaign.id);
+    const mine = session.members.filter((m) => m.accountId === alice);
+    expect(mine, 'one member, not two').toHaveLength(1);
+    expect(mine[0]!.character?.name).toBe('Torvald the Second');
+  });
+
+  /**
+   * The boundary where a browser's JSON becomes rules data. An invalid
+   * character stored now is a crash at the table later, so it is validated
+   * here rather than trusted.
+   */
+  it('refuses a character that is not a legal set of choices', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const { campaign } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+
+    await expect(campaigns.saveCharacter(alice, campaign.id, { classId: 'class.fighter' }))
+      .rejects.toBeInstanceOf(AuthError);
+    await expect(campaigns.saveCharacter(alice, campaign.id, null)).rejects.toBeInstanceOf(AuthError);
+
+    const blank = { ...fighterChoices('  ') };
+    await expect(campaigns.saveCharacter(alice, campaign.id, blank), 'a name of spaces is not a name')
+      .rejects.toBeInstanceOf(AuthError);
+  });
+
+  it('will not let a stranger make a character at a table they are not at', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const carol = await seat('carol@example.com', 'Carol');
+    const { campaign } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+
+    await expect(campaigns.saveCharacter(carol, campaign.id, fighterChoices('Interloper')))
+      .rejects.toBeInstanceOf(AuthError);
+    await expect(campaigns.myCharacter(carol, campaign.id)).rejects.toBeInstanceOf(AuthError);
+  });
+
+  it('reports no character before one is made', async () => {
+    const alice = await seat('alice@example.com', 'Alice');
+    const { campaign } = await campaigns.createCampaign(alice, 'The Sunless Keep');
+    expect(await campaigns.myCharacter(alice, campaign.id)).toBeNull();
   });
 
   it('a stranger token resolves to nothing, not an error', async () => {

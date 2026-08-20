@@ -6,7 +6,8 @@
  * pools, bonds web, promotions) — that is M4. This is only what M3's shell needs to
  * make "create → join → land in the party view" real.
  */
-import type { Campaign, CampaignSession, MyCampaigns } from '@questra/contracts';
+import { CharacterChoicesSchema, CharacterSchema } from '@questra/contracts';
+import type { Campaign, CampaignMember, CampaignSession, Character, MyCampaigns } from '@questra/contracts';
 import type { AuthRepo } from './repo.js';
 import { hashToken, newRefreshToken, type Clock, systemClock } from './tokens.js';
 import { AuthError } from './service.js';
@@ -25,6 +26,7 @@ export interface CampaignDeps {
   clock?: Clock;
   newCampaignId: () => string;
   newPlaySessionId: () => string;
+  newCharacterId: () => string;
   /** Raw code/token generator. Defaults to a CSPRNG; tests inject a fixed sequence. */
   newSecret?: () => string;
 }
@@ -131,12 +133,79 @@ export class CampaignService {
       campaignId,
       campaignName: campaign.name,
       playSessionId,
-      members: await this.deps.repo.membersOfCampaign(campaignId),
+      members: await this.rosterFor(campaignId),
       /* A membership row's role is typed with the full ViewerRole union, but a
          table_display credential never has one — it is not an account. Narrow
          here rather than widening the contract to admit a case that cannot occur. */
       yourRole: me.role === 'dm' ? 'dm' : 'player',
     };
+  }
+
+  /**
+   * Save the character this account plays in this campaign.
+   *
+   * Membership-gated: you cannot make a character for a table you are not at.
+   * Re-running the wizard REPLACES the existing one rather than erroring —
+   * rebuilding before session one is ordinary, and the one-per-member
+   * constraint means there is exactly one thing to replace.
+   *
+   * `choices` is validated against CharacterChoicesSchema here rather than
+   * trusted: this is the boundary where a browser's JSON becomes rules data,
+   * and an invalid character stored now is a crash at the table later.
+   */
+  async saveCharacter(callerAccountId: string, campaignId: string, choices: unknown): Promise<Character> {
+    const me = await this.deps.repo.membership(callerAccountId, campaignId);
+    if (!me) throw new AuthError('not_member', 'You are not part of this campaign.', 403);
+
+    const parsed = CharacterChoicesSchema.safeParse(choices);
+    if (!parsed.success) {
+      throw new AuthError('bad_character', 'That character is not finished — go back and fill in the rest.', 400);
+    }
+
+    const name = parsed.data.identity.name.trim();
+    if (!name) throw new AuthError('bad_character', 'Your character needs a name.', 400);
+
+    const existing = await this.deps.repo.characterFor(callerAccountId, campaignId);
+    const row = {
+      /* Keep the id across a rebuild: play events reference characterId, so
+         minting a new one would orphan anything already recorded against it. */
+      id: existing?.id ?? this.deps.newCharacterId(),
+      campaignId,
+      accountId: callerAccountId,
+      name,
+      choices: parsed.data,
+      createdAt: existing?.createdAt ?? this.nowIso(),
+    };
+    await this.deps.repo.putCharacter(row);
+    return CharacterSchema.parse(row);
+  }
+
+  /** The character this account plays here, or null if they have not made one. */
+  async myCharacter(callerAccountId: string, campaignId: string): Promise<Character | null> {
+    const me = await this.deps.repo.membership(callerAccountId, campaignId);
+    if (!me) throw new AuthError('not_member', 'You are not part of this campaign.', 403);
+    const row = await this.deps.repo.characterFor(callerAccountId, campaignId);
+    return row ? CharacterSchema.parse(row) : null;
+  }
+
+  /**
+   * The roster, with each member's character attached.
+   *
+   * Two queries rather than a join, deliberately: the character table is
+   * optional per member and the lobby needs EVERY member listed whether or not
+   * they have made one. A join would have to be a LEFT JOIN whose null-handling
+   * lives in SQL rather than in a place a reader can see it.
+   */
+  private async rosterFor(campaignId: string): Promise<CampaignMember[]> {
+    const [members, characters] = await Promise.all([
+      this.deps.repo.membersOfCampaign(campaignId),
+      this.deps.repo.charactersOfCampaign(campaignId),
+    ]);
+    const byAccount = new Map(characters.map((c) => [c.accountId, c]));
+    return members.map((m) => {
+      const c = byAccount.get(m.accountId);
+      return { ...m, character: c ? { id: c.id, name: c.name } : null };
+    });
   }
 
   /**

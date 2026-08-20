@@ -32,9 +32,11 @@ export interface LobbyProps {
   session: SessionApi;
   onBegin: () => void;
   onLeave: () => void;
+  /** Where "make your character" goes. The lobby is the only route to it. */
+  onMakeCharacter: () => void;
 }
 
-export function Lobby({ campaignId, session, onBegin, onLeave }: LobbyProps): ReactElement {
+export function Lobby({ campaignId, session, onBegin, onLeave, onMakeCharacter }: LobbyProps): ReactElement {
   const reduced = usePrefersReducedMotion();
   const [table, setTable] = useState<CampaignSession | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -81,6 +83,10 @@ export function Lobby({ campaignId, session, onBegin, onLeave }: LobbyProps): Re
   }, [unknownPresent, campaignId, session]);
 
   const isDm = table?.yourRole === 'dm';
+  const me = table?.members.find((m) => m.accountId === session.account?.id);
+  /* A DM does not play a character, so they are never "missing" one. */
+  const needCharacter = table?.members.filter((m) => m.role === 'player' && !m.character) ?? [];
+  const iNeedCharacter = me?.role === 'player' && !me.character;
   const dm = table?.members.find((m) => m.role === 'dm');
   const waitingOn = table?.members.filter((m) => !here.has(m.accountId)) ?? [];
 
@@ -122,7 +128,11 @@ export function Lobby({ campaignId, session, onBegin, onLeave }: LobbyProps): Re
                 <span className="qa-seat-dot" aria-hidden="true" />
                 <span className="qa-seat-name">{m.displayName}{you && <span className="qa-seat-you"> (you)</span>}</span>
                 <span className="rd-micro qa-seat-role">
-                  {m.role === 'dm' ? 'Runs the game' : present ? 'Here' : 'Not yet'}
+                  {m.role === 'dm'
+                    ? 'Runs the game'
+                    : m.character
+                      ? m.character.name
+                      : present ? 'Choosing' : 'Not yet'}
                 </span>
               </li>
             );
@@ -133,9 +143,11 @@ export function Lobby({ campaignId, session, onBegin, onLeave }: LobbyProps): Re
           isDm ? (
             <>
               <p className="rd-detail">
-                {waitingOn.length === 0
-                  ? 'Everyone is here. Begin whenever you are ready.'
-                  : `Still to arrive: ${waitingOn.map((m) => m.displayName).join(', ')}. You can begin without them — they will drop in when they open the link.`}
+                {waitingOn.length > 0
+                  ? `Still to arrive: ${waitingOn.map((m) => m.displayName).join(', ')}. You can begin without them — they will drop in when they open the link.`
+                  : needCharacter.length > 0
+                    ? `Still choosing: ${needCharacter.map((m) => m.displayName).join(', ')}. You can begin without them, but they will have nobody to play.`
+                    : 'Everyone is here and ready. Begin whenever you like.'}
               </p>
               <div className="rd-actions">
                 <button type="button" className="qa2-cta" onClick={onBegin}>Begin the session</button>
@@ -144,14 +156,38 @@ export function Lobby({ campaignId, session, onBegin, onLeave }: LobbyProps): Re
             </>
           ) : (
             <>
-              <p className="rd-detail">
-                {dm
-                  ? `${dm.displayName} starts the session when the table is ready.`
-                  : 'Waiting for whoever runs this game to begin.'}
-              </p>
-              <div className="rd-actions">
-                <button type="button" className="qa2-quiet-link" onClick={onLeave}>Leave for now</button>
-              </div>
+              {/* The one thing a player can actually DO here. Until they have a
+                  character they are not waiting on the DM — they are waiting on
+                  themselves, and saying so is the difference between a lobby
+                  that stalls and one that moves. */}
+              {iNeedCharacter ? (
+                <>
+                  <p className="rd-detail">
+                    You have a seat. Now you need somebody to sit in it.
+                  </p>
+                  <div className="rd-actions">
+                    <button type="button" className="qa2-cta" onClick={onMakeCharacter}>Make your character</button>
+                    <button type="button" className="qa2-quiet-link" onClick={onLeave}>Leave for now</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="rd-detail">
+                    {me?.character ? `Playing as ${me.character.name}. ` : ''}
+                    {dm
+                      ? `${dm.displayName} starts the session when the table is ready.`
+                      : 'Waiting for whoever runs this game to begin.'}
+                  </p>
+                  <div className="rd-actions">
+                    {me?.character && (
+                      <button type="button" className="qa2-quiet-link" onClick={onMakeCharacter}>
+                        Change your character
+                      </button>
+                    )}
+                    <button type="button" className="qa2-quiet-link" onClick={onLeave}>Leave for now</button>
+                  </div>
+                </>
+              )}
             </>
           )
         )}

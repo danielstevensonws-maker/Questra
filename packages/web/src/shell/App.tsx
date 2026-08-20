@@ -14,6 +14,7 @@ import { JoinFlow } from './JoinFlow.js';
 import { CreateCampaign } from './CreateCampaign.js';
 import { CampaignPlaceholder } from './CampaignPlaceholder.js';
 import { Lobby } from './Lobby.js';
+import { CharacterWizardRoute } from '../wizard/CharacterWizardRoute.js';
 import { Attribution } from './Attribution.js';
 import { Nav } from './Nav.js';
 import { ShellStyles } from './ShellStyles.js';
@@ -96,6 +97,27 @@ function CampaignRoute(): ReactElement {
       session={session}
       onBegin={() => navigate(`/campaign/${id}/play`)}
       onLeave={() => navigate('/home')}
+      onMakeCharacter={() => navigate(`/campaign/${id}/character`)}
+    />
+  );
+}
+
+/* The wizard lives under the campaign because a character belongs to one
+   table — the same character cannot be carried between campaigns, which is
+   what the one-per-member constraint means in the database. */
+function CharacterRoute(): ReactElement {
+  const { id } = useParams<{ id: string }>();
+  const session = useSession();
+  const navigate = useNavigate();
+  if (session.loading) return <ShellLoading label="Finding your seat…" />;
+  if (!session.account) return <Navigate to="/" replace />;
+  if (!id) return <Navigate to="/home" replace />;
+  return (
+    <CharacterWizardRoute
+      campaignId={id}
+      session={session}
+      onDone={() => navigate(`/campaign/${id}`)}
+      onCancel={() => navigate(`/campaign/${id}`)}
     />
   );
 }
@@ -126,6 +148,7 @@ function Shell(): ReactElement {
       <Route path="/join/:code" element={<JoinRoute />} />
       <Route path="/campaign/new" element={<CreateCampaignRoute />} />
       <Route path="/campaign/:id" element={<CampaignRoute />} />
+      <Route path="/campaign/:id/character" element={<CharacterRoute />} />
       <Route path="/campaign/:id/play" element={<PlayRoute />} />
       <Route path="/legal" element={<AttributionRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -42,6 +42,33 @@ export const MyCampaignsSchema = z.object({
 export type MyCampaigns = z.infer<typeof MyCampaignsSchema>;
 
 /**
+ * A player character, as stored.
+ *
+ * IT HOLDS CHOICES, NOT A COMPUTED SHEET, and that is the important decision.
+ * `computeSheet(choices, rules)` is a pure function of the choices and the
+ * rules data, so persisting the sheet would mean storing a value that goes
+ * stale the moment a rules table is corrected — and worse, storing it in two
+ * places that can disagree. Every consumer recomputes instead. The same
+ * reasoning is why levelling re-runs computeSheet over bumped choices rather
+ * than patching a stored sheet (see engine/sim/advancement).
+ *
+ * One character belongs to exactly one campaign. A player in three campaigns
+ * has three characters, which is what a real table does — the sheet you bring
+ * to one game is not the sheet you bring to another.
+ */
+export const CharacterSchema = z.object({
+  id: z.string().min(1),
+  campaignId: z.string().min(1),
+  accountId: AccountIdSchema,
+  /** Denormalised from choices.identity.name so a roster need not fold rules. */
+  name: z.string().min(1).max(60),
+  /** The wizard's output. Validated as CharacterChoices when the engine reads it. */
+  choices: z.unknown(),
+  createdAt: z.string().datetime(),
+});
+export type Character = z.infer<typeof CharacterSchema>;
+
+/**
  * One person at a campaign's table.
  *
  * `displayName` exists here because the sync protocol's `presence` message
@@ -54,6 +81,14 @@ export const CampaignMemberSchema = z.object({
   accountId: AccountIdSchema,
   displayName: z.string().min(1),
   role: z.enum(['dm', 'player']),
+  /**
+   * The character this person brings, if they have made one yet.
+   *
+   * Null is a real and expected state, not a missing value: a player who has
+   * just followed a join link has a seat and no character, and the lobby's job
+   * is to show exactly that. A DM legitimately never has one.
+   */
+  character: z.object({ id: z.string().min(1), name: z.string().min(1) }).nullable(),
 });
 export type CampaignMember = z.infer<typeof CampaignMemberSchema>;
 

@@ -7,7 +7,7 @@
  */
 import pg from 'pg';
 import type { Membership, Campaign } from '@questra/contracts';
-import type { AuthRepo, AccountRow, TokenRow } from './repo.js';
+import type { AuthRepo, AccountRow, CharacterRow, TokenRow } from './repo.js';
 
 const { Pool } = pg;
 
@@ -28,6 +28,17 @@ function toAccountRow(r: AccountDb): AccountRow {
     passwordHash: r.password_hash, onboarding: r.onboarding, settings: r.settings,
     ageBracket: r.age_bracket, createdAt: r.created_at.toISOString(),
     deletedAt: r.deleted_at ? r.deleted_at.toISOString() : null,
+  };
+}
+
+type CharacterDb = {
+  id: string; campaign_id: string; account_id: string;
+  name: string; choices: unknown; created_at: Date;
+};
+function toCharacter(r: CharacterDb): CharacterRow {
+  return {
+    id: r.id, campaignId: r.campaign_id, accountId: r.account_id,
+    name: r.name, choices: r.choices, createdAt: r.created_at.toISOString(),
   };
 }
 
@@ -159,6 +170,33 @@ export class PostgresAuthRepo implements AuthRepo {
       [campaignId],
     );
     return rows.map((r) => ({ accountId: r.account_id, displayName: r.display_name, role: r.role }));
+  }
+
+  /* Upsert: re-running the wizard replaces the character rather than failing on
+     the one-per-member constraint. A player who rebuilds before session one is
+     doing something ordinary, not something exceptional. */
+  async putCharacter(c: CharacterRow): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO character (id, campaign_id, account_id, name, choices, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (campaign_id, account_id)
+       DO UPDATE SET name = EXCLUDED.name, choices = EXCLUDED.choices`,
+      [c.id, c.campaignId, c.accountId, c.name, JSON.stringify(c.choices), c.createdAt],
+    );
+  }
+
+  async characterFor(accountId: string, campaignId: string): Promise<CharacterRow | null> {
+    const { rows } = await this.pool.query<CharacterDb>(
+      `SELECT * FROM character WHERE account_id = $1 AND campaign_id = $2`, [accountId, campaignId],
+    );
+    return rows[0] ? toCharacter(rows[0]) : null;
+  }
+
+  async charactersOfCampaign(campaignId: string): Promise<CharacterRow[]> {
+    const { rows } = await this.pool.query<CharacterDb>(
+      `SELECT * FROM character WHERE campaign_id = $1`, [campaignId],
+    );
+    return rows.map(toCharacter);
   }
 
   async putTableDisplayToken(t: { tokenHash: string; campaignId: string; createdAt: string }): Promise<void> {

@@ -20,7 +20,7 @@ interface ErrorBody { error?: string; reason?: string }
 
 export async function apiRequest<T>(
   path: string,
-  opts: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown; token?: string | null } = {},
+  opts: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown; token?: string | null } = {},
 ): Promise<T> {
   /* The content-type header is sent ONLY when there is a body to describe.
      Declaring application/json on a bodyless POST makes Fastify reject the

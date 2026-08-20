@@ -82,6 +82,28 @@ export function registerCampaignRoutes(
     }),
   );
 
+  /* The wizard's destination. Membership-gated, and it replaces rather than
+     duplicates — see saveCharacter. */
+  app.put<{ Params: { campaignId: string }; Body: { choices: unknown } }>(
+    '/campaigns/:campaignId/character',
+    async (req, reply) => handle(reply, async () => {
+      const callerId = await requireAccount(req, reply);
+      if (!callerId) return { error: 'auth', reason: 'Please sign in.' };
+      return service.saveCharacter(callerId, req.params.campaignId, req.body?.choices);
+    }),
+  );
+
+  app.get<{ Params: { campaignId: string } }>(
+    '/campaigns/:campaignId/character',
+    async (req, reply) => handle(reply, async () => {
+      const callerId = await requireAccount(req, reply);
+      if (!callerId) return { error: 'auth', reason: 'Please sign in.' };
+      /* null is a real answer here — "you have not made one yet" — so it is
+         wrapped rather than returned bare, which would look like an empty body. */
+      return { character: await service.myCharacter(callerId, req.params.campaignId) };
+    }),
+  );
+
   app.post<{ Params: { campaignId: string } }>(
     '/campaigns/:campaignId/table-display-token',
     async (req, reply) => handle(reply, async () => {

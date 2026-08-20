@@ -16,10 +16,10 @@ import { Lobby } from './Lobby.js';
 import { mockSession, MOCK_ACCOUNT } from './mockSession.js';
 
 const MEMBERS = [
-  { accountId: 'acc_wren', displayName: 'Wren', role: 'dm' as const },
-  { accountId: 'acc_mira', displayName: 'Mira', role: 'player' as const },
-  { accountId: 'acc_bren', displayName: 'Bren', role: 'player' as const },
-  { accountId: 'acc_ash', displayName: 'Ash', role: 'player' as const },
+  { accountId: 'acc_wren', displayName: 'Wren', role: 'dm' as const, character: null },
+  { accountId: 'acc_mira', displayName: 'Mira', role: 'player' as const, character: { id: 'ch1', name: 'Mira Vale' } },
+  { accountId: 'acc_bren', displayName: 'Bren', role: 'player' as const, character: { id: 'ch2', name: 'Bren Ash' } },
+  { accountId: 'acc_ash', displayName: 'Ash', role: 'player' as const, character: null },
 ];
 
 /**
@@ -74,7 +74,7 @@ type Story = StoryObj<typeof Lobby>;
 export const DmWaiting: Story = {
   render: () => {
     stubSocket(['acc_wren', 'acc_mira', 'acc_bren']);
-    return <Lobby campaignId="camp_1" session={sessionFor('acc_wren', 'Wren', 'dm')} onBegin={() => {}} onLeave={() => {}} />;
+    return <Lobby campaignId="camp_1" session={sessionFor('acc_wren', 'Wren', 'dm')} onBegin={() => {}} onLeave={() => {}} onMakeCharacter={() => {}} />;
   },
 };
 
@@ -82,7 +82,7 @@ export const DmWaiting: Story = {
 export const DmEveryoneHere: Story = {
   render: () => {
     stubSocket(MEMBERS.map((m) => m.accountId));
-    return <Lobby campaignId="camp_1" session={sessionFor('acc_wren', 'Wren', 'dm')} onBegin={() => {}} onLeave={() => {}} />;
+    return <Lobby campaignId="camp_1" session={sessionFor('acc_wren', 'Wren', 'dm')} onBegin={() => {}} onLeave={() => {}} onMakeCharacter={() => {}} />;
   },
 };
 
@@ -90,6 +90,6 @@ export const DmEveryoneHere: Story = {
 export const PlayerWaiting: Story = {
   render: () => {
     stubSocket(['acc_wren', 'acc_mira']);
-    return <Lobby campaignId="camp_1" session={sessionFor('acc_mira', 'Mira', 'player')} onBegin={() => {}} onLeave={() => {}} />;
+    return <Lobby campaignId="camp_1" session={sessionFor('acc_mira', 'Mira', 'player')} onBegin={() => {}} onLeave={() => {}} onMakeCharacter={() => {}} />;
   },
 };

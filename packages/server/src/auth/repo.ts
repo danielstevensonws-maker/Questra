@@ -29,6 +29,20 @@ export interface TokenRow {
   revokedAt?: number | null;
 }
 
+/**
+ * A stored character. `choices` is the wizard's output, kept opaque here —
+ * contracts owns its shape (CharacterChoicesSchema) and validates it on the
+ * way in and out, so the repo does not fork that schema into the data layer.
+ */
+export interface CharacterRow {
+  id: string;
+  campaignId: string;
+  accountId: string;
+  name: string;
+  choices: unknown;
+  createdAt: string;
+}
+
 export interface AuthRepo {
   // accounts
   createAccount(a: Omit<AccountRow, 'createdAt' | 'deletedAt'> & { createdAt: string }): Promise<void>;
@@ -65,6 +79,13 @@ export interface AuthRepo {
    *  Presence answers who is connected; this answers who belongs. */
   membersOfCampaign(campaignId: string): Promise<{ accountId: string; displayName: string; role: 'dm' | 'player' }[]>;
 
+  // characters (the wizard's output — choices, never a computed sheet)
+  putCharacter(c: CharacterRow): Promise<void>;
+  /** The one character this account plays in this campaign, if they have made one. */
+  characterFor(accountId: string, campaignId: string): Promise<CharacterRow | null>;
+  /** Every character at a campaign's table, for the lobby roster. */
+  charactersOfCampaign(campaignId: string): Promise<CharacterRow[]>;
+
   // table_display credentials (Brief 14 §2) — a shared screen, not a signed-in person,
   // so this is its own token table rather than a fake account (see the migration doc).
   putTableDisplayToken(t: { tokenHash: string; campaignId: string; createdAt: string }): Promise<void>;
@@ -89,6 +110,9 @@ export class InMemoryAuthRepo implements AuthRepo {
   private accounts = new Map<string, AccountRow>();
   private byEmail = new Map<string, string>();
   private memberships = new Map<string, Membership>(); // key: campaign|account
+  /* Same composite key as memberships: one character per person per campaign,
+     which is the unique constraint the migration enforces in Postgres. */
+  private characters = new Map<string, CharacterRow>();
   private campaigns = new Map<string, Campaign>();
   private joinTokens = new Map<string, string>(); // tokenHash → campaignId
   private sessions = new Map<string, string>(); // playSessionId → campaignId
@@ -197,6 +221,16 @@ export class InMemoryAuthRepo implements AuthRepo {
             role: m.role,
           }]
         : []));
+  }
+
+  async putCharacter(c: CharacterRow): Promise<void> {
+    this.characters.set(this.mkey(c.accountId, c.campaignId), c);
+  }
+  async characterFor(accountId: string, campaignId: string): Promise<CharacterRow | null> {
+    return this.characters.get(this.mkey(accountId, campaignId)) ?? null;
+  }
+  async charactersOfCampaign(campaignId: string): Promise<CharacterRow[]> {
+    return [...this.characters.values()].filter((c) => c.campaignId === campaignId);
   }
 
   async putTableDisplayToken(t: { tokenHash: string; campaignId: string }): Promise<void> {

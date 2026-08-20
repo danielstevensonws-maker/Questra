@@ -36,6 +36,8 @@ import {
 export interface CharacterWizardProps {
   /** The campaign this character is being made for, shown for context. */
   campaignName?: string;
+  /** Saving — the finish button reports it rather than looking inert. */
+  busy?: boolean;
   onFinish: (choices: CharacterChoices) => void;
   onCancel: () => void;
 }
@@ -46,7 +48,7 @@ const COMPLEXITY_LABEL: Record<string, string> = {
   high: 'Lots of options',
 };
 
-export function CharacterWizard({ campaignName, onFinish, onCancel }: CharacterWizardProps): ReactElement {
+export function CharacterWizard({ campaignName, busy = false, onFinish, onCancel }: CharacterWizardProps): ReactElement {
   const reduced = usePrefersReducedMotion();
   const api = useCharacterDraft();
   const { draft, steps, choices } = api;
@@ -267,10 +269,10 @@ export function CharacterWizard({ campaignName, onFinish, onCancel }: CharacterW
           <button
             type="button"
             className="qa2-cta"
-            disabled={choices === null}
+            disabled={choices === null || busy}
             onClick={() => { if (choices) onFinish(choices); }}
           >
-            {choices ? 'That’s me' : 'Not finished yet'}
+            {busy ? 'Saving' : choices ? 'That’s me' : 'Not finished yet'}
           </button>
         </footer>
       </div>
