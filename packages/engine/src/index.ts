@@ -21,6 +21,7 @@ export * from './data/spells.js';
 export * from './data/monsters.js';
 export * from './data/classes.js';
 export * from './data/named.js';
+export * from './data/origins.js';
 export * from './data/items.js';
 export * from './data/tables.js';
 export * from './data/loader.js';
