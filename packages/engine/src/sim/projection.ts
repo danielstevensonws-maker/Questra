@@ -81,6 +81,17 @@ function apply(state: ProjectionState, event: PlayEvent): void {
       }
       break;
     }
+    case 'initiative_rolled': {
+      /* The order IS the fight. Without it folded, a reconnecting client knows
+         whose turn it is but not who is next, and the round spine cannot be
+         drawn from a snapshot alone. The event carries totals; the projection
+         keeps only the resulting sequence, because the totals are a roll
+         result the log already holds. */
+      state.order = [...b.order]
+        .sort((x, y) => y.total - x.total)
+        .map((e) => e.creatureId);
+      break;
+    }
     case 'turn_advanced': {
       state.round = b.round;
       state.activeCreatureId = b.activeCreatureId;

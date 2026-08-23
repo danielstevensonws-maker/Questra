@@ -16,6 +16,11 @@ import {
 } from '@questra/contracts';
 import {
   buildRulesData, resolveAttack, CONDITIONS, type Combatant, type RulesData,
+  rollInitiative,
+  advanceTurn,
+  inCombat,
+  takenEvent,
+  declinedEvent,
 } from '@questra/engine';
 import { SyncCore, type IntentResolver, type ResolvedToken } from './sync-core.js';
 import { InMemoryEventStore, type EventStore } from './store/event-store.js';
@@ -158,108 +163,221 @@ export function createApp(config: ServerConfig): App {
     driving a socket to observe a pure function. */
 export function makeSliceResolver(): IntentResolver {
   const rules: RulesData = buildRulesData(CONDITIONS.map((c) => RulesEntitySchema.parse(c)));
-  // a deterministic-enough rng for a dev server (not a golden; real rolls in play)
-  const rng = () => 0.5;
+  /**
+   * Real dice. A fixed rng made every fight identical, which is fine for a
+   * golden and wrong for a table — the whole point of rolling is not knowing.
+   * Goldens inject their own rng; this is the live server's.
+   */
+  const rng = () => Math.random();
   let n = 0;
 
-  return (envelope, state) => {
+  return (envelope, state, actor) => {
     const intent = envelope.intent as {
       kind?: string;
       attackerId?: string; targetId?: string; actionName?: string;
       creatureId?: string; text?: string;
       tokenId?: string; path?: { x: number; y: number }[];
+      toAccountId?: string;
+      promptId?: string; take?: boolean; optionName?: string;
     };
+    const at = new Date().toISOString();
     const seq = state.nextSeq;
-    const stamp = (i = 0) => ({
-      seq: seq + i,
-      id: `e-${n}-${String(i)}`,
-      at: new Date().toISOString(),
-    });
+    const stamp = (i = 0) => ({ seq: seq + i, id: `e-${String(n)}-${String(i)}`, at });
 
-    /**
-     * FREE TEXT IS THE ESCAPE HATCH THE WHOLE PRODUCT RESTS ON (Law 2, Brief 10
-     * §4.1). A player who cannot find the right button types what they want to
-     * do, and it becomes part of the table's record rather than being refused.
-     * A DM narrating uses the same path — one composer, one event, no separate
-     * chat channel to keep in sync.
-     *
-     * It resolves to narration rather than escalating to a Ruling because the
-     * AI ruling tier is not wired to this server yet; saying the words out loud
-     * to everybody is the honest subset of that behaviour, and it is what makes
-     * a table feel live today.
-     */
-    if (intent.kind === 'free_text' && intent.text) {
-      n++;
-      return {
-        ok: true,
-        events: [{
-          ...stamp(),
-          causeId: `cause-say-${n}`,
-          /* The envelope carries no account — SyncCore knows who sent it, the
-             resolver does not. Attributing to the creature is both what the event
-             body records and what a reader of the log actually wants. */
-          actor: { kind: 'player', accountId: intent.creatureId ?? 'table', creatureId: intent.creatureId },
-          visibility: 'public',
-          body: { t: 'narration', text: intent.text, from: 'dm' },
-        }] as PlayEvent[],
-      };
-    }
+    /** Running the game is a role, and these controls belong to it. */
+    const isDm = actor.role === 'dm';
+    const dmOnly = (): { ok: false; reason: string } =>
+      ({ ok: false, reason: 'Only whoever runs the game can do that.' });
 
-    /**
-     * Moving a token. The path is trusted as declared for now — legality
-     * (movement budget, difficult terrain, opportunity attacks) is checkIntent's
-     * job and wiring it is the next piece. What matters here is that a move
-     * REACHES EVERYONE: a table where one person drags a token and nobody else
-     * sees it move is not a shared table.
-     */
-    if (intent.kind === 'move' && intent.tokenId && intent.path?.length) {
-      const to = intent.path[intent.path.length - 1]!;
-      const from = intent.path[0] ?? to;
-      n++;
-      return {
-        ok: true,
-        events: [{
-          ...stamp(),
-          causeId: `cause-move-${n}`,
-          actor: { kind: 'player', accountId: intent.tokenId ?? 'table' },
-          visibility: 'public',
-          body: {
-            t: 'token_moved',
-            tokenId: intent.tokenId,
-            from, to,
-            path: intent.path,
-            forced: false,
-            /* Chebyshev, five feet a square (ADR-0012) — the same metric the
-               engine's own geometry uses. */
-            costFt: 5 * Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y)),
+    switch (intent.kind) {
+      /**
+       * FREE TEXT IS THE ESCAPE HATCH THE WHOLE PRODUCT RESTS ON (Law 2, Brief
+       * 10 §4.1). A player who cannot find the right button types what they
+       * want to do, and it becomes part of the table's record rather than being
+       * refused. A DM narrating uses the same path — one composer, one event,
+       * no separate chat channel to keep in sync.
+       */
+      case 'free_text': {
+        if (!intent.text) return { ok: false, reason: 'Say something first.' };
+        n++;
+        return {
+          ok: true,
+          events: [{
+            ...stamp(),
+            causeId: `cause-say-${String(n)}`,
+            actor: { kind: isDm ? 'dm' : 'player', accountId: actor.accountId },
+            visibility: 'public',
+            body: { t: 'narration', text: intent.text, from: isDm ? 'dm' : 'engine' },
+          }] as PlayEvent[],
+        };
+      }
+
+      /**
+       * A whisper reaches one person and the DM, and nobody else — enforced by
+       * the event's own visibility, which is the single filter every fan-out
+       * and every replay already goes through (ADR-0004). There is no second
+       * code path here that could disagree with it.
+       */
+      case 'whisper': {
+        if (!intent.toAccountId || !intent.text) return { ok: false, reason: 'Pick somebody, and say something.' };
+        n++;
+        return {
+          ok: true,
+          events: [{
+            ...stamp(),
+            causeId: `cause-whisper-${String(n)}`,
+            actor: { kind: isDm ? 'dm' : 'player', accountId: actor.accountId },
+            /* The addressee lives in visibility, not in the body — so the ONE
+               filter every fan-out and replay already goes through is what
+               decides who reads it. A body field would be a second, weaker
+               answer to the same question. */
+            visibility: { whisperTo: intent.toAccountId },
+            body: { t: 'whisper_sent', text: intent.text },
+          }] as PlayEvent[],
+        };
+      }
+
+      /**
+       * Moving a token. The path is trusted as declared for now — the movement
+       * budget and opportunity attacks are checkIntent's job. What matters here
+       * is that a move REACHES EVERYONE: a table where one person drags a token
+       * and nobody else sees it move is not a shared table.
+       */
+      case 'move': {
+        if (!intent.tokenId || !intent.path?.length) return { ok: false, reason: 'Nowhere to go.' };
+        const to = intent.path[intent.path.length - 1]!;
+        const from = intent.path[0] ?? to;
+        n++;
+        return {
+          ok: true,
+          events: [{
+            ...stamp(),
+            causeId: `cause-move-${String(n)}`,
+            actor: { kind: isDm ? 'dm' : 'player', accountId: actor.accountId },
+            visibility: 'public',
+            body: {
+              t: 'token_moved',
+              tokenId: intent.tokenId,
+              from, to,
+              path: intent.path,
+              forced: false,
+              /* Chebyshev, five feet a square (ADR-0012) — the same metric the
+                 engine's own geometry uses. */
+              costFt: 5 * Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y)),
+            },
+          }] as PlayEvent[],
+        };
+      }
+
+      /**
+       * Starting a fight is the boundary between the table's two modes. It
+       * rolls for everybody present, publishes the order, and opens round one —
+       * all as one cascade, so a client never sees a half-started fight.
+       */
+      case 'start_combat': {
+        if (!isDm) return dmOnly();
+        if (Object.keys(state.combatants).length === 0) {
+          return { ok: false, reason: 'There is nobody here to fight.' };
+        }
+        n++;
+        const cause = `cause-init-${String(n)}`;
+        return {
+          ok: true,
+          events: rollInitiative(state, rng, { seq, ids: [], at, causeId: cause }),
+        };
+      }
+
+      case 'advance_turn': {
+        if (!isDm) return dmOnly();
+        const events = advanceTurn(state, { seq, id: `e-${String(++n)}`, at, causeId: `cause-turn-${String(n)}` });
+        if (events.length === 0) return { ok: false, reason: 'Nobody is in this fight.' };
+        return { ok: true, events };
+      }
+
+      /**
+       * Ending a fight returns the table to exploring. The order is cleared by
+       * an initiative event carrying nobody rather than by a bespoke event —
+       * one way to say a thing, not two.
+       */
+      case 'end_combat': {
+        if (!isDm) return dmOnly();
+        if (!inCombat(state)) return { ok: false, reason: 'You are not in a fight.' };
+        n++;
+        return {
+          ok: true,
+          events: [
+            {
+              ...stamp(0),
+              causeId: `cause-end-${String(n)}`,
+              actor: { kind: 'dm', accountId: actor.accountId },
+              visibility: 'public',
+              body: { t: 'initiative_rolled', order: [] },
+            },
+            {
+              ...stamp(1),
+              causeId: `cause-end-${String(n)}`,
+              actor: { kind: 'dm', accountId: actor.accountId },
+              visibility: 'public',
+              body: { t: 'narration', text: 'The fight is over.', from: 'engine' },
+            },
+          ] as PlayEvent[],
+        };
+      }
+
+      /**
+       * Answering a reaction prompt (Brief 08). The engine owns what a taken
+       * reaction DOES; this closes the prompt's lifecycle so the holder is not
+       * left with a card that never resolves.
+       */
+      case 'prompt_reply': {
+        if (!intent.promptId) return { ok: false, reason: 'That prompt has gone.' };
+        n++;
+        const body = intent.take
+          ? takenEvent(intent.promptId, intent.optionName)
+          : declinedEvent(intent.promptId, 'holder');
+        return {
+          ok: true,
+          events: [{
+            ...stamp(),
+            causeId: `cause-prompt-${String(n)}`,
+            actor: { kind: isDm ? 'dm' : 'player', accountId: actor.accountId },
+            visibility: 'public',
+            body,
+          }] as PlayEvent[],
+        };
+      }
+
+      case 'attack': {
+        if (!intent.attackerId || !intent.targetId) return { ok: false, reason: 'Pick a target.' };
+        const attacker = state.combatants[intent.attackerId];
+        const target = state.combatants[intent.targetId];
+        if (!attacker || !target) return { ok: false, reason: 'That target is not here.' };
+        /* In a fight, you attack on your own turn. Outside one, anybody may
+           swing — that is what makes an ambush possible. */
+        if (inCombat(state) && state.activeCreatureId !== intent.attackerId && !isDm) {
+          return { ok: false, reason: 'It is not your turn.' };
+        }
+        const events: PlayEvent[] = resolveAttack(
+          {
+            kind: 'attack', attackerId: intent.attackerId, targetId: intent.targetId,
+            actionName: intent.actionName ?? 'Attack', damageDice: '1d8 + 3', damageType: 'slashing',
+            coverDegree: 'none',
           },
-        }] as PlayEvent[],
-      };
-    }
+          state, rules, rng,
+          {
+            seq,
+            timestamps: [at, at, at],
+            ids: [`e-${String(n)}-a`, `e-${String(n)}-b`, `e-${String(n)}-c`],
+            rollId: `roll-${String(n)}`,
+            actor: { kind: 'player', accountId: actor.accountId, creatureId: attacker.id },
+          },
+          `cause-attack-${String(n++)}`,
+        );
+        return { ok: true, events };
+      }
 
-    if (intent.kind !== 'attack' || !intent.attackerId || !intent.targetId) {
-      return { ok: false, reason: 'That action is not available yet.' };
+      default:
+        return { ok: false, reason: 'That action is not available yet.' };
     }
-    const attacker = state.combatants[intent.attackerId];
-    const target = state.combatants[intent.targetId];
-    if (!attacker || !target) return { ok: false, reason: 'That target is not here.' };
-    const base = state.nextSeq;
-    const events: PlayEvent[] = resolveAttack(
-      {
-        kind: 'attack', attackerId: intent.attackerId, targetId: intent.targetId,
-        actionName: intent.actionName ?? 'Attack', damageDice: '1d8 + 3', damageType: 'slashing',
-        coverDegree: 'none',
-      },
-      state, rules, () => rng(),
-      {
-        seq: base,
-        timestamps: [`t-${n}-a`, `t-${n}-b`, `t-${n}-c`],
-        ids: [`e-${n}-a`, `e-${n}-b`, `e-${n}-c`],
-        rollId: `roll-${n}`,
-        actor: { kind: 'player', accountId: attacker.id, creatureId: attacker.id },
-      },
-      `cause-attack-${n++}`,
-    );
-    return { ok: true, events };
   };
 }

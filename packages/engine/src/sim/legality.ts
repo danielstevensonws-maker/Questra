@@ -117,6 +117,24 @@ export function checkIntent(
     }
     case 'move':
       return LEGAL;
+
+    /**
+     * The table controls and the two conversation intents never grey.
+     *
+     * Greying answers "would the rules allow this?", and none of these are
+     * rules questions: starting a fight, ending one, and passing the turn are
+     * the DM's to make, and whether SOMEBODY MAY send one is authorisation,
+     * decided server-side by role. Answering it here too would give the
+     * question two answers free to disagree — and the client's copy is the one
+     * an attacker skips. Whispering and answering a prompt are likewise always
+     * legal to attempt.
+     */
+    case 'start_combat':
+    case 'end_combat':
+    case 'advance_turn':
+    case 'whisper':
+    case 'prompt_reply':
+      return LEGAL;
   }
 }
 

@@ -42,6 +42,14 @@ export interface ResolvedToken {
 export type IntentResolver = (
   envelope: { idempotencyKey: string; intent: unknown },
   state: ProjectionState,
+  /**
+   * WHO SENT IT. The resolver needs this to refuse a DM control from a player:
+   * "start the fight" and "next turn" change shared state, and being able to
+   * name an intent is not permission to send one. Authorisation is decided
+   * here, server-side, next to the state it protects — never by hiding a button
+   * on a client that can simply send the message anyway.
+   */
+  actor: Viewer,
 ) => { ok: true; events: PlayEvent[] } | { ok: false; reason: string };
 
 export interface SyncCoreOptions {
@@ -242,7 +250,10 @@ export class SyncCore {
 
     // validate → legality → cascade or reject (§2.4). Reject reason == greying string.
     const state = fold(s.base, s.log);
-    const result = this.opts.resolveIntent(envelope, state);
+    /* The viewer was established at hello and is the server's own record of
+       who this connection is — not anything the client asserted in the frame. */
+    const viewer = s.viewers.get(conn.connId)!.viewer;
+    const result = this.opts.resolveIntent(envelope, state, viewer);
     if (!result.ok) {
       conn.send({ m: 'intent_rejected', idempotencyKey: envelope.idempotencyKey, reason: result.reason });
       return;

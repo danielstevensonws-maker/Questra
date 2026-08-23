@@ -51,6 +51,12 @@ export interface ProjectionState {
   /** Initiative order (creature ids) and whose turn it is, if in combat. */
   round: number;
   activeCreatureId?: string;
+  /**
+   * Initiative order, highest first — the creature ids in the sequence they
+   * act. Empty means nobody has rolled and the table is exploring, which is a
+   * different thing from a fight with one combatant in it.
+   */
+  order?: string[];
   /** The next seq the server would assign (monotonic). */
   nextSeq: number;
 }
@@ -86,6 +92,7 @@ export function cloneState(s: ProjectionState): ProjectionState {
     combatants,
     round: s.round,
     ...(s.activeCreatureId !== undefined ? { activeCreatureId: s.activeCreatureId } : {}),
+    ...(s.order !== undefined ? { order: [...s.order] } : {}),
     nextSeq: s.nextSeq,
   };
 }

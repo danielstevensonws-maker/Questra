@@ -27,6 +27,7 @@ export * from './data/tables.js';
 export * from './data/loader.js';
 export * from './sim/state.js';
 export * from './sim/projection.js';
+export * from './sim/encounter.js';
 export * from './sim/pipeline.js';
 export * from './sim/cascade.js';
 export * from './sim/sheet.js';

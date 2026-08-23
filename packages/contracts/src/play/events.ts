@@ -128,6 +128,22 @@ export const IntentSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('move'), tokenId: ID, path: z.array(CellSchema).nonempty() }),
   z.object({ kind: z.literal('use_feature'), creatureId: ID, featureId: ID }),
   z.object({ kind: z.literal('free_text'), creatureId: ID, text: z.string().min(1) }),
+  /**
+   * The DM's table controls. These are intents rather than a separate channel
+   * because they change shared state and belong on the same ordered log as
+   * everything else — a fight that started is a fact the log must carry, or a
+   * reconnecting client cannot tell whether it is in one.
+   *
+   * The server refuses these from a player; being in the union is not
+   * permission to send one.
+   */
+  z.object({ kind: z.literal('start_combat') }),
+  z.object({ kind: z.literal('end_combat') }),
+  z.object({ kind: z.literal('advance_turn') }),
+  /** A private line to one account — the whisper composer (Brief 10 §3). */
+  z.object({ kind: z.literal('whisper'), toAccountId: ID, text: z.string().min(1) }),
+  /** Answering a reaction prompt (Brief 08): take it, or let it pass. */
+  z.object({ kind: z.literal('prompt_reply'), promptId: ID, take: z.boolean(), optionName: z.string().optional() }),
 ]);
 export type Intent = z.infer<typeof IntentSchema>;
 
