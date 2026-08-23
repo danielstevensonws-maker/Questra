@@ -150,6 +150,29 @@ export class SyncCore {
       const combatants = this.opts.initialCombatants?.(playSessionId) ?? [];
       s = { log: [], base: initialState(combatants), idempotency: new Map(), viewers: new Map(), writeChain: Promise.resolve() };
       this.sessions.set(playSessionId, s);
+      return s;
+    }
+
+    /**
+     * RESEAT ANYBODY WHO ARRIVED AFTER THE SESSION OPENED.
+     *
+     * The base was built once, when the first person said hello — so a player
+     * who made their character afterwards never reached the table at all. The
+     * DM opened the lobby, the session came into being empty, and every
+     * character created from that moment on was invisible to it: "There is
+     * nobody here to fight" with a full party standing in the room (found by
+     * running it, 2026-08-23).
+     *
+     * Only ADDING is safe. The log has folded on top of this base since the
+     * session opened, so replacing a combatant already in it would silently
+     * undo every wound and condition the fight has applied. A newcomer has no
+     * history to lose, which is exactly why they are the only case handled
+     * here — anything else is a mid-session character change, and that is an
+     * event, not a reseat.
+     */
+    const seated = this.opts.initialCombatants?.(playSessionId) ?? [];
+    for (const c of seated) {
+      if (!s.base.combatants[c.id]) s.base.combatants[c.id] = c;
     }
     return s;
   }
