@@ -139,6 +139,25 @@ export function Lobby({ campaignId, session, onBegin, onLeave, onMakeCharacter }
    * nobody in the lobby.
    */
   const [starting, setStarting] = useState(false);
+
+  /**
+   * The link for a screen in the middle of the table.
+   *
+   * Minted on request rather than shown by default: most tables are remote and
+   * will never want one, and a link nobody asked for is a link somebody has to
+   * wonder about. Asking again mints a fresh one and revokes the old, which is
+   * how a display gets cut off when a session moves house.
+   */
+  const [displayLink, setDisplayLink] = useState<string | null>(null);
+  const [displayError, setDisplayError] = useState<string | null>(null);
+  const makeDisplayLink = (): void => {
+    session.authedRequest<{ token: string }>(`/campaigns/${campaignId}/table-display-token`, { method: 'POST' })
+      .then(({ token }) => {
+        setDisplayError(null);
+        setDisplayLink(`${window.location.origin}/display/${table?.playSessionId ?? ''}?t=${token}`);
+      })
+      .catch(() => { setDisplayError('Could not make a link just now.'); });
+  };
   const begin = (): void => {
     if (starting) return;
     setStarting(true);
@@ -214,8 +233,19 @@ export function Lobby({ campaignId, session, onBegin, onLeave, onMakeCharacter }
                 <button type="button" className="qa2-cta" onClick={begin} disabled={starting}>
                   {starting ? 'Opening the table…' : 'Begin the session'}
                 </button>
+                {/* For tables sharing one room and one screen. */}
+                <button type="button" className="qa2-quiet-link" onClick={makeDisplayLink}>
+                  {displayLink ? 'Make a new screen link' : 'Add a shared screen'}
+                </button>
                 <button type="button" className="qa2-quiet-link" onClick={onLeave}>Back to your campaigns</button>
               </div>
+              {displayLink && (
+                <p className="rd-micro qa-lobby-note">
+                  Open this on the screen everyone can see. Making another link stops this one working.
+                  <input className="qa-display-link" readOnly value={displayLink} onFocus={(e) => { e.target.select(); }} />
+                </p>
+              )}
+              {displayError && <p className="rd-error">{displayError}</p>}
             </>
           ) : (
             <>

@@ -123,4 +123,30 @@ export function registerCampaignRoutes(
       return service.mintTableDisplayToken(callerId, req.params.campaignId);
     }),
   );
+
+  /**
+   * The map, for the screen in the middle of the table.
+   *
+   * A SEPARATE ROUTE BECAUSE A TELEVISION HAS NO ACCOUNT. Every other route
+   * here answers "who is signed in?"; this one answers "is this the campaign's
+   * live display credential?" — a different question with a different answer,
+   * and folding them together would mean one of them is being asked loosely.
+   *
+   * The room comes back filtered exactly as a player's does. A screen everybody
+   * can see is the last place a hidden creature should appear, and the fact
+   * that it is physically visible to the room is precisely why it gets the
+   * players' view rather than the DM's.
+   */
+  app.get<{ Params: { playSessionId: string } }>(
+    '/table-display/:playSessionId/room',
+    async (req, reply) => handle(reply, async () => {
+      const header = req.headers.authorization;
+      const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+      if (!token) { reply.code(401); return { error: 'auth', reason: 'This screen has no credential.' }; }
+
+      const room = await service.tableDisplayRoom(token, req.params.playSessionId);
+      if (!room) { reply.code(403); return { error: 'auth', reason: 'This screen is no longer connected to that table.' }; }
+      return room;
+    }),
+  );
 }

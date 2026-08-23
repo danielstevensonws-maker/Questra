@@ -945,6 +945,102 @@ const CSS = `
   color: var(--qa-ink-dim);
   white-space: pre-wrap;
 }
+
+/* ---- the shared screen -----------------------------------------------------
+   A television at the end of the table has no hands and no pointer, so there
+   are no hover states and no controls here at all. Its one job is being
+   readable from four feet away, which is why everything is scaled up and
+   thinned out relative to a personal screen. */
+.qa-td { position: relative; height: 100vh; overflow: hidden; }
+
+.qa-td-scene {
+  position: absolute;
+  z-index: 2;
+  top: var(--qa-hud-inset);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--qa-s3) var(--qa-s5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--qa-s2);
+  text-align: center;
+}
+.qa-td-name {
+  font-family: var(--qa-font-display);
+  /* The display size, because this is read across a room rather than at
+     arm's length — the one place the top of the ramp is the right answer. */
+  font-size: var(--qa-text-display);
+  color: var(--qa-ink);
+  line-height: 1.05;
+}
+/* Whose turn it is, in the accent, because it is the one thing anybody looks
+   up to check. */
+.qa-td-state {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-body);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-accent);
+}
+
+.qa-td-order {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: var(--qa-hud-inset);
+  transform: translateY(-50%);
+  padding: var(--qa-s4);
+  max-height: 80%;
+  overflow: hidden;
+}
+.qa-td-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--qa-s3); }
+.qa-td-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--qa-s5);
+  padding-left: var(--qa-s3);
+  border-left: 2px solid transparent;
+}
+.qa-td-row.is-acting { border-left-color: var(--qa-accent); }
+.qa-td-who { font-family: var(--qa-font-display); font-size: var(--qa-text-lg); color: var(--qa-ink); }
+.qa-td-row.is-acting .qa-td-who { color: var(--qa-accent); }
+.qa-td-state-word {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-label);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.qa-td-log {
+  position: absolute;
+  z-index: 2;
+  right: var(--qa-hud-inset);
+  bottom: var(--qa-hud-inset);
+  width: min(520px, 40%);
+  padding: var(--qa-s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s3);
+}
+.qa-td-line {
+  margin: 0;
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-body);
+  line-height: 1.5;
+  color: var(--qa-ink);
+}
+.qa-td-line-who {
+  display: block;
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+}
 `;
 
 /**

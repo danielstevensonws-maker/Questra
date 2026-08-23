@@ -6,7 +6,7 @@
  * pools, bonds web, promotions) — that is M4. This is only what M3's shell needs to
  * make "create → join → land in the party view" real.
  */
-import { CharacterChoicesSchema, CharacterSchema, RoomSchema } from '@questra/contracts';
+import { CharacterChoicesSchema, CharacterSchema, RoomSchema, filterRoomForViewer } from '@questra/contracts';
 import {
   CLASSES, DRAFT_ITEMS, DRAFT_SPELLS, VERIFIED_SPECIES,
   buildSheetRulesData, computeSheet, speciesSpeedFt, starterRoom,
@@ -188,16 +188,27 @@ export class CampaignService {
    * whoever actually turned up.
    *
    * Membership-gated: a map is not public, and its unrevealed cells are the
-   * DM's to give away. Filtering per viewer happens at the payload boundary
-   * (filterRoomForViewer), not here — this returns the whole truth and the
-   * caller decides who may see what.
+   * DM's to give away.
+   *
+   * FILTERED PER VIEWER, HERE, BEFORE IT LEAVES. This used to return the whole
+   * truth on the reasoning that the caller would filter — and the HTTP route
+   * did not, so a player fetching their own map received hidden tokens,
+   * unrevealed terrain and the DM's prep notes. The sync socket had always gone
+   * through `filterRoomForViewer`; this door did not, which is exactly how a
+   * second path around a choke point becomes a leak.
+   *
+   * The filter is the same one the socket uses (Brief 06 non-negotiable #3 —
+   * ONE visibility implementation), so the two doors cannot disagree.
    */
   async currentRoom(callerAccountId: string, campaignId: string): Promise<Room> {
     const me = await this.deps.repo.membership(callerAccountId, campaignId);
     if (!me) throw new AuthError('not_member', 'You are not part of this campaign.', 403);
 
+    const forMe = (room: Room): Room =>
+      filterRoomForViewer(room, { role: me.role, accountId: callerAccountId });
+
     const existing = await this.deps.repo.currentRoom(campaignId);
-    if (existing) return RoomSchema.parse(existing.body);
+    if (existing) return forMe(RoomSchema.parse(existing.body));
 
     const characters = await this.deps.repo.charactersOfCampaign(campaignId);
     const room = starterRoom({
@@ -212,7 +223,10 @@ export class CampaignService {
       isCurrent: true,
       createdAt: this.nowIso(),
     });
-    return room;
+    /* Filtered on the way out like any other room — a freshly-minted one is
+       not a special case, and treating it as one is how the exception that
+       leaks gets written. */
+    return forMe(room);
   }
 
   /**
@@ -297,6 +311,33 @@ export class CampaignService {
         },
       };
     });
+  }
+
+  /**
+   * The map for a shared screen, authorised by its own credential.
+   *
+   * FILTERED LIKE A PLAYER'S, deliberately and not as a compromise: a screen in
+   * the middle of the table is looked at by the players, so giving it the DM's
+   * view would broadcast every hidden creature to the room it was hidden from.
+   * The credential grants the players' view of one campaign and nothing else —
+   * no writes, no roster, no whispers.
+   *
+   * Returns null rather than throwing on a bad or revoked token: a display that
+   * has been cut off should say so calmly on its own screen, not surface a
+   * stack trace on a television.
+   */
+  async tableDisplayRoom(token: string, playSessionId: string): Promise<Room | null> {
+    const granted = await this.deps.repo.tableDisplayCampaignId(await hashToken(token));
+    if (!granted) return null;
+
+    /* The token names a campaign; the URL names a session. They must agree, or
+       one display's credential would open another table's map. */
+    const campaignId = await this.deps.repo.campaignIdForSession(playSessionId);
+    if (!campaignId || campaignId !== granted) return null;
+
+    const existing = await this.deps.repo.currentRoom(campaignId);
+    if (!existing) return null;
+    return filterRoomForViewer(RoomSchema.parse(existing.body), { role: 'table_display' });
   }
 
   /**

@@ -6,7 +6,7 @@
  * logged-out (brief-14 §3: "the join link is a player's entire front door").
  */
 import type { ReactElement } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { SessionProvider, useSession } from './session.js';
 import { Landing } from './Landing.js';
 import { Home } from './Home.js';
@@ -15,6 +15,7 @@ import { CreateCampaign } from './CreateCampaign.js';
 import { Lobby } from './Lobby.js';
 import { CharacterWizardRoute } from '../wizard/CharacterWizardRoute.js';
 import { PlayRoute as PlaySurface } from '../play/PlayRoute.js';
+import { TableDisplayRoute } from '../play/TableDisplayRoute.js';
 import { Attribution } from './Attribution.js';
 import { Nav } from './Nav.js';
 import { ShellStyles } from './ShellStyles.js';
@@ -134,6 +135,23 @@ function PlayRoute(): ReactElement {
   return <PlaySurface campaignId={id} session={session} onLeave={() => navigate(`/campaign/${id}`)} />;
 }
 
+/**
+ * The screen in the middle of the table.
+ *
+ * UNGATED BY AN ACCOUNT, because a television has none — its authority is the
+ * table_display credential in the URL and nothing else. That is a deliberate
+ * trade: anyone with the link sees the table's public view, which is what a
+ * screen in the middle of a room already shows to everyone present. The DM can
+ * regenerate, which revokes every prior link.
+ */
+function TableDisplayScreen(): ReactElement {
+  const { playSessionId } = useParams<{ playSessionId: string }>();
+  const [params] = useSearchParams();
+  const token = params.get('t');
+  if (!playSessionId || !token) return <Navigate to="/" replace />;
+  return <TableDisplayRoute playSessionId={playSessionId} token={token} />;
+}
+
 /* Public and ungated on purpose: ADR-0010 wants the attribution ACCESSIBLE,
    and a licence notice you must create an account to read is not accessible.
    It is also the one page reachable from both signed-out and signed-in shells. */
@@ -152,6 +170,7 @@ function Shell(): ReactElement {
       <Route path="/campaign/:id" element={<CampaignRoute />} />
       <Route path="/campaign/:id/character" element={<CharacterRoute />} />
       <Route path="/campaign/:id/play" element={<PlayRoute />} />
+      <Route path="/display/:playSessionId" element={<TableDisplayScreen />} />
       <Route path="/legal" element={<AttributionRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

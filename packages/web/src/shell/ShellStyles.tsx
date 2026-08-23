@@ -474,6 +474,20 @@ const CSS = `
   .qa-home-head { align-items: flex-start; }
   .qa-make-panel { padding: var(--qa-s4); }
 }
+
+/* The shared-screen link: long, and meant to be copied rather than read. */
+.qa-display-link {
+  display: block;
+  width: 100%;
+  margin-top: var(--qa-s2);
+  padding: var(--qa-s2) var(--qa-s3);
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  color: var(--rd-dim);
+  background: var(--qa-chip);
+  border: var(--qa-hairline) solid var(--rd-line);
+  border-radius: var(--qa-radius);
+}
 `;
 
 /** The shell's screen layouts on top of the shared table language. */

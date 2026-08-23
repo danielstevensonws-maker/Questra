@@ -38,7 +38,8 @@ import {
    appears, promote this to an export there instead. */
 type ClientIntentEnvelope = z.infer<typeof ClientIntentEnvelopeSchema>;
 
-const API_BASE = (import.meta as unknown as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE ?? 'http://localhost:8787';
+/** Shared so nothing else re-derives where the server lives. */
+export const API_BASE = (import.meta as unknown as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE ?? 'http://localhost:8787';
 
 /** http(s) → ws(s) on the same host: the WebSocket server shares Fastify's port. */
 function socketUrl(): string {
