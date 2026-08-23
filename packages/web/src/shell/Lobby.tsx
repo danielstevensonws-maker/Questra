@@ -127,17 +127,28 @@ export function Lobby({ campaignId, session, onBegin, onLeave, onMakeCharacter }
 
   /**
    * The DM beginning is a thing they SAY, not a page they navigate to. Sending
-   * it first means the log carries the moment the session opened, every
-   * connected player is carried in by the effect above, and the DM's own
-   * navigation is just what happens next rather than the whole mechanism.
+   * it puts the moment on the shared log, which is what carries every connected
+   * player in — the DM's own navigation is just what happens next rather than
+   * the whole mechanism.
+   *
+   * NAVIGATION WAITS FOR THE ACK. Sending and navigating in the same tick meant
+   * unmounting this screen — and its effect cleanup closing the socket — in the
+   * same tick as the send. The close won, the intent never reached the server,
+   * and nobody moved, including the DM's own journal (owner, 2026-08-23). The
+   * ack is proof the server has it; the timeout is so a dead socket strands
+   * nobody in the lobby.
    */
+  const [starting, setStarting] = useState(false);
   const begin = (): void => {
-    sync.sendIntent({
-      idempotencyKey: 'begin-' + campaignId + '-' + String(Date.now()),
-      intent: { kind: 'free_text', creatureId: 'dm', text: 'The session begins.' },
-    });
-    onBegin();
+    if (starting) return;
+    setStarting(true);
+    const key = 'begin-' + campaignId + '-' + String(Date.now());
+    sync.sendIntent(
+      { idempotencyKey: key, intent: { kind: 'free_text', creatureId: 'dm', text: 'The session begins.' } },
+      () => { onBegin(); },
+    );
   };
+
 
 
   if (loadError) {
@@ -200,7 +211,9 @@ export function Lobby({ campaignId, session, onBegin, onLeave, onMakeCharacter }
                     : 'Everyone is here and ready. Begin whenever you like.'}
               </p>
               <div className="rd-actions">
-                <button type="button" className="qa2-cta" onClick={begin}>Begin the session</button>
+                <button type="button" className="qa2-cta" onClick={begin} disabled={starting}>
+                  {starting ? 'Opening the table…' : 'Begin the session'}
+                </button>
                 <button type="button" className="qa2-quiet-link" onClick={onLeave}>Back to your campaigns</button>
               </div>
             </>

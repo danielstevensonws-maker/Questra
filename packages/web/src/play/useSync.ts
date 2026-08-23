@@ -64,7 +64,7 @@ export interface SyncState {
   /** Set when the server refused the connection — auth, not_member, and so on. */
   error: string | null;
   /** Send a player intent. No-ops while not live. */
-  sendIntent: (envelope: ClientIntentEnvelope) => void;
+  sendIntent: (envelope: ClientIntentEnvelope, onAck?: () => void) => void;
 }
 
 export interface UseSyncOptions {
@@ -94,6 +94,8 @@ export function useSync({ playSessionId, token, enabled = true }: UseSyncOptions
   const attemptRef = useRef<number>(0);
   const closedByUsRef = useRef<boolean>(false);
   const timerRef = useRef<number | undefined>(undefined);
+  /* Callers waiting to hear the server has their intent, by idempotency key. */
+  const ackWaitersRef = useRef<Map<string, () => void>>(new Map());
 
   const handle = useCallback((msg: ServerMsg): void => {
     switch (msg.m) {
@@ -127,7 +129,12 @@ export function useSync({ playSessionId, token, enabled = true }: UseSyncOptions
       case 'intent_rejected':
         setError(msg.reason);
         break;
-      case 'intent_ack':
+      case 'intent_ack': {
+        /* Whoever is waiting on this one gets to move on. */
+        const waiter = ackWaitersRef.current.get(msg.idempotencyKey);
+        if (waiter) { ackWaitersRef.current.delete(msg.idempotencyKey); waiter(); }
+        break;
+      }
       case 'pong':
         break;
     }
@@ -186,8 +193,21 @@ export function useSync({ playSessionId, token, enabled = true }: UseSyncOptions
     };
   }, [playSessionId, token, enabled, handle]);
 
-  const sendIntent = useCallback((envelope: ClientIntentEnvelope): void => {
+  /**
+   * Send an intent, and optionally learn when the server has it.
+   *
+   * The callback exists because some actions are a HANDOFF: the DM starting a
+   * session sends, then leaves this screen, and leaving closes the socket. Doing
+   * both in one tick meant the close beat the send and the intent evaporated.
+   * Waiting for the ack makes the handoff safe, and the timeout means a dead
+   * socket delays somebody rather than trapping them.
+   */
+  const sendIntent = useCallback((envelope: ClientIntentEnvelope, onAck?: () => void): void => {
     const ws = socketRef.current;
+    if (onAck) {
+      const timer = window.setTimeout(() => { ackWaitersRef.current.delete(envelope.idempotencyKey); onAck(); }, 3000);
+      ackWaitersRef.current.set(envelope.idempotencyKey, () => { window.clearTimeout(timer); onAck(); });
+    }
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     const msg: ClientMsg = { m: 'intent', envelope };
     ws.send(JSON.stringify(msg));

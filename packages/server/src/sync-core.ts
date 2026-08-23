@@ -86,6 +86,10 @@ interface PendingPrompt {
   timer: ReturnType<typeof setTimeout>;
 }
 
+/** How much of the journal a fresh join is caught up on. Enough to read the
+    room; not so much that a long session floods a reconnect. */
+const RECENT_EVENTS = 100;
+
 export class SyncCore {
   private sessions = new Map<string, SessionState>();
   private connToSession = new Map<string, string>();
@@ -195,6 +199,23 @@ export class SyncCore {
       const visible = filterStream(s.log, viewer);
       const snapshot = fold(s.base, visible); // fold(log) — the one projection function (§2.8)
       conn.send({ m: 'welcome', viewer: { role: resolved.role }, snapshotSeq: currentSeq, snapshot });
+      /**
+       * The story so far, replayed.
+       *
+       * A fresh join gets a folded snapshot, and folding keeps NUMBERS: hit
+       * points, positions, conditions. Narration is not a number — it never
+       * survives the fold, so a player walking from the lobby into the table
+       * arrived to an empty journal every time and the session's opening line
+       * was simply gone (owner, 2026-08-23).
+       *
+       * Replaying the visible tail fixes that without weakening anything:
+       * every event still passes eventVisibleTo, so a latecomer sees exactly
+       * what they would have seen had they been connected — and no whisper
+       * meant for somebody else.
+       */
+      for (const e of filterStream(s.log, viewer).slice(-RECENT_EVENTS)) {
+        conn.send({ m: 'event', event: e });
+      }
     } else {
       // reconnect → welcome with snapshot up to lastSeq, then replay filtered (lastSeq, now]
       const upTo = s.log.filter((e) => e.seq <= msg.lastSeq!);
