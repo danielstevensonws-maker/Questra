@@ -27,6 +27,7 @@ import {
   ClientIntentEnvelopeSchema,
   ServerMsgSchema,
   type ClientMsg,
+  type EffectId,
   type PlayEvent,
   type ServerMsg,
   type ViewerRole,
@@ -65,6 +66,8 @@ export interface SyncState {
   error: string | null;
   /** Send a player intent. No-ops while not live. */
   sendIntent: (envelope: ClientIntentEnvelope, onAck?: () => void) => void;
+  sendEffect: (effect: EffectId) => void;
+  onEffect: (fn: (e: EffectId) => void) => void;
 }
 
 export interface UseSyncOptions {
@@ -96,6 +99,9 @@ export function useSync({ playSessionId, token, enabled = true }: UseSyncOptions
   const timerRef = useRef<number | undefined>(undefined);
   /* Callers waiting to hear the server has their intent, by idempotency key. */
   const ackWaitersRef = useRef<Map<string, () => void>>(new Map());
+  /* The current effect listener. A ref rather than state so arriving effects
+     never re-run the socket effect and tear the connection down. */
+  const effectRef = useRef<((e: EffectId) => void) | undefined>(undefined);
 
   const handle = useCallback((msg: ServerMsg): void => {
     switch (msg.m) {
@@ -128,6 +134,12 @@ export function useSync({ playSessionId, token, enabled = true }: UseSyncOptions
         break;
       case 'intent_rejected':
         setError(msg.reason);
+        break;
+      case 'effect':
+        /* Ephemeral by design (Brief 10 §4): handed to the listener and kept
+           nowhere. Reduce-motion suppression happens where it renders, because
+           it is a property of the person watching, not of the effect. */
+        effectRef.current?.(msg.effect);
         break;
       case 'intent_ack': {
         /* Whoever is waiting on this one gets to move on. */
@@ -213,5 +225,17 @@ export function useSync({ playSessionId, token, enabled = true }: UseSyncOptions
     ws.send(JSON.stringify(msg));
   }, []);
 
-  return { status, present, activeCreatureId, snapshot, events, error, sendIntent };
+  /** Send a screen effect. The server refuses these from anyone but the DM. */
+  const sendEffect = useCallback((effect: EffectId): void => {
+    const ws = socketRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ m: 'effect', effect } satisfies ClientMsg));
+  }, []);
+
+  /** Register what happens when an effect arrives. */
+  const onEffect = useCallback((fn: (e: EffectId) => void): void => {
+    effectRef.current = fn;
+  }, []);
+
+  return { status, present, activeCreatureId, snapshot, events, error, sendIntent, sendEffect, onEffect };
 }

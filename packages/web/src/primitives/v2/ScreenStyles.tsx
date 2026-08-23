@@ -698,6 +698,170 @@ const CSS = `
 }
 
 
+
+/* ---- running the fight -----------------------------------------------------
+   The controls that move the whole table sit together, top-right, because they
+   are one question: is this a fight, and whose turn is it? */
+.qa-dm-controls { display: flex; align-items: center; gap: var(--qa-s2); }
+.qa-dm-run { flex: none; }
+
+/* ---- the prompt dock -------------------------------------------------------
+   Centre-bottom, over the map, because a prompt is the one thing on this screen
+   that must be answered before anything else happens. Everything else on the
+   DM's screen can wait; this cannot, so it takes the position the eye returns
+   to and nothing else is allowed to sit there. */
+.qa-prompt {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: var(--qa-hud-inset);
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - var(--qa-hud-inset) * 2));
+  padding: var(--qa-s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s3);
+  border-color: var(--qa-accent-line);
+}
+.qa-prompt-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--qa-s3); }
+.qa-prompt-kind {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-accent);
+}
+.qa-prompt-clock {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-label);
+  color: var(--qa-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+/* Ten seconds left is the moment it stops being information and starts being
+   pressure, so that is where the colour changes. */
+.qa-prompt-clock.is-urgent { color: var(--qa-danger); }
+.qa-prompt-context {
+  margin: 0;
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-body);
+  line-height: 1.5;
+  color: var(--qa-ink);
+}
+.qa-prompt-options { display: flex; flex-wrap: wrap; align-items: center; gap: var(--qa-s2); }
+.qa-prompt-take { display: inline-flex; align-items: baseline; gap: var(--qa-s2); }
+.qa-prompt-cost {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  opacity: 0.75;
+}
+.qa-prompt-queued {
+  margin: 0;
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+}
+
+/* ---- what only you know ----------------------------------------------------
+   A drawer inside the journal rather than a panel of its own: it holds only the
+   things with no creature to sit on, and it opens where a DM is already typing. */
+.qa-dm-drawer-toggle {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.qa-dm-drawer-toggle:hover { color: var(--qa-accent); }
+.qa-dm-drawer {
+  flex: none;
+  padding: var(--qa-s3) var(--qa-s4);
+  border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
+  background: var(--qa-chip);
+}
+.qa-dm-drawer-note {
+  margin: 0 0 var(--qa-s2);
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+}
+.qa-dm-whisper { display: flex; flex-direction: column; gap: var(--qa-s2); }
+.qa-dm-select {
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-label);
+  padding: var(--qa-s2) var(--qa-s3);
+  color: var(--qa-ink);
+  background: var(--qa-glass);
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-radius: var(--qa-radius);
+}
+
+/* Tones in the journal. A whisper is set apart because reading one aloud by
+   mistake is a real way to spoil a secret. */
+.qa-dm-line.is-chat { color: var(--qa-accent); }
+.qa-dm-line.is-roll .qa-dm-line-who { color: var(--qa-ink-dim); }
+.qa-dm-line.is-system { color: var(--qa-ink-faint); }
+
+/* ---- the atmosphere console ------------------------------------------------
+   Bottom-left, opposite the journal, collapsed to a single pill. A DM's
+   attention is the scarcest thing at the table; an open panel of effects is a
+   tab open on a decision nobody is making. */
+.qa-console {
+  position: absolute;
+  z-index: 3;
+  left: var(--qa-hud-inset);
+  bottom: var(--qa-hud-inset);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--qa-s2);
+}
+.qa-console-toggle { flex: none; }
+.qa-console-panel { width: 280px; padding: var(--qa-s3); display: flex; flex-direction: column; gap: var(--qa-s3); }
+.qa-console-note {
+  margin: 0;
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+  line-height: 1.4;
+}
+.qa-console-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qa-s2); }
+.qa-console-effect {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--qa-s2) var(--qa-s3);
+  text-align: left;
+  background: var(--qa-chip);
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-radius: var(--qa-radius);
+  cursor: pointer;
+  transition: border-color var(--qa-dur) var(--qa-ease), background var(--qa-dur) var(--qa-ease);
+}
+.qa-console-effect:hover { border-color: var(--qa-accent-line); background: var(--qa-accent-soft); }
+.qa-console-label { font-family: var(--qa-font-body); font-size: var(--qa-text-label); color: var(--qa-ink); }
+.qa-console-hint {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  color: var(--qa-ink-faint);
+}
+
+@media (max-width: 900px) {
+  .qa-prompt, .qa-console { position: static; transform: none; width: auto; margin: var(--qa-s3); }
+  .qa-console-panel { width: auto; }
+}
+
 `;
 
 /**

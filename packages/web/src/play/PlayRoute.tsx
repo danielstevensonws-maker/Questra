@@ -18,10 +18,15 @@
  * class and read where it came from. That is the product's whole promise: you
  * learn the rules by playing, not before playing.
  */
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
-import type { CampaignSession, Room } from '@questra/contracts';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import type { CampaignSession, Intent, Room } from '@questra/contracts';
 import { PlayerViewV2 } from '../primitives/v2/PlayerViewV2.js';
 import { DmScreen } from './DmScreen.js';
+import { promptsFrom } from './promptsFrom.js';
+import { tilesFrom } from './tilesFrom.js';
+import { PromptDock, type PromptVM } from './PromptDock.js';
+import type { EffectId } from './ImmersionConsole.js';
+import { EffectLayer } from './EffectLayer.js';
 import { ShellStyles } from '../shell/ShellStyles.js';
 import { Road } from '../shell/road/Road.js';
 import { usePrefersReducedMotion } from '../shell/shared.js';
@@ -109,6 +114,45 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
     return out;
   }, [table]);
 
+  /**
+   * One place that turns an intent into a sent frame, so no caller has to
+   * remember how an idempotency key is built. Every key is unique per press:
+   * the server re-acks a repeat rather than re-emitting, which is protection
+   * against a double-click, not a reason to reuse one deliberately.
+   */
+  const send = useCallback((intent: Intent): void => {
+    sync.sendIntent({
+      idempotencyKey: `${intent.kind}-${String(Date.now())}-${String(Math.random()).slice(2, 8)}`,
+      intent,
+    });
+  }, [sync]);
+
+  /**
+   * Reaction prompts waiting on this viewer (Brief 08). The server owns which
+   * one is active and when it expires; this only holds what has arrived and
+   * not yet been closed by a taken/declined event.
+   */
+  const prompts = useMemo<PromptVM[]>(() => promptsFrom(sync.events), [sync.events]);
+
+  /* What this character can do, straight off their sheet. */
+  const tiles = useMemo(() => tilesFrom(myCharacter?.sheet ?? null), [myCharacter]);
+
+  /**
+   * Atmosphere effects are ephemeral by design (Brief 10 §4) — they play and
+   * are gone, leaving nothing in the log to replay at somebody reconnecting.
+   *
+   * The server echoes an effect to EVERY viewer including whoever sent it, so
+   * there is one path that draws one: what the DM sees is what the table sees,
+   * rather than a local preview that could differ from the broadcast.
+   */
+  const [effect, setEffect] = useState<EffectId | null>(null);
+  useEffect(() => { sync.onEffect((e) => { setEffect(e); }); }, [sync]);
+  useEffect(() => {
+    if (!effect) return;
+    const t = window.setTimeout(() => { setEffect(null); }, 2000);
+    return () => { window.clearTimeout(t); };
+  }, [effect]);
+
   const view = useMemo(() => {
     /* The snapshot is the engine's projection, opaque to contracts — the sync
        client deliberately does not fold it, so this is where it becomes a
@@ -174,16 +218,25 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
             characterName: m.character?.name ?? null,
             here: sync.present.some((p) => p.accountId === m.accountId),
           }))}
+        prompts={prompts}
         onLeave={onLeave}
         onSay={(text) => {
           /* Straight onto the shared log, where every connected player sees it.
              The DM narrating and a player describing an action take the SAME
              path — one composer, one event, no separate chat to keep in sync. */
-          sync.sendIntent({
-            idempotencyKey: 'say-' + String(Date.now()) + '-' + String(Math.random()).slice(2, 8),
-            intent: { kind: 'free_text', creatureId: table.members.find((m) => m.role === 'dm')?.character?.id ?? 'dm', text },
-          });
+          send({ kind: 'free_text', creatureId: 'dm', text });
         }}
+        onWhisper={(toAccountId, text) => { send({ kind: 'whisper', toAccountId, text }); }}
+        onStartCombat={() => { send({ kind: 'start_combat' }); }}
+        onEndCombat={() => { send({ kind: 'end_combat' }); }}
+        onAdvanceTurn={() => { send({ kind: 'advance_turn' }); }}
+        onAnswerPrompt={(promptId, take, optionName) => {
+          send(optionName === undefined
+            ? { kind: 'prompt_reply', promptId, take }
+            : { kind: 'prompt_reply', promptId, take, optionName });
+        }}
+        onEffect={(e) => { sync.sendEffect(e); }}
+        effect={effect}
       />
     );
   }
@@ -223,20 +276,63 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
   }
 
   return (
-    <PlayerViewV2
-      scene={view.scene}
-      hero={view.hero}
-      cast={view.cast}
-      room={room}
-      /* The action rows, spells and inventory come from the character's own
-         sheet and are the next piece of wiring — empty rather than fabricated,
-         because a tile that does nothing when tapped is worse than no tile. */
-      tiles={[]}
-      turn={view.turn}
-      entries={view.entries}
-      features={[]}
-      inventory={[]}
-      onMenuPick={(action) => { if (action === 'leave') onLeave(); }}
-    />
+    <>
+      <PlayerViewV2
+        scene={view.scene}
+        hero={view.hero}
+        cast={view.cast}
+        room={room}
+        /* Real cards off the character's own sheet, with the arithmetic behind
+           every number — the thing that makes tapping one teach you why it
+           worked. */
+        tiles={tiles}
+        turn={view.turn}
+        entries={view.entries}
+        {...(view.dying ? { dying: view.dying } : {})}
+        features={[]}
+        inventory={[]}
+        /**
+         * Using a tile is an attack on whoever is selected. Targeting is the
+         * next real piece of the map; until it exists, the first foe standing
+         * is a better answer than a card that does nothing, and the server
+         * refuses anything illegal with a sentence the player can read.
+         */
+        onUse={(tileId) => {
+          if (!view.hero || !tileId.startsWith('attack:')) return;
+          const foe = view.cast.find((c) => c.kind === 'foe' && c.status !== 'Down');
+          if (!foe) return;
+          send({
+            kind: 'attack',
+            attackerId: view.hero.id,
+            targetId: foe.id,
+            actionName: tileId.slice('attack:'.length),
+          });
+        }}
+        /* Law 2's escape hatch, on the player's side: describe what you want to
+           do and it becomes part of the table's record rather than being
+           refused for not matching a button. */
+        onDescribe={(text) => {
+          if (view.hero) send({ kind: 'free_text', creatureId: view.hero.id, text });
+        }}
+        onSend={(text) => {
+          if (view.hero) send({ kind: 'free_text', creatureId: view.hero.id, text });
+        }}
+        onRollDeathSave={() => {
+          if (view.hero) send({ kind: 'free_text', creatureId: view.hero.id, text: 'rolls a death save.' });
+        }}
+        onMenuPick={(action) => { if (action === 'leave') onLeave(); }}
+      />
+      {/* A player answers their own reactions — an opportunity attack is theirs
+          to take or let pass, and the card queues where they are looking. */}
+      <PromptDock
+        prompts={prompts}
+        onAnswer={(promptId, take, optionName) => {
+          send(optionName === undefined
+            ? { kind: 'prompt_reply', promptId, take }
+            : { kind: 'prompt_reply', promptId, take, optionName });
+        }}
+      />
+      <EffectLayer effect={effect} />
+    </>
   );
 }

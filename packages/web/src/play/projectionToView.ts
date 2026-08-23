@@ -48,6 +48,8 @@ export interface Projection {
   combatants: Record<string, Combatant>;
   round: number;
   activeCreatureId?: string;
+  /** Initiative order, highest first. Empty or absent means nobody has rolled. */
+  order?: string[];
   nextSeq: number;
 }
 
@@ -280,7 +282,24 @@ export function castFrom(
         acting: c.id === projection.activeCreatureId,
       };
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    /**
+     * IN A FIGHT, THE ORDER IS THE ORDER. Sorting a turn order alphabetically
+     * would be actively misleading — the list's whole job is to answer "who is
+     * next?", and it can only do that in initiative sequence. Outside a fight
+     * there is no sequence to respect, so a stable alphabetical list is the
+     * kindest way to find somebody by name.
+     */
+    .sort((a, b) => {
+      const order = projection.order ?? [];
+      if (order.length > 0) {
+        const ia = order.indexOf(a.id);
+        const ib = order.indexOf(b.id);
+        /* Anybody not in the order joined mid-fight; they sit at the end
+           rather than jumping the queue. */
+        if (ia !== ib) return (ia < 0 ? Number.MAX_SAFE_INTEGER : ia) - (ib < 0 ? Number.MAX_SAFE_INTEGER : ib);
+      }
+      return a.name.localeCompare(b.name);
+    });
 }
 
 /**
@@ -291,15 +310,206 @@ export function castFrom(
  * starting) change the numbers the screen already shows and would otherwise
  * bury the story under bookkeeping — the thing the journal exists to prevent.
  */
-export function logFrom(events: readonly PlayEvent[]): LogEntryVM[] {
+export function logFrom(
+  events: readonly PlayEvent[],
+  /* Creature id → name, so a roll reads "Mira rolled 17" rather than quoting
+     an id at somebody who has never seen one. */
+  names: Record<string, string> = {},
+): LogEntryVM[] {
   const lines: LogEntryVM[] = [];
+  const who = (id: string | undefined): string => (id ? names[id] ?? id : 'The table');
+
   for (const e of events) {
-    const body = e.body as { t: string; text?: string };
-    if (body.t === 'narration' && body.text) {
-      lines.push({ id: String(e.seq), tone: 'narration', actor: 'The table', text: body.text });
+    const body = e.body as {
+      t: string; text?: string; creatureId?: string; from?: string;
+      d20?: number; modifiers?: { label: string; value: number }[]; total?: number;
+      kind?: string; outcome?: string; vs?: { type: string; value: number };
+      amount?: number; type?: string; round?: number; activeCreatureId?: string;
+      order?: { creatureId: string; total: number }[];
+    };
+
+    switch (body.t) {
+      case 'narration':
+        if (body.text) {
+          lines.push({
+            id: String(e.seq),
+            tone: 'narration',
+            actor: body.from === 'dm' ? 'The DM' : 'The table',
+            text: body.text,
+          });
+        }
+        break;
+
+      /**
+       * A WHISPER ONLY EVER REACHES THIS CLIENT IF IT WAS MEANT FOR IT — the
+       * server filtered it before the payload was built. Rendering it here is
+       * not a decision about who may read it; that was settled upstream.
+       */
+      case 'whisper_sent':
+        if (body.text) {
+          /* 'chat' rather than a new tone: a whisper IS a line somebody spoke,
+             and the actor label is what marks it private. */
+          lines.push({ id: String(e.seq), tone: 'chat', actor: 'Just to you', text: body.text });
+        }
+        break;
+
+      /**
+       * ROLLS ARE THE PRODUCT'S WHOLE PROMISE MADE VISIBLE (Brief 10 §3: the
+       * log carries roll results). "17" teaches nothing. "12 + 5 = 17, beat 15,
+       * hit" teaches the game while it is being played, which is the entire
+       * reason somebody who has never played can sit down at this table.
+       */
+      case 'roll_made': {
+        if (body.d20 === undefined || body.total === undefined) break;
+        const mods = (body.modifiers ?? [])
+          .map((m) => `${m.value >= 0 ? '+' : '−'}${String(Math.abs(m.value))} ${m.label}`)
+          .join(' ');
+        const target = body.vs ? ` against ${String(body.vs.value)}` : '';
+        const result = body.outcome && body.outcome !== 'success' ? ` — ${outcomeWord(body.outcome)}` : '';
+        lines.push({
+          id: String(e.seq),
+          tone: 'roll',
+          actor: who(body.creatureId ?? (body.kind === 'initiative' ? undefined : undefined)),
+          text: `${rollName(body.kind)}: rolled ${String(body.d20)}${mods ? ` ${mods}` : ''} = ${String(body.total)}${target}${result}`,
+        });
+        break;
+      }
+
+      case 'damage_applied':
+        if (body.amount !== undefined && body.creatureId) {
+          lines.push({
+            id: String(e.seq),
+            tone: 'roll',
+            actor: who(body.creatureId),
+            text: `takes ${String(body.amount)} ${body.type ?? ''} damage`.replace('  ', ' '),
+          });
+        }
+        break;
+
+      case 'turn_advanced':
+        if (body.activeCreatureId) {
+          lines.push({
+            id: String(e.seq),
+            tone: 'system',
+            actor: `Round ${String(body.round ?? 1)}`,
+            text: `${who(body.activeCreatureId)} is up.`,
+          });
+        }
+        break;
+
+      case 'initiative_rolled':
+        lines.push({
+          id: String(e.seq),
+          tone: 'system',
+          actor: 'The table',
+          text: (body.order?.length ?? 0) > 0
+            ? `Order: ${(body.order ?? []).map((o) => who(o.creatureId)).join(', ')}.`
+            : 'The fight is over.',
+        });
+        break;
+
+      default:
+        /* Everything else changes numbers the screen already shows. Logging it
+           too would bury the story under bookkeeping, which is the one thing
+           the journal exists to prevent. */
+        break;
     }
   }
   return lines;
+}
+
+/**
+ * The death-save ladder for one character, counted from the log.
+ *
+ * DERIVED, NOT STORED, for the same reason everything else here is: the events
+ * are the truth, and a separately-held tally is a second copy free to drift. A
+ * player watching their own three-and-three has to be able to trust it.
+ *
+ * The count resets whenever the character comes back up or drops again, so a
+ * second knockdown in the same fight starts clean — which is the SRD's rule and
+ * also the only thing that makes sense to somebody reading their own pips.
+ */
+export function dyingFrom(
+  events: readonly PlayEvent[],
+  creatureId: string | null,
+  hp: number,
+): { successes: number; failures: number; phase: 'dying' | 'stable' | 'dead' | 'up' } | undefined {
+  if (!creatureId) return undefined;
+
+  let successes = 0;
+  let failures = 0;
+  let phase: 'dying' | 'stable' | 'dead' | 'up' = hp > 0 ? 'up' : 'dying';
+
+  for (const e of events) {
+    const body = e.body as {
+      t: string; creatureId?: string; kind?: string; outcome?: string; amount?: number;
+    };
+    if (body.creatureId !== creatureId) continue;
+
+    switch (body.t) {
+      case 'creature_unconscious':
+        successes = 0; failures = 0; phase = 'dying';
+        break;
+      case 'creature_stabilized':
+        phase = 'stable';
+        break;
+      case 'creature_died':
+        phase = 'dead';
+        break;
+      case 'healing_applied':
+        /* Any healing brings you back up and wipes the ladder. */
+        successes = 0; failures = 0; phase = 'up';
+        break;
+      case 'roll_made':
+        if (body.kind === 'death_save') {
+          if (body.outcome === 'success' || body.outcome === 'crit') successes += 1;
+          else failures += body.outcome === 'fumble' ? 2 : 1;
+          if (successes >= 3) phase = 'stable';
+          if (failures >= 3) phase = 'dead';
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  /* Nothing to show for somebody on their feet — the near edge stays as it is
+     rather than flipping to an empty ladder. */
+  if (phase === 'up' && hp > 0) return undefined;
+  return { successes, failures, phase };
+}
+
+/** The key only exists when there is something to show — under
+    exactOptionalPropertyTypes an absent field and one set to undefined are
+    different things, and PlayView means the former. */
+function dyingOf(me: Combatant | undefined, events: readonly PlayEvent[]): Pick<PlayView, 'dying'> {
+  if (!me) return {};
+  const d = dyingFrom(events, me.id, me.hp);
+  return d ? { dying: d } : {};
+}
+
+/** Roll kinds in words a first-timer reads without a glossary. */
+function rollName(kind: string | undefined): string {
+  switch (kind) {
+    case 'attack_roll': return 'Attack';
+    case 'saving_throw': return 'Saving throw';
+    case 'ability_check': return 'Check';
+    case 'death_save': return 'Death save';
+    case 'concentration_save': return 'Holding concentration';
+    case 'initiative': return 'Initiative';
+    default: return 'Roll';
+  }
+}
+
+function outcomeWord(outcome: string): string {
+  switch (outcome) {
+    case 'hit': return 'a hit';
+    case 'miss': return 'a miss';
+    case 'crit': return 'a critical hit';
+    case 'fumble': return 'a fumble';
+    case 'failure': return 'failed';
+    default: return outcome;
+  }
 }
 
 export interface PlayView {
@@ -309,6 +519,12 @@ export interface PlayView {
   room: Room | null;
   entries: LogEntryVM[];
   turn: { active: boolean; activeName?: string; exploring: boolean };
+  /**
+   * Present and not 'up' means the near edge flips to the death-save ladder.
+   * Only ever about YOUR character: watching somebody else's death saves is
+   * the DM's view of the table, not a player's near edge.
+   */
+  dying?: { successes: number; failures: number; phase: 'dying' | 'stable' | 'dead' | 'up' };
 }
 
 export function projectionToView(input: ViewInput): PlayView {
@@ -333,7 +549,8 @@ export function projectionToView(input: ViewInput): PlayView {
     hero: me && myCharacter ? heroFrom(me, myCharacter) : null,
     cast: castFrom(projection, myCharacter?.id ?? null, rosterNames),
     room,
-    entries: logFrom(events),
+    entries: logFrom(events, Object.fromEntries(Object.values(projection.combatants).map((c) => [c.id, rosterNames[c.id] ?? c.name]))),
+    ...dyingOf(me, events),
     turn: {
       active: me !== undefined && projection.activeCreatureId === me.id,
       ...(active ? { activeName: active.name } : {}),

@@ -21,6 +21,7 @@ import {
   type PlayEvent,
   type Viewer,
   type ViewerRole,
+  type EffectId,
 } from '@questra/contracts';
 import { fold, initialState, type Combatant, type ProjectionState } from '@questra/engine';
 import type { Connection } from './transport.js';
@@ -126,6 +127,7 @@ export class SyncCore {
       case 'hello': return this.onHello(conn, msg);
       case 'intent': return this.onIntent(conn, msg.envelope);
       case 'ping': return conn.send({ m: 'pong' });
+      case 'effect': return this.onEffect(conn, msg.effect);
       case 'ruling_response':
       case 'prompt_response': return this.onPromptResponse(conn, msg.promptId);
     }
@@ -275,6 +277,27 @@ export class SyncCore {
     // path is not blocked on the DB.
     this.persist(s, sid, result.events, envelope.idempotencyKey, firstSeq);
     conn.send({ m: 'intent_ack', idempotencyKey: envelope.idempotencyKey, accepted: true, firstSeq });
+  }
+
+  /**
+   * Relay a screen effect to everybody at the table (Brief 10 §4).
+   *
+   * NOTHING IS STORED. It does not touch the log, does not get a seq, and is
+   * never replayed — a viewer who was not connected simply missed the thunder,
+   * which is exactly right for weather. Storing it would put "shake" in the
+   * play record between two lines of narration.
+   *
+   * Only whoever runs the game may send one, for the same reason only they may
+   * start a fight: it changes what everybody is looking at.
+   */
+  private onEffect(conn: Connection, effect: EffectId): void {
+    const sid = this.connToSession.get(conn.connId);
+    if (!sid) return this.err(conn, 'not_member');
+    const s = this.sessions.get(sid)!;
+    const me = s.viewers.get(conn.connId);
+    if (!me || me.role !== 'dm') return this.err(conn, 'not_member');
+
+    for (const { conn: c } of s.viewers.values()) c.send({ m: 'effect', effect });
   }
 
   private onPromptResponse(conn: Connection, promptId: string): void {
