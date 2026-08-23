@@ -27,6 +27,7 @@ import { tilesFrom } from './tilesFrom.js';
 import { PromptDock, type PromptVM } from './PromptDock.js';
 import type { EffectId } from './ImmersionConsole.js';
 import { EffectLayer } from './EffectLayer.js';
+import { Compendium } from './Compendium.js';
 import { ShellStyles } from '../shell/ShellStyles.js';
 import { Road } from '../shell/road/Road.js';
 import { usePrefersReducedMotion } from '../shell/shared.js';
@@ -137,6 +138,14 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
   /* What this character can do, straight off their sheet. */
   const tiles = useMemo(() => tilesFrom(myCharacter?.sheet ?? null), [myCharacter]);
 
+  /* The compendium is public — the SRD is the same text in every campaign — but
+     going through authedRequest keeps one path to the API rather than two. */
+  const fetchJson = useCallback(
+    <T,>(path: string): Promise<T> => session.authedRequest<T>(path),
+    [session],
+  );
+  const [rulesOpen, setRulesOpen] = useState(false);
+
   /**
    * Atmosphere effects are ephemeral by design (Brief 10 §4) — they play and
    * are gone, leaving nothing in the log to replay at somebody reconnecting.
@@ -237,6 +246,7 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
         }}
         onEffect={(e) => { sync.sendEffect(e); }}
         effect={effect}
+        fetchJson={fetchJson}
       />
     );
   }
@@ -320,8 +330,15 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
         onRollDeathSave={() => {
           if (view.hero) send({ kind: 'free_text', creatureId: view.hero.id, text: 'rolls a death save.' });
         }}
-        onMenuPick={(action) => { if (action === 'leave') onLeave(); }}
+        onMenuPick={(action) => {
+          if (action === 'leave') onLeave();
+          /* "What does Frightened mean?" is the question this product exists
+             to answer without anybody leaving the table, and 'help' is already
+             the menu's word for needing to know something. */
+          if (action === 'help') setRulesOpen(true);
+        }}
       />
+      {rulesOpen && <Compendium fetchJson={fetchJson} onClose={() => { setRulesOpen(false); }} />}
       {/* A player answers their own reactions — an opportunity attack is theirs
           to take or let pass, and the card queues where they are looking. */}
       <PromptDock

@@ -12,3 +12,4 @@ export * from './campaign-service.js';
 export * from './resolve-token.js';
 export * from './routes.js';
 export * from './campaign-routes.js';
+export * from './compendium-routes.js';

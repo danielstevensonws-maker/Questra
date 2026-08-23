@@ -862,6 +862,89 @@ const CSS = `
   .qa-console-panel { width: auto; }
 }
 
+
+/* ---- the compendium --------------------------------------------------------
+   Opens OVER the table, never instead of it: looking a rule up must not cost
+   you the game. The map, the log and whose turn it is all stay where they were. */
+.qa-comp {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--qa-s4);
+  background: var(--qa-scrim);
+}
+.qa-comp-panel {
+  width: min(560px, 100%);
+  max-height: 100%;
+  padding: var(--qa-s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s3);
+  overflow: hidden;
+}
+.qa-comp-head { display: flex; align-items: baseline; justify-content: space-between; }
+.qa-comp-search { flex: none; }
+.qa-comp-types { display: flex; flex-wrap: wrap; gap: var(--qa-s2); flex: none; }
+.qa-comp-types .is-on { border-color: var(--qa-accent-line); color: var(--qa-accent); }
+
+.qa-comp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.qa-comp-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--qa-s2) var(--qa-s3);
+  text-align: left;
+  background: none;
+  border: var(--qa-hairline) solid transparent;
+  border-radius: var(--qa-radius);
+  cursor: pointer;
+  transition: background var(--qa-dur) var(--qa-ease), border-color var(--qa-dur) var(--qa-ease);
+}
+.qa-comp-row:hover { background: var(--qa-chip); border-color: var(--qa-glass-border); }
+.qa-comp-row-name { font-family: var(--qa-font-display); font-size: var(--qa-text-body); color: var(--qa-ink); }
+/* The plain line is the one that teaches, so it is the one the list shows. */
+.qa-comp-row-plain {
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-label);
+  line-height: 1.45;
+  color: var(--qa-ink-dim);
+}
+
+.qa-comp-entry { overflow-y: auto; scrollbar-width: thin; display: flex; flex-direction: column; gap: var(--qa-s3); }
+.qa-comp-back { align-self: flex-start; }
+.qa-comp-name { margin: 0; font-family: var(--qa-font-display); font-size: var(--qa-text-lg); color: var(--qa-ink); }
+.qa-comp-plain {
+  margin: 0;
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-body);
+  line-height: 1.55;
+  color: var(--qa-ink);
+}
+/* The printed rule sits quieter than the sentence that explains it — correct,
+   available, and deliberately not the first thing the eye lands on. */
+.qa-comp-srd {
+  margin: 0;
+  padding-top: var(--qa-s3);
+  border-top: var(--qa-hairline) solid var(--qa-glass-border);
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-label);
+  line-height: 1.6;
+  color: var(--qa-ink-dim);
+  white-space: pre-wrap;
+}
 `;
 
 /**

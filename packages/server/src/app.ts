@@ -32,7 +32,7 @@ import {
 import { CharacterChoicesSchema } from '@questra/contracts';
 import {
   AuthService, CampaignService, InMemoryAuthRepo, LogMailer, makeResolveToken,
-  registerAuthRoutes, registerCampaignRoutes,
+  registerAuthRoutes, registerCampaignRoutes, registerCompendiumRoutes,
   verifySession, secretFromEnv, type AuthRepo, type TokenConfig,
 } from './auth/index.js';
 import { PostgresAuthRepo } from './auth/postgres-repo.js';
@@ -139,6 +139,9 @@ export function createApp(config: ServerConfig): App {
   const mountAuth = (fastify: FastifyInstance): void => {
     registerAuthRoutes(fastify, auth, currentAccountId);
     registerCampaignRoutes(fastify, campaigns, currentAccountId);
+    /* Public: the SRD is the same text in every campaign, and requiring a
+       login to read a rule would be friction with nothing behind it. */
+    registerCompendiumRoutes(fastify);
   };
 
   return {

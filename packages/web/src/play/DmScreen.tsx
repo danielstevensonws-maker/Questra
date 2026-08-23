@@ -36,6 +36,7 @@ import { ScreenStyles } from '../primitives/v2/ScreenStyles.js';
 import { PromptDock, type PromptVM } from './PromptDock.js';
 import { ImmersionConsole, type EffectId } from './ImmersionConsole.js';
 import { EffectLayer } from './EffectLayer.js';
+import { Compendium } from './Compendium.js';
 import type { PlayView } from './projectionToView.js';
 
 export interface DmSeat {
@@ -62,15 +63,18 @@ export interface DmScreenProps {
   onEffect: (effect: EffectId) => void;
   /** The effect currently playing, if any — drawn over the map for everyone. */
   effect: EffectId | null;
+  /** Reads the rules API for the compendium sheet. */
+  fetchJson: <T>(path: string) => Promise<T>;
 }
 
 export function DmScreen({
   view, room, campaignName, seats, prompts,
-  onLeave, onSay, onWhisper, onStartCombat, onEndCombat, onAdvanceTurn, onAnswerPrompt, onEffect, effect,
+  onLeave, onSay, onWhisper, onStartCombat, onEndCombat, onAdvanceTurn, onAnswerPrompt, onEffect, effect, fetchJson,
 }: DmScreenProps): ReactElement {
   const [line, setLine] = useState('');
   const [spotlit, setSpotlit] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [whisperTo, setWhisperTo] = useState<string>('');
   const [whisperText, setWhisperText] = useState('');
   const logRef = useRef<HTMLDivElement>(null);
@@ -132,6 +136,9 @@ export function DmScreen({
             <button type="button" className="qa2-pill" onClick={onEndCombat}>End the fight</button>
           </>
         )}
+        {/* A DM looks things up more than anyone — the rules sit one press
+            away rather than behind a menu. */}
+        <button type="button" className="qa2-pill" onClick={() => { setRulesOpen(true); }}>Rules</button>
         <button type="button" className="qa2-pill" onClick={onLeave}>Leave</button>
       </div>
 
@@ -284,6 +291,7 @@ export function DmScreen({
 
       <ImmersionConsole onEffect={onEffect} />
       <EffectLayer effect={effect} />
+      {rulesOpen && <Compendium fetchJson={fetchJson} onClose={() => { setRulesOpen(false); }} />}
     </div>
   );
 }
