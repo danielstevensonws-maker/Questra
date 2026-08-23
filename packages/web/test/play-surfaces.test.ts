@@ -131,8 +131,8 @@ describe('the death-save ladder', () => {
   it('counts successes and failures from the rolls themselves', () => {
     const d = dyingFrom([
       ev(1, { t: 'creature_unconscious', creatureId: 'mira' }),
-      ev(2, { t: 'roll_made', creatureId: 'mira', kind: 'death_save', d20: 15, collapsed: 'straight', sources: [], modifiers: [], total: 15, outcome: 'success', entry: 'server' }),
-      ev(3, { t: 'roll_made', creatureId: 'mira', kind: 'death_save', d20: 4, collapsed: 'straight', sources: [], modifiers: [], total: 4, outcome: 'failure', entry: 'server' }),
+      ev(2, { t: 'roll_made', kind: 'death_save', d20: 15, collapsed: 'straight', sources: ['mira'], modifiers: [], total: 15, outcome: 'success', entry: 'server' }),
+      ev(3, { t: 'roll_made', kind: 'death_save', d20: 4, collapsed: 'straight', sources: ['mira'], modifiers: [], total: 4, outcome: 'failure', entry: 'server' }),
     ], 'mira', 0);
     expect(d).toEqual({ successes: 1, failures: 1, phase: 'dying' });
   });
@@ -141,7 +141,7 @@ describe('the death-save ladder', () => {
   it('counts a fumble twice', () => {
     const d = dyingFrom([
       ev(1, { t: 'creature_unconscious', creatureId: 'mira' }),
-      ev(2, { t: 'roll_made', creatureId: 'mira', kind: 'death_save', d20: 1, collapsed: 'straight', sources: [], modifiers: [], total: 1, outcome: 'fumble', entry: 'server' }),
+      ev(2, { t: 'roll_made', kind: 'death_save', d20: 1, collapsed: 'straight', sources: ['mira'], modifiers: [], total: 1, outcome: 'fumble', entry: 'server' }),
     ], 'mira', 0);
     expect(d!.failures).toBe(2);
   });
@@ -149,7 +149,7 @@ describe('the death-save ladder', () => {
   it('wipes the ladder when somebody heals you', () => {
     const d = dyingFrom([
       ev(1, { t: 'creature_unconscious', creatureId: 'mira' }),
-      ev(2, { t: 'roll_made', creatureId: 'mira', kind: 'death_save', d20: 4, collapsed: 'straight', sources: [], modifiers: [], total: 4, outcome: 'failure', entry: 'server' }),
+      ev(2, { t: 'roll_made', kind: 'death_save', d20: 4, collapsed: 'straight', sources: ['mira'], modifiers: [], total: 4, outcome: 'failure', entry: 'server' }),
       ev(3, { t: 'healing_applied', creatureId: 'mira', amount: 5 }),
     ], 'mira', 5);
     expect(d, 'back on your feet is not a ladder with one rung ticked').toBeUndefined();
@@ -158,7 +158,7 @@ describe('the death-save ladder', () => {
   it('is only ever about your own character', () => {
     const d = dyingFrom([
       ev(1, { t: 'creature_unconscious', creatureId: 'bren' }),
-      ev(2, { t: 'roll_made', creatureId: 'bren', kind: 'death_save', d20: 4, collapsed: 'straight', sources: [], modifiers: [], total: 4, outcome: 'failure', entry: 'server' }),
+      ev(2, { t: 'roll_made', kind: 'death_save', d20: 4, collapsed: 'straight', sources: ['bren'], modifiers: [], total: 4, outcome: 'failure', entry: 'server' }),
     ], 'mira', 12);
     expect(d).toBeUndefined();
   });
@@ -168,8 +168,8 @@ describe('the journal', () => {
   it('shows the arithmetic of a roll, which is the whole promise', () => {
     const [line] = logFrom([
       ev(1, {
-        t: 'roll_made', rollId: 'r1', kind: 'attack_roll', creatureId: 'mira',
-        d20: 12, collapsed: 'straight', sources: [], modifiers: [{ label: 'STR', value: 5 }],
+        t: 'roll_made', rollId: 'r1', kind: 'attack_roll',
+        d20: 12, collapsed: 'straight', sources: ['mira'], modifiers: [{ label: 'STR', value: 5 }],
         total: 17, vs: { type: 'ac', value: 15 }, outcome: 'hit', entry: 'server',
       }),
     ], { mira: 'Mira' });

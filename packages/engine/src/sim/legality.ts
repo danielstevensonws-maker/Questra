@@ -135,6 +135,23 @@ export function checkIntent(
     case 'whisper':
     case 'prompt_reply':
       return LEGAL;
+
+    /**
+     * A rest is a fiction decision the DM makes, not a rules gate — the engine
+     * decides what a rest RESTORES (canLongRest holds the 16-hour rule), which
+     * is a different question from whether the button is pressable.
+     */
+    case 'rest':
+      return LEGAL;
+
+    /**
+     * You roll death saves because you are dying, and the greying layer is not
+     * where that is decided: the near edge flips to the ladder only when the
+     * character is down, so the button does not exist to be greyed. The server
+     * still refuses one from somebody on their feet.
+     */
+    case 'death_save':
+      return LEGAL;
   }
 }
 

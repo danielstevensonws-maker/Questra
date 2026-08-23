@@ -142,6 +142,14 @@ export const IntentSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('advance_turn') }),
   /** A private line to one account — the whisper composer (Brief 10 §3). */
   z.object({ kind: z.literal('whisper'), toAccountId: ID, text: z.string().min(1) }),
+  /**
+   * Resting. A short rest is where hit dice are spent; a long one is the whole
+   * transaction (Brief 04 §1). Both are the DM's to call at the table, because
+   * a rest is a fiction decision — you rest when the story lets you.
+   */
+  z.object({ kind: z.literal('rest'), rest: z.enum(['short', 'long']) }),
+  /** A death save, rolled by whoever is dying. */
+  z.object({ kind: z.literal('death_save'), creatureId: ID }),
   /** Answering a reaction prompt (Brief 08): take it, or let it pass. */
   z.object({ kind: z.literal('prompt_reply'), promptId: ID, take: z.boolean(), optionName: z.string().optional() }),
 ]);

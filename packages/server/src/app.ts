@@ -21,6 +21,8 @@ import {
   inCombat,
   takenEvent,
   declinedEvent,
+  longRest,
+  completeShortRest,
 } from '@questra/engine';
 import { SyncCore, type IntentResolver, type ResolvedToken } from './sync-core.js';
 import { InMemoryEventStore, type EventStore } from './store/event-store.js';
@@ -179,6 +181,7 @@ export function makeSliceResolver(): IntentResolver {
       kind?: string;
       attackerId?: string; targetId?: string; actionName?: string;
       creatureId?: string; text?: string;
+      rest?: 'short' | 'long';
       tokenId?: string; path?: { x: number; y: number }[];
       toAccountId?: string;
       promptId?: string; take?: boolean; optionName?: string;
@@ -346,6 +349,100 @@ export function makeSliceResolver(): IntentResolver {
             actor: { kind: isDm ? 'dm' : 'player', accountId: actor.accountId },
             visibility: 'public',
             body,
+          }] as PlayEvent[],
+        };
+      }
+
+      /**
+       * A rest, for everybody at once.
+       *
+       * The DM's call because resting is a FICTION decision — you rest when the
+       * story lets you, not when a button becomes available. The engine owns
+       * what a rest restores; this walks the party and lets it decide per
+       * character, so a rest that gives one person nothing still gives the
+       * others theirs.
+       */
+      case 'rest': {
+        if (!isDm) return dmOnly();
+        const party = Object.values(state.combatants).filter((c) => c.isPlayer);
+        if (party.length === 0) return { ok: false, reason: 'There is nobody here to rest.' };
+
+        const events: PlayEvent[] = [];
+        let i = 0;
+        n++;
+        for (const c of party) {
+          const resources = {
+            creatureId: c.id,
+            hp: c.hp, maxHp: c.maxHp,
+            /* Hit dice are per-class and live on the sheet, which the
+               projection does not carry — so a rest restores hit points and
+               pools here, and spending dice is the player screen's job. */
+            hitDie: 8, hitDiceRemaining: 0, hitDiceMax: 0,
+            conMod: Math.floor((c.abilities.con - 10) / 2),
+            exhaustion: 0,
+            pools: [],
+          };
+          /* A short rest heals nothing on its own — hit dice are spent one at a
+             time, and that interaction belongs to the player's own screen. So
+             the short branch records that it happened and restores what
+             recharges on one; the long branch is the whole transaction. */
+          const review = intent.rest === 'long'
+            ? longRest(resources)
+            : completeShortRest(resources, []);
+
+          for (const body of review.events) {
+            events.push({
+              ...stamp(i++),
+              causeId: `cause-rest-${String(n)}`,
+              actor: { kind: 'dm', accountId: actor.accountId },
+              visibility: 'public',
+              body,
+            } as PlayEvent);
+          }
+        }
+        if (events.length === 0) return { ok: false, reason: 'Nobody needs that rest yet.' };
+        return { ok: true, events };
+      }
+
+      /**
+       * A death save. Three successes and you are stable; three failures and
+       * you are gone — the ladder every player learns the hard way.
+       *
+       * The roll is flat: no modifier, no proficiency, nothing on your sheet
+       * changes it (SRD). That is worth preserving exactly, because it is the
+       * one roll in the game where being a high-level character does not help,
+       * and a table feels that.
+       */
+      case 'death_save': {
+        if (!intent.creatureId) return { ok: false, reason: 'Nobody is dying.' };
+        const c = state.combatants[intent.creatureId];
+        if (!c) return { ok: false, reason: 'That character is not here.' };
+        if (c.hp > 0) return { ok: false, reason: 'You are on your feet.' };
+
+        const die = Math.floor(rng() * 20) + 1;
+        n++;
+        return {
+          ok: true,
+          events: [{
+            ...stamp(),
+            causeId: `cause-death-${String(n)}`,
+            actor: { kind: 'player', accountId: actor.accountId, creatureId: c.id },
+            visibility: 'public',
+            body: {
+              t: 'roll_made',
+              rollId: `death-${String(n)}`,
+              kind: 'death_save',
+              d20: die,
+              collapsed: 'straight',
+              sources: [c.id],
+              modifiers: [],
+              total: die,
+              vs: { type: 'dc', value: 10 },
+              /* A natural 20 is not "a very good save" — it is waking up with
+                 one hit point, and a natural 1 costs two failures. */
+              outcome: die === 20 ? 'crit' : die === 1 ? 'fumble' : die >= 10 ? 'success' : 'failure',
+              entry: 'server',
+            },
           }] as PlayEvent[],
         };
       }

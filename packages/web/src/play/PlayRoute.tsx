@@ -239,6 +239,7 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
         onStartCombat={() => { send({ kind: 'start_combat' }); }}
         onEndCombat={() => { send({ kind: 'end_combat' }); }}
         onAdvanceTurn={() => { send({ kind: 'advance_turn' }); }}
+        onRest={(rest) => { send({ kind: 'rest', rest }); }}
         onAnswerPrompt={(promptId, take, optionName) => {
           send(optionName === undefined
             ? { kind: 'prompt_reply', promptId, take }
@@ -328,7 +329,9 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
           if (view.hero) send({ kind: 'free_text', creatureId: view.hero.id, text });
         }}
         onRollDeathSave={() => {
-          if (view.hero) send({ kind: 'free_text', creatureId: view.hero.id, text: 'rolls a death save.' });
+          /* Flat d20, nothing added: the one roll in the game where being a
+             high-level character does not help, and the server owns it. */
+          if (view.hero) send({ kind: 'death_save', creatureId: view.hero.id });
         }}
         onMenuPick={(action) => {
           if (action === 'leave') onLeave();

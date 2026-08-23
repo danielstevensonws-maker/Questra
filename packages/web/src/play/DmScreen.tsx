@@ -59,6 +59,7 @@ export interface DmScreenProps {
   onStartCombat: () => void;
   onEndCombat: () => void;
   onAdvanceTurn: () => void;
+  onRest: (rest: 'short' | 'long') => void;
   onAnswerPrompt: (promptId: string, take: boolean, optionName?: string) => void;
   onEffect: (effect: EffectId) => void;
   /** The effect currently playing, if any — drawn over the map for everyone. */
@@ -69,7 +70,7 @@ export interface DmScreenProps {
 
 export function DmScreen({
   view, room, campaignName, seats, prompts,
-  onLeave, onSay, onWhisper, onStartCombat, onEndCombat, onAdvanceTurn, onAnswerPrompt, onEffect, effect, fetchJson,
+  onLeave, onSay, onWhisper, onStartCombat, onEndCombat, onAdvanceTurn, onRest, onAnswerPrompt, onEffect, effect, fetchJson,
 }: DmScreenProps): ReactElement {
   const [line, setLine] = useState('');
   const [spotlit, setSpotlit] = useState<string | null>(null);
@@ -125,9 +126,15 @@ export function DmScreen({
           one decision: is this a fight, and whose turn is it? */}
       <div className="qa2-controls qa-dm-controls">
         {exploring ? (
-          <button type="button" className="qa2-cta qa-dm-run" onClick={onStartCombat}>
-            Roll for initiative
-          </button>
+          <>
+            <button type="button" className="qa2-cta qa-dm-run" onClick={onStartCombat}>
+              Roll for initiative
+            </button>
+            {/* Only out of a fight: nobody rests mid-round, and offering it
+                there would be offering a mistake. */}
+            <button type="button" className="qa2-pill" onClick={() => { onRest('short'); }}>Short rest</button>
+            <button type="button" className="qa2-pill" onClick={() => { onRest('long'); }}>Long rest</button>
+          </>
         ) : (
           <>
             <button type="button" className="qa2-cta qa-dm-run" onClick={onAdvanceTurn}>

@@ -326,6 +326,8 @@ export function logFrom(
       kind?: string; outcome?: string; vs?: { type: string; value: number };
       amount?: number; type?: string; round?: number; activeCreatureId?: string;
       order?: { creatureId: string; total: number }[];
+      /* roll_made names its creature here rather than in a creatureId field. */
+      sources?: string[];
     };
 
     switch (body.t) {
@@ -369,7 +371,10 @@ export function logFrom(
         lines.push({
           id: String(e.seq),
           tone: 'roll',
-          actor: who(body.creatureId ?? (body.kind === 'initiative' ? undefined : undefined)),
+          /* A roll names its creature in its sources list — the schema has no
+             creatureId on roll_made, and reading one would silently attribute
+             every roll to 'The table'. */
+          actor: who(body.sources?.[0]),
           text: `${rollName(body.kind)}: rolled ${String(body.d20)}${mods ? ` ${mods}` : ''} = ${String(body.total)}${target}${result}`,
         });
         break;
@@ -443,8 +448,13 @@ export function dyingFrom(
   for (const e of events) {
     const body = e.body as {
       t: string; creatureId?: string; kind?: string; outcome?: string; amount?: number;
+      sources?: string[];
     };
-    if (body.creatureId !== creatureId) continue;
+    /* A roll_made carries its creature in its sources list; everything else
+       uses creatureId. Reading only one of the two silently dropped every
+       death save, which is the whole ladder. */
+    const subject = body.t === 'roll_made' ? body.sources?.[0] : body.creatureId;
+    if (subject !== creatureId) continue;
 
     switch (body.t) {
       case 'creature_unconscious':
