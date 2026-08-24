@@ -43,6 +43,14 @@ export interface Combatant {
   concentratingOn?: string;
   /** Whether this creature is a player character (affects the 0-HP branch: unconscious vs dies). */
   isPlayer: boolean;
+  /**
+   * The death-save ladder, while this creature is dying. Folded from the log
+   * rather than held anywhere else — a tally kept beside the events is a second
+   * copy free to drift, and the drift here is somebody dying who should not.
+   * Both reset to zero on regaining any hit points or becoming Stable (SRD).
+   */
+  deathSuccesses?: number;
+  deathFailures?: number;
 }
 
 export interface ProjectionState {
@@ -82,6 +90,8 @@ export function cloneCombatant(c: Combatant): Combatant {
     ...(c.resistances ? { resistances: [...c.resistances] } : {}),
     ...(c.vulnerabilities ? { vulnerabilities: [...c.vulnerabilities] } : {}),
     ...(c.damageImmunities ? { damageImmunities: [...c.damageImmunities] } : {}),
+    ...(c.deathSuccesses !== undefined ? { deathSuccesses: c.deathSuccesses } : {}),
+    ...(c.deathFailures !== undefined ? { deathFailures: c.deathFailures } : {}),
   };
 }
 

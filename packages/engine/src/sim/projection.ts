@@ -11,6 +11,7 @@
  * and its cascade are exactly the events the undo marker removes.
  */
 import type { PlayEvent, EventBody } from '@questra/contracts';
+import { deathSave } from './cascade.js';
 import { cloneState, type Combatant, type ProjectionState } from './state.js';
 
 /** Build the initial state from a set of combatants (pre-combat setup). */
@@ -49,7 +50,17 @@ function apply(state: ProjectionState, event: PlayEvent): void {
     }
     case 'healing_applied': {
       const t = c(b.creatureId);
-      if (t) t.hp = b.resultingHp;
+      if (!t) break;
+      t.hp = b.resultingHp;
+      /* SRD: "The number of both is reset to zero when you regain any Hit
+         Points." Any healing at all wipes the ladder — one hit point off a
+         natural 20 counts exactly as much as a full heal. */
+      if (b.resultingHp > 0) {
+        t.deathSuccesses = 0;
+        t.deathFailures = 0;
+        /* And you are no longer unconscious from dropping. */
+        t.conditions = t.conditions.filter((x) => x.conditionId !== 'condition.unconscious');
+      }
       break;
     }
     case 'condition_applied': {
@@ -102,6 +113,40 @@ function apply(state: ProjectionState, event: PlayEvent): void {
       if (state.order.length === 0) delete state.activeCreatureId;
       break;
     }
+    /**
+     * The death-save ladder, kept where every other derived number is kept.
+     *
+     * The SRD: "The number of both is reset to zero when you regain any Hit
+     * Points or become Stable." Healing and stabilising are handled in their
+     * own cases; this one only counts.
+     */
+    case 'roll_made': {
+      if (b.kind !== 'death_save') break;
+      const dying = b.sources?.[0] === undefined ? undefined : state.combatants[b.sources[0]];
+      if (!dying) break;
+      const result = deathSave(b.d20, dying.deathSuccesses ?? 0, dying.deathFailures ?? 0);
+      dying.deathSuccesses = result.successes;
+      dying.deathFailures = result.failures;
+      break;
+    }
+
+    case 'creature_stabilized': {
+      const t = state.combatants[b.creatureId];
+      if (!t) break;
+      /* Stable is not dying: the ladder is cleared and the SRD's unconscious
+         condition stays until they are healed or come round. */
+      t.deathSuccesses = 0;
+      t.deathFailures = 0;
+      break;
+    }
+
+    case 'creature_died': {
+      const t = state.combatants[b.creatureId];
+      if (!t) break;
+      t.hp = 0;
+      break;
+    }
+
     case 'turn_advanced': {
       state.round = b.round;
       state.activeCreatureId = b.activeCreatureId;

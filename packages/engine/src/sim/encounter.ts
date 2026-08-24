@@ -14,10 +14,18 @@
  * player who has never played before can read why they are going third.
  *
  * TIES GO TO THE HIGHER DEXTERITY, then to the order the creatures were passed
- * in. The SRD lets the DM decide ties; picking a deterministic rule instead
- * keeps replay byte-identical, which matters more here than the DM's freedom to
- * break a tie by preference — and no table has ever cared which goblin went
- * first.
+ * in.
+ *
+ * THIS IS A DELIBERATE DEVIATION FROM THE SRD, and worth naming as one. The
+ * book says: "If a tie occurs, the GM decides the order among tied monsters,
+ * and the players decide the order among tied characters." That is a
+ * conversation, and stopping a fight to have it — before anybody has acted —
+ * costs more than it returns at nearly every table.
+ *
+ * The higher-Dexterity rule is the common table convention, produces the
+ * answer most people would have chosen anyway, and keeps replay byte-identical
+ * so a golden can pin it. A DM who cares can reorder; nothing here prevents
+ * that. What is NOT acceptable is pretending this is what the book says.
  */
 import type { PlayEvent } from '@questra/contracts';
 import { abilityMod, type ProjectionState } from './state.js';

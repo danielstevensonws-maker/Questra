@@ -24,6 +24,7 @@ import {
   longRest,
   completeShortRest,
   SKILL_ABILITY,
+  deathSave,
 } from '@questra/engine';
 import { SyncCore, type IntentResolver, type ResolvedToken } from './sync-core.js';
 import { InMemoryEventStore, type EventStore } from './store/event-store.js';
@@ -427,30 +428,73 @@ export function makeSliceResolver(): IntentResolver {
 
         const die = Math.floor(rng() * 20) + 1;
         n++;
-        return {
-          ok: true,
-          events: [{
-            ...stamp(),
-            causeId: `cause-death-${String(n)}`,
-            actor: { kind: 'player', accountId: actor.accountId, creatureId: c.id },
+
+        /**
+         * THE ENGINE OWNS THE LADDER, and this must not restate it.
+         *
+         * An earlier version of this case labelled the roll correctly and then
+         * applied nothing: a natural 20 read as "crit" and left the character
+         * at 0 hit points, still dying, rolling again next turn. The SRD is
+         * explicit — "If you roll a 20 on the d20, you regain 1 Hit Point" —
+         * and `deathSave` in cascade.ts has always implemented it, along with
+         * the natural 1 costing two failures and three of a kind resolving.
+         * Nothing called it.
+         *
+         * Counting the prior successes and failures off the log rather than
+         * holding them: the log is the record, and a tally kept beside it is a
+         * second copy free to drift.
+         */
+        const outcome = deathSave(die, c.deathSuccesses ?? 0, c.deathFailures ?? 0);
+        const cause = `cause-death-${String(n)}`;
+        const events: PlayEvent[] = [{
+          ...stamp(0),
+          causeId: cause,
+          actor: { kind: 'player', accountId: actor.accountId, creatureId: c.id },
+          visibility: 'public',
+          body: {
+            t: 'roll_made',
+            rollId: `death-${String(n)}`,
+            kind: 'death_save',
+            d20: die,
+            collapsed: 'straight',
+            sources: [c.id],
+            modifiers: [],
+            total: die,
+            vs: { type: 'dc', value: 10 },
+            outcome: die === 20 ? 'crit' : die === 1 ? 'fumble' : die >= 10 ? 'success' : 'failure',
+            entry: 'server',
+          },
+        } as PlayEvent];
+
+        /* What the roll DID, not just what it was. Each of these is the SRD
+           rule made real rather than announced. */
+        if (outcome.result === 'revive_1hp') {
+          events.push({
+            ...stamp(1),
+            causeId: cause,
+            actor: { kind: 'engine' },
             visibility: 'public',
-            body: {
-              t: 'roll_made',
-              rollId: `death-${String(n)}`,
-              kind: 'death_save',
-              d20: die,
-              collapsed: 'straight',
-              sources: [c.id],
-              modifiers: [],
-              total: die,
-              vs: { type: 'dc', value: 10 },
-              /* A natural 20 is not "a very good save" — it is waking up with
-                 one hit point, and a natural 1 costs two failures. */
-              outcome: die === 20 ? 'crit' : die === 1 ? 'fumble' : die >= 10 ? 'success' : 'failure',
-              entry: 'server',
-            },
-          }] as PlayEvent[],
-        };
+            body: { t: 'healing_applied', creatureId: c.id, amount: 1, resultingHp: 1 },
+          } as PlayEvent);
+        } else if (outcome.result === 'stable') {
+          events.push({
+            ...stamp(1),
+            causeId: cause,
+            actor: { kind: 'engine' },
+            visibility: 'public',
+            body: { t: 'creature_stabilized', creatureId: c.id },
+          } as PlayEvent);
+        } else if (outcome.result === 'dead') {
+          events.push({
+            ...stamp(1),
+            causeId: cause,
+            actor: { kind: 'engine' },
+            visibility: 'public',
+            body: { t: 'creature_died', creatureId: c.id },
+          } as PlayEvent);
+        }
+
+        return { ok: true, events };
       }
 
       /**
