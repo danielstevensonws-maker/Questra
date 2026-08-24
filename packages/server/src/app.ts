@@ -226,6 +226,37 @@ export function makeSliceResolver(): IntentResolver {
       }
 
       /**
+       * The DM speaking AS somebody — the goblin boss, the innkeeper, the
+       * voice behind the door.
+       *
+       * A different act from narrating, and the table needs to hear which is
+       * happening: narration describes the world, this performs in it. The
+       * event carries the speaker so a journal can set it apart rather than
+       * flattening everything the DM types into one voice.
+       */
+      case 'speak_as': {
+        if (!isDm) return dmOnly();
+        if (!intent.name || !intent.text) return { ok: false, reason: 'Pick a voice, and say something.' };
+        n++;
+        return {
+          ok: true,
+          events: [{
+            ...stamp(),
+            causeId: `cause-voice-${String(n)}`,
+            actor: { kind: 'dm', accountId: actor.accountId, ...(intent.creatureId ? { creatureId: intent.creatureId } : {}) },
+            visibility: 'public',
+            body: {
+              t: 'narration',
+              text: intent.text,
+              from: 'dm',
+              spoken: true,
+              as: { name: intent.name, ...(intent.creatureId ? { creatureId: intent.creatureId } : {}) },
+            },
+          }] as PlayEvent[],
+        };
+      }
+
+      /**
        * A whisper reaches one person and the DM, and nobody else — enforced by
        * the event's own visibility, which is the single filter every fan-out
        * and every replay already goes through (ADR-0004). There is no second

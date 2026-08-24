@@ -37,10 +37,10 @@ export interface AskForCheckProps {
   /** Everyone who could be asked — the players at the table. */
   targets: CheckTarget[];
   onAsk: (ask: { skill: string; creatureIds: string[]; secret: boolean }) => void;
+  onClose: () => void;
 }
 
-export function AskForCheck({ targets, onAsk }: AskForCheckProps): ReactElement {
-  const [open, setOpen] = useState(false);
+export function AskForCheck({ targets, onAsk, onClose }: AskForCheckProps): ReactElement {
   const [showAll, setShowAll] = useState(false);
   /* Empty means everybody — the common case, so it is where this starts. */
   const [only, setOnly] = useState<string | null>(null);
@@ -48,25 +48,13 @@ export function AskForCheck({ targets, onAsk }: AskForCheckProps): ReactElement 
 
   const ask = (skill: string): void => {
     onAsk({ skill, creatureIds: only ? [only] : [], secret });
-    setOpen(false);
-    setShowAll(false);
-    setOnly(null);
-    setSecret(false);
   };
-
-  if (!open) {
-    return (
-      <button type="button" className="qa2-pill" onClick={() => { setOpen(true); }}>
-        Ask for a roll
-      </button>
-    );
-  }
 
   return (
     <div className="qa2-panel qa-ask">
       <header className="qa-ask-head">
         <span className="qa-dm-kicker">Ask for a roll</span>
-        <button type="button" className="qa-dm-drawer-toggle" onClick={() => { setOpen(false); }}>Close</button>
+        <button type="button" className="qa-dm-drawer-toggle" onClick={onClose}>Close</button>
       </header>
 
       {/* Who owes it. "Everyone" first because it is the usual answer. */}

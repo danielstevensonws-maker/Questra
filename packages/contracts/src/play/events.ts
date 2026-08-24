@@ -206,6 +206,23 @@ export const IntentSchema = z.discriminatedUnion('kind', [
   }),
   /** Take one off the board — fled, or a mistake. */
   z.object({ kind: z.literal('remove_creature'), creatureId: ID }),
+
+  /**
+   * The DM speaking AS somebody — the goblin boss, the innkeeper, the voice
+   * behind the door.
+   *
+   * A separate intent from `free_text` because it is a different act: narrating
+   * is describing the world, and this is performing in it. The table needs to
+   * hear which is happening, and a `from: 'dm'` narration cannot say.
+   */
+  z.object({
+    kind: z.literal('speak_as'),
+    /** The creature, when it is one on the board. */
+    creatureId: ID.optional(),
+    /** What to call them — works for a creature or for somebody off-board. */
+    name: z.string().min(1),
+    text: z.string().min(1),
+  }),
 ]);
 export type Intent = z.infer<typeof IntentSchema>;
 
@@ -310,7 +327,21 @@ export const EventBodySchema = z.discriminatedUnion('t', [
     applied: z.object({ kind: RollKindSchema, dc: z.number().int() }).optional(),
   }),
   z.object({ t: z.literal('scene_changed'), sceneId: ID }),
-  z.object({ t: z.literal('narration'), text: z.string(), from: z.enum(['engine', 'dm']), spoken: z.boolean().optional() }),
+  z.object({
+    t: z.literal('narration'),
+    text: z.string(),
+    from: z.enum(['engine', 'dm']),
+    spoken: z.boolean().optional(),
+    /**
+     * WHO IS SAYING IT. Absent means the DM narrating as themselves — the
+     * voice of the world. Present means they are speaking AS somebody: the
+     * goblin boss, the innkeeper, the voice behind the door.
+     *
+     * This is the difference between a DM describing a scene and a DM
+     * performing in it, and the table needs to hear which one is happening.
+     */
+    as: z.object({ creatureId: ID.optional(), name: z.string() }).optional(),
+  }),
 
   /**
    * The DM asked for a check. PUBLIC by default and that is deliberate: at a

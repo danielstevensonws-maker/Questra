@@ -24,6 +24,8 @@ import { PlayerViewV2 } from '../primitives/v2/PlayerViewV2.js';
 import { DmScreen } from './DmScreen.js';
 import { promptsFrom } from './promptsFrom.js';
 import { rulingsFrom } from './rulingsFrom.js';
+import { roomWithMoves } from './roomWithMoves.js';
+import { useMapAction } from './useMapAction.js';
 import { tilesFrom } from './tilesFrom.js';
 import { PromptDock, type PromptVM } from './PromptDock.js';
 import type { EffectId } from './ImmersionConsole.js';
@@ -153,6 +155,7 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
   );
   const [rulesOpen, setRulesOpen] = useState(false);
 
+
   /**
    * Atmosphere effects are ephemeral by design (Brief 10 §4) — they play and
    * are gone, leaving nothing in the log to replay at somebody reconnecting.
@@ -169,6 +172,29 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
     return () => { window.clearTimeout(t); };
   }, [effect]);
 
+  /**
+   * The room with everybody standing where they are now. A room is fetched once
+   * and never changes; token_moved events flow past on the socket. Replaying
+   * them here is what makes movement visible at all — before this the map was
+   * frozen at page load no matter how much the table moved.
+   */
+  const liveRoom = useMemo(() => roomWithMoves(room, sync.events), [room, sync.events]);
+
+  /**
+   * Pointing at the map: tap yourself to move, tap an enemy to aim at them.
+   * Speed comes off the sheet rather than assumed, because a Goliath's
+   * thirty-five feet is exactly the sort of thing a hardcoded six squares
+   * gets wrong forever.
+   */
+  const mapAction = useMapAction({
+    room: liveRoom,
+    myCreatureId: myCharacter?.id ?? null,
+    speedFt: myCharacter?.sheet.speedFt.value ?? 30,
+    onMove: (tokenId, path) => {
+      send({ kind: 'move', tokenId, path: path as [{ x: number; y: number }, ...{ x: number; y: number }[]] });
+    },
+  });
+
   const view = useMemo(() => {
     /* The snapshot is the engine's projection, opaque to contracts — the sync
        client deliberately does not fold it, so this is where it becomes a
@@ -176,14 +202,34 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
     const projection = (sync.snapshot ?? { combatants: {}, round: 1, nextSeq: 0 }) as Projection;
     return projectionToView({
       projection,
-      room,
+      room: liveRoom,
       myCharacter,
       role: table?.yourRole ?? 'player',
       events: sync.events,
       campaignName: table?.campaignName ?? '',
       rosterNames,
     });
-  }, [sync.snapshot, sync.events, room, myCharacter, table, rosterNames]);
+  }, [sync.snapshot, sync.events, liveRoom, myCharacter, table, rosterNames]);
+
+  /**
+   * Who each token is TO THIS VIEWER — the room stores a creatureRef and knows
+   * nothing about allegiance, so the map cannot colour a token without this.
+   * The chosen target is marked here too, because "which one am I aiming at"
+   * has to be visible on the board rather than only in a menu.
+   */
+  const present = useMemo(() => {
+    const out: Record<string, { name: string; side: 'you' | 'ally' | 'foe'; tag?: string }> = {};
+    for (const c of view.cast) {
+      out[c.id] = {
+        name: c.name,
+        side: c.kind,
+        ...(mapAction.targetId === c.id
+          ? { tag: 'Aiming' }
+          : c.status ? { tag: c.status } : c.hurt ? { tag: c.hurt } : {}),
+      };
+    }
+    return out;
+  }, [view, mapAction.targetId]);
 
   if (loadError) {
     return (
@@ -203,7 +249,7 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
 
   /* The map is the one thing the screen cannot draw without. Everything else
      degrades — an empty cast, no log — but a table with no floor is nothing. */
-  if (!room || !table) {
+  if (!liveRoom || !table) {
     return (
       <div className={'rd qa-make' + (reduced ? ' is-still' : '')}>
         <ShellStyles />
@@ -224,7 +270,7 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
     return (
       <DmScreen
         view={view}
-        room={room}
+        room={liveRoom}
         campaignName={table.campaignName}
         seats={table.members
           .filter((m) => m.role === 'player')
@@ -260,6 +306,15 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
           send({ kind: 'ask_for_check', skill: skill as never, creatureIds, secret });
         }}
         onRule={(onSeq, verdict) => { send({ kind: 'rule_on', onSeq, verdict }); }}
+        onSpeakAs={(as, text) => {
+          send(as.creatureId === undefined
+            ? { kind: 'speak_as', name: as.name, text }
+            : { kind: 'speak_as', creatureId: as.creatureId, name: as.name, text });
+        }}
+        onRemoveCreature={(creatureId) => { send({ kind: 'remove_creature', creatureId }); }}
+        onMove={(tokenId, path) => {
+          send({ kind: 'move', tokenId, path: path as [{ x: number; y: number }, ...{ x: number; y: number }[]] });
+        }}
         onAddCreature={(c) => {
           send(c.monsterId === undefined
             ? { kind: 'add_creature', name: c.name, maxHp: c.maxHp, ac: c.ac }
@@ -309,7 +364,11 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
         scene={view.scene}
         hero={view.hero}
         cast={view.cast}
-        room={room}
+        room={liveRoom}
+        present={present}
+        {...(mapAction.moveFrom ? { measureFrom: mapAction.moveFrom } : {})}
+        onTarget={mapAction.onTokenClick}
+        onCell={mapAction.onCellClick}
         /* Real cards off the character's own sheet, with the arithmetic behind
            every number — the thing that makes tapping one teach you why it
            worked. */
@@ -347,7 +406,10 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
           }
 
           if (!tileId.startsWith('attack:')) return;
-          const foe = view.cast.find((c) => c.kind === 'foe' && c.status !== 'Down');
+          /* Whoever you aimed at on the map. With one enemy on the board the
+             fallback keeps it a single tap, which is the common case. */
+          const foe = view.cast.find((c) => c.id === mapAction.targetId)
+            ?? view.cast.find((c) => c.kind === 'foe' && c.status !== 'Down');
           /**
            * Nothing to hit is a SENTENCE, not a silent no-op. Swinging at an
            * empty room used to do nothing at all, which reads as a broken

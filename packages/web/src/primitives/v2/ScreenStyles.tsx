@@ -1160,6 +1160,327 @@ const CSS = `
     max-height: none;
   }
 }
+
+/* ---- the director's desk ---------------------------------------------------
+   A fixed rail, not floating panels. The screen this replaced had nine glass
+   rectangles of equal weight, several of which opened ON TOP of the map the DM
+   was trying to read. A rail cannot cover the map, is always in the same place,
+   and gives the eye one home to return to between beats.
+
+   THE COLOUR RULE IS THE DESIGN:
+     --qa-accent  NEEDS YOU — a turn waiting, a fight to start. Nothing else.
+     --qa-gold    YOUR VOICE — the DM speaking, and only that.
+     --qa-danger  hurt, dying, gone.
+   Everything else sits in ink-faint and comes forward only on hover. A screen
+   carrying everybody's information stays readable only if almost none of it
+   is loud. */
+.qa-desk {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  background: var(--qa-glass-solid);
+  border-right: var(--qa-hairline) solid var(--qa-glass-border);
+  backdrop-filter: blur(var(--qa-glass-blur));
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.qa-desk-head {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s1);
+  padding: var(--qa-s4) var(--qa-s4) var(--qa-s3);
+  border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
+}
+.qa-desk-state {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+}
+/* Whose turn it is, in the accent, because it is the one thing on the desk
+   genuinely waiting on the DM. */
+.qa-desk-acting {
+  font-family: var(--qa-font-display);
+  font-size: var(--qa-text-lg);
+  line-height: 1.1;
+  color: var(--qa-accent);
+}
+
+/* A deck: a tab that is always readable, and a body only when open. */
+.qa-deck { flex: none; border-bottom: var(--qa-hairline) solid var(--qa-glass-border); }
+.qa-deck-tab {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--qa-s3);
+  padding: var(--qa-s3) var(--qa-s4);
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color var(--qa-dur) var(--qa-ease), background var(--qa-dur) var(--qa-ease);
+}
+.qa-deck-tab:hover { background: var(--qa-chip); }
+.qa-deck.is-open > .qa-deck-tab { border-left-color: var(--qa-ink-faint); background: var(--qa-chip); }
+.qa-deck-label {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-label);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-dim);
+}
+.qa-deck.is-open .qa-deck-label { color: var(--qa-ink); }
+/* The badge is what keeps a CLOSED deck useful — "2 away", "Goblin Boss" —
+   which is what makes one-open-at-a-time survivable. */
+.qa-deck-badge {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+}
+.qa-deck-body { padding: 0 var(--qa-s4) var(--qa-s4); display: flex; flex-direction: column; gap: var(--qa-s3); }
+
+.qa-desk-note {
+  margin: 0;
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-label);
+  line-height: 1.45;
+  color: var(--qa-ink-faint);
+}
+.qa-desk-empty {
+  margin: 0;
+  padding: var(--qa-s3) 0;
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-label);
+  line-height: 1.5;
+  color: var(--qa-ink-faint);
+  list-style: none;
+}
+
+/* ---- the table deck --------------------------------------------------------
+   Three columns that answer three questions at a glance: who, how hurt, and
+   whose they are. Tabular numerals so the middle column stays a column. */
+.qa-desk-cast { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.qa-desk-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "name hp" "who hp";
+  gap: 0 var(--qa-s3);
+  padding: var(--qa-s2) var(--qa-s3);
+  text-align: left;
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: var(--qa-radius-sm);
+  cursor: pointer;
+  transition: background var(--qa-dur) var(--qa-ease), border-color var(--qa-dur) var(--qa-ease);
+}
+.qa-desk-row:hover { background: var(--qa-chip); }
+.qa-desk-row.is-spotlit { background: var(--qa-chip); border-left-color: var(--qa-ink-dim); }
+/* The accent, spent exactly once per screen: on whoever the table is waiting for. */
+.qa-desk-row.is-acting { border-left-color: var(--qa-accent); background: var(--qa-accent-soft); }
+.qa-desk-row-name { grid-area: name; font-family: var(--qa-font-display); font-size: var(--qa-text-body); color: var(--qa-ink); }
+.qa-desk-row-hp {
+  grid-area: hp;
+  align-self: center;
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-label);
+  color: var(--qa-ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+.qa-desk-row-hp.is-down { color: var(--qa-danger); }
+.qa-desk-row-who {
+  grid-area: who;
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+}
+
+/* ---- verbs, not nouns ------------------------------------------------------
+   Every control on this desk says what it DOES. "Bring something in", not
+   "Creatures". A director presses a verb. */
+.qa-desk-actions { display: flex; flex-direction: column; gap: var(--qa-s2); }
+.qa-desk-do {
+  padding: var(--qa-s2) var(--qa-s3);
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-label);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--qa-ink-dim);
+  background: var(--qa-chip);
+  border: var(--qa-hairline) solid transparent;
+  border-radius: var(--qa-radius);
+  cursor: pointer;
+  transition: color var(--qa-dur) var(--qa-ease), border-color var(--qa-dur) var(--qa-ease);
+}
+.qa-desk-do:hover { color: var(--qa-ink); border-color: var(--qa-glass-border); }
+.qa-desk-do:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* The one loud control per deck: the thing the DM is most likely to do next. */
+.qa-desk-go {
+  padding: var(--qa-s3);
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-label);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-accent-ink);
+  background: var(--qa-accent);
+  border: none;
+  border-radius: var(--qa-radius);
+  cursor: pointer;
+  transition: filter var(--qa-dur) var(--qa-ease);
+}
+.qa-desk-go:hover { filter: brightness(1.08); }
+
+/* ---- the cast deck: the signature ------------------------------------------
+   Gold is the DM's voice and appears nowhere else on the screen. A chosen voice
+   is the only gold thing visible, which is why it reads instantly. */
+.qa-desk-voices { display: flex; flex-direction: column; gap: var(--qa-s2); }
+.qa-desk-voice {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--qa-s2) var(--qa-s3);
+  text-align: left;
+  font-family: var(--qa-font-display);
+  font-size: var(--qa-text-body);
+  color: var(--qa-ink-dim);
+  background: var(--qa-chip);
+  border: var(--qa-hairline) solid transparent;
+  border-radius: var(--qa-radius);
+  cursor: pointer;
+  transition: color var(--qa-dur) var(--qa-ease), border-color var(--qa-dur) var(--qa-ease);
+}
+.qa-desk-voice:hover { color: var(--qa-ink); }
+.qa-desk-voice.is-on {
+  color: var(--qa-gold);
+  border-color: var(--qa-gold);
+  background: var(--qa-gold-soft);
+}
+.qa-desk-voice-hint {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+}
+.qa-desk-newvoice { display: flex; flex-direction: column; gap: var(--qa-s2); }
+.qa-desk-input {
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-label);
+  padding: var(--qa-s2) var(--qa-s3);
+  color: var(--qa-ink);
+  background: var(--qa-chip);
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-radius: var(--qa-radius);
+}
+.qa-desk-input::placeholder { color: var(--qa-ink-faint); }
+.qa-desk-input:focus { outline: none; border-color: var(--qa-gold); }
+
+/* ---- the room deck --------------------------------------------------------- */
+.qa-desk-weather { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qa-s2); }
+.qa-desk-effect {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--qa-s2) var(--qa-s3);
+  text-align: left;
+  background: var(--qa-chip);
+  border: var(--qa-hairline) solid transparent;
+  border-radius: var(--qa-radius);
+  cursor: pointer;
+  transition: border-color var(--qa-dur) var(--qa-ease);
+}
+.qa-desk-effect:hover { border-color: var(--qa-glass-border); }
+.qa-desk-effect-label { font-family: var(--qa-font-body); font-size: var(--qa-text-label); color: var(--qa-ink); }
+.qa-desk-effect-hint {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  color: var(--qa-ink-faint);
+}
+.qa-desk-remove { display: flex; flex-direction: column; gap: var(--qa-s2); }
+
+/* ---- speaking as somebody --------------------------------------------------
+   The composer changes when a voice is chosen: gold rule, gold caret, and the
+   line itself set in the story face. The DM is performing, and the input says
+   so before a word is typed. */
+.qa-dm-compose.is-voiced { border-top-color: var(--qa-gold); }
+.qa-dm-compose.is-voiced .qa-dm-input {
+  font-family: var(--qa-font-display);
+  font-size: var(--qa-text-body);
+  color: var(--qa-gold);
+  border-color: var(--qa-gold);
+  caret-color: var(--qa-gold);
+}
+.qa-dm-voicetag {
+  flex: none;
+  align-self: center;
+  padding-right: var(--qa-s2);
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-gold);
+}
+/* A spoken line in the journal, so a table can tell narration from performance
+   at a glance rather than by reading. */
+.qa-dm-line.is-spoken { color: var(--qa-gold); font-family: var(--qa-font-display); font-size: var(--qa-text-body); }
+.qa-dm-line.is-spoken .qa-dm-line-who { color: var(--qa-gold); opacity: 0.8; }
+
+/* ---- moving and aiming on the map ------------------------------------------
+   A square you can reach, and the enemy you have chosen. Both are hints: the
+   server decides what is legal, and a client that enforced it would be a
+   second rules engine free to disagree. */
+.qa-map-hint {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: var(--qa-hud-inset);
+  transform: translateX(-50%);
+  padding: var(--qa-s2) var(--qa-s4);
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-label);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-accent);
+  background: var(--qa-glass-solid);
+  border: var(--qa-hairline) solid var(--qa-accent-line);
+  border-radius: var(--qa-radius-round);
+  pointer-events: none;
+}
+
+/* The desk owns the left edge, so everything that used to float there moves
+   over to clear it. */
+.qa-dm-desked .qa2-scene { left: calc(50% + 150px); }
+.qa-dm-desked .qa-console { display: none; }
+
+@media (max-width: 900px) {
+  /* A rail on a phone is most of the phone. It becomes a strip at the top and
+     the map takes what is left. */
+  .qa-desk {
+    position: static;
+    width: auto;
+    max-height: 45vh;
+    border-right: none;
+    border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
+  }
+  .qa-dm-desked .qa2-scene { left: 50%; }
+}
 `;
 
 /**

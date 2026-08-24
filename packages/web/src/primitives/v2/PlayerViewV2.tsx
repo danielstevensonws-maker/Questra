@@ -104,6 +104,10 @@ export interface PlayerViewV2Props {
   onDescribe?: (text: string) => void;
   onSend?: (text: string) => void;
   onTarget?: (id: string) => void;
+  /** Tapping a square — the destination when a move is being planned. */
+  onCell?: (cell: { x: number; y: number }) => void;
+  /** Where a planned move starts, drawn as the reach ring. */
+  measureFrom?: { x: number; y: number };
   onEquip?: (economy: Economy) => void;
   onReact?: (emoji: string) => void;
   onRollDeathSave?: () => void;
@@ -150,6 +154,8 @@ export function PlayerViewV2({
   onDescribe,
   onSend,
   onTarget,
+  onCell,
+  measureFrom,
   onEquip,
   onReact,
   onRollDeathSave,
@@ -212,6 +218,8 @@ export function PlayerViewV2({
         fit="fill"
         {...(present !== undefined ? { present } : {})}
         {...(onTarget !== undefined ? { onTokenClick: onTarget } : {})}
+        {...(onCell !== undefined ? { onCellClick: onCell } : {})}
+        {...(measureFrom !== undefined ? { measureFrom } : {})}
       />
 
       <SceneRail

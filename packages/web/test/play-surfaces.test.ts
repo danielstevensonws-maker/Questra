@@ -11,6 +11,7 @@ import type { PlayEvent } from '@questra/contracts';
 import { promptsFrom } from '../src/play/promptsFrom.js';
 import { tilesFrom } from '../src/play/tilesFrom.js';
 import { rulingsFrom } from '../src/play/rulingsFrom.js';
+import { roomWithMoves } from '../src/play/roomWithMoves.js';
 import { dyingFrom, logFrom, castFrom, type Combatant, type Projection } from '../src/play/projectionToView.js';
 
 const at = '2026-08-23T00:00:00.000Z';
@@ -315,5 +316,93 @@ describe('what players want to do', () => {
   it('puts the ruling in the log, because the log is the play record', () => {
     const [line] = logFrom([ev(4, { t: 'ruled', onSeq: 3, verdict: 'refuse', note: 'The door is iron.' })]);
     expect(line!.text).toBe('says not this time. The door is iron.');
+  });
+});
+
+describe('the map, showing where people actually are', () => {
+  const room = {
+    id: 'r', terrainImageRef: 'stone', gridSize: { w: 10, h: 10 },
+    cellTags: {}, revealed: ['1,1'], assets: [],
+    tokens: [
+      { id: 't-mira', creatureRef: 'mira', cell: { x: 1, y: 1 }, size: 'medium', hidden: false, staged: false },
+      { id: 't-gob', creatureRef: 'gob', cell: { x: 5, y: 5 }, size: 'medium', hidden: false, staged: false },
+    ],
+  } as never as import('@questra/contracts').Room;
+
+  const moved = (tokenId: string, to: { x: number; y: number }, path: { x: number; y: number }[]) =>
+    ev(7, { t: 'token_moved', tokenId, from: { x: 1, y: 1 }, to, path, forced: false, costFt: 15 });
+
+  /**
+   * THE MAP WAS FROZEN. A room is fetched once and never changes while
+   * token_moved events flow past on the socket — and nothing applied them, so
+   * tokens sat where they were at page load no matter how much the table moved.
+   */
+  it('puts a token where the log says it went', () => {
+    const out = roomWithMoves(room, [moved('t-mira', { x: 4, y: 1 }, [{ x: 1, y: 1 }, { x: 4, y: 1 }])])!;
+    expect(out.tokens.find((t) => t.id === 't-mira')!.cell).toEqual({ x: 4, y: 1 });
+  });
+
+  it('leaves everybody else where they were', () => {
+    const out = roomWithMoves(room, [moved('t-mira', { x: 4, y: 1 }, [])])!;
+    expect(out.tokens.find((t) => t.id === 't-gob')!.cell).toEqual({ x: 5, y: 5 });
+  });
+
+  /** A move names the CREATURE; the room names the token that stands for it. */
+  it('matches a move addressed to the creature rather than the token', () => {
+    const out = roomWithMoves(room, [moved('mira', { x: 2, y: 2 }, [])])!;
+    expect(out.tokens.find((t) => t.id === 't-mira')!.cell).toEqual({ x: 2, y: 2 });
+  });
+
+  it('reveals the squares somebody walked through', () => {
+    const out = roomWithMoves(room, [moved('t-mira', { x: 3, y: 1 }, [{ x: 2, y: 1 }, { x: 3, y: 1 }])])!;
+    expect(out.revealed).toContain('2,1');
+    expect(out.revealed).toContain('3,1');
+  });
+
+  /**
+   * Replaying rather than mutating is what makes a refetch safe: the fetched
+   * room is the base, the moves are the log, and later moves win.
+   */
+  it('lands on the last place they went, not the first', () => {
+    const out = roomWithMoves(room, [
+      moved('t-mira', { x: 2, y: 1 }, []),
+      moved('t-mira', { x: 6, y: 1 }, []),
+    ])!;
+    expect(out.tokens.find((t) => t.id === 't-mira')!.cell).toEqual({ x: 6, y: 1 });
+  });
+
+  it('hands back the same room when nobody has moved', () => {
+    expect(roomWithMoves(room, [])).toBe(room);
+  });
+});
+
+describe('the DM performing rather than narrating', () => {
+  /**
+   * "The goblin boss says" reads as somebody speaking; "The DM" reads as the
+   * world being described. Flattening both into one voice is what makes a log
+   * feel like a chat window instead of a table.
+   */
+  it('names the character, not the DM', () => {
+    const [line] = logFrom([ev(3, {
+      t: 'narration', text: 'You will not pass.', from: 'dm', spoken: true,
+      as: { name: 'The Goblin Boss', creatureId: 'gob' },
+    })]);
+    expect(line!.actor).toBe('The Goblin Boss');
+    expect(line!.tone, 'set apart from narration on sight').toBe('chat');
+  });
+
+  it('still says The DM when they are narrating as themselves', () => {
+    const [line] = logFrom([ev(3, { t: 'narration', text: 'The door gives.', from: 'dm' })]);
+    expect(line!.actor).toBe('The DM');
+    expect(line!.tone).toBe('narration');
+  });
+
+  /** A DM performing is not asking their own permission. */
+  it('never queues a performance for a ruling', () => {
+    const open = rulingsFrom([ev(3, {
+      t: 'narration', text: 'You will not pass.', from: 'dm', spoken: true,
+      as: { name: 'The Goblin Boss' },
+    })]);
+    expect(open).toHaveLength(0);
   });
 });

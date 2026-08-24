@@ -3,43 +3,45 @@
  *
  * THE JOB IS DIFFERENT FROM A PLAYER'S. A player's screen answers "what do I
  * do?" — one character, deep. A DM's answers "what is going on, and what needs
- * me?" — every character, shallow, plus the things only they know. That is why
- * this is a different component tree rather than the player view with a toggle,
- * even though it shares the map, the log and the whole design language.
+ * me?" — every character, shallow, plus the things only they know.
  *
- * THE ACCENT CHANGES MEANING, and this is the one idea worth stating. On the
- * player screen --qa-accent means YOU: your token, your turn, your name. A DM
- * has no token, so here it means NEEDS YOU — a prompt waiting, a creature
- * bloodied, the turn sitting on somebody who has not acted. Reserving it that
- * way is what keeps a screen with everybody's information on it from reading
- * as an undifferentiated wall.
+ * THREE ZONES, AND NOTHING FLOATS OVER THE MAP:
  *
- * WHAT ONLY YOU KNOW IS NOT A PANEL OF SECRETS. The obvious build is a box in a
- * corner holding hidden things, and it is wrong: a DM's private information is
- * ABOUT the creatures in the list, so putting it elsewhere means reading two
- * places and joining them by eye, mid-sentence, while five people wait. What
- * lives in the drawer is only what has no creature to sit on — the whisper
- * composer and undo. Everything else is inline on the row it concerns.
+ *   the desk (left rail)  — every control, four decks, always in the same place
+ *   the map (centre)      — never covered; it is what everyone is looking at
+ *   the journal (right)   — the record, and the composer you speak from
  *
- * FIRST CONTACT (Brief 10 §3): the console and the drawer start collapsed. A DM
- * running their first session sees a map, a table and a place to type, which is
- * the whole game; the rest opens when they go looking for it.
+ * The version this replaces had nine glass panels of equal weight, several of
+ * which opened on top of the map. Nothing said where to look, and every control
+ * was named for a NOUN rather than the act it performs (owner, 2026-08-25: "the
+ * design feels flat and not engaging"). The desk is the fix: one home for the
+ * eye, a verb on every button, and the map left alone.
+ *
+ * THE ACCENT MEANS NEEDS YOU. On a player's screen --qa-accent means YOU. A DM
+ * has no token, so here it marks the thing waiting on a decision — a turn, a
+ * prompt, a player who has described something. Reserving it that strictly is
+ * what keeps a screen carrying everybody's information from reading as a wall.
+ *
+ * GOLD MEANS YOUR VOICE, and appears nowhere else. Pick somebody from the cast
+ * deck and the composer turns gold, sets itself in the story face, and what
+ * lands in the journal is the goblin speaking rather than the DM narrating.
  *
  * The DM receives the WHOLE room — unrevealed cells, hidden creatures, the lot
  * — because filterRoomForViewer passes their payload through untouched. That
  * asymmetry is settled server-side; nothing here decides it.
  */
 import { useEffect, useRef, useState, type ReactElement } from 'react';
-import type { Room } from '@questra/contracts';
-import { MapCanvas } from '../primitives/MapCanvas.js';
+import type { Cell, Room } from '@questra/contracts';
+import { MapCanvas, type TokenPresentation } from '../primitives/MapCanvas.js';
 import { ScreenStyles } from '../primitives/v2/ScreenStyles.js';
 import { PromptDock, type PromptVM } from './PromptDock.js';
-import { ImmersionConsole, type EffectId } from './ImmersionConsole.js';
 import { EffectLayer } from './EffectLayer.js';
 import { Compendium } from './Compendium.js';
 import { AskForCheck } from './AskForCheck.js';
 import { AddCreature } from './AddCreature.js';
 import { RulingDock } from './RulingDock.js';
+import { DirectorDesk } from './DirectorDesk.js';
+import type { EffectId } from './ImmersionConsole.js';
 import type { RulingRequestVM } from './rulingsFrom.js';
 import type { PlayView } from './projectionToView.js';
 
@@ -54,48 +56,54 @@ export interface DmScreenProps {
   view: PlayView;
   room: Room;
   campaignName: string;
-  /** Everyone at the table, whether or not they are connected right now. */
   seats: DmSeat[];
   prompts: PromptVM[];
+  rulings: RulingRequestVM[];
+  effect: EffectId | null;
+  fetchJson: <T>(path: string) => Promise<T>;
   onLeave: () => void;
   onSay: (text: string) => void;
+  onSpeakAs: (as: { creatureId?: string; name: string }, text: string) => void;
   onWhisper: (toAccountId: string, text: string) => void;
   onStartCombat: () => void;
   onEndCombat: () => void;
   onAdvanceTurn: () => void;
   onRest: (rest: 'short' | 'long') => void;
   onAnswerPrompt: (promptId: string, take: boolean, optionName?: string) => void;
-  onEffect: (effect: EffectId) => void;
-  /** The effect currently playing, if any — drawn over the map for everyone. */
-  effect: EffectId | null;
-  /** Reads the rules API for the compendium sheet and the creature search. */
-  fetchJson: <T>(path: string) => Promise<T>;
-  /** What players have described and are waiting to hear about. */
-  rulings: RulingRequestVM[];
   onAskCheck: (ask: { skill: string; creatureIds: string[]; secret: boolean }) => void;
   onRule: (onSeq: number, verdict: 'allow' | 'refuse') => void;
   onAddCreature: (c: { name: string; maxHp: number; ac: number; monsterId?: string }) => void;
+  onRemoveCreature: (creatureId: string) => void;
+  onEffect: (effect: EffectId) => void;
+  /** Moving somebody around the board by hand. */
+  onMove: (tokenId: string, path: Cell[]) => void;
 }
 
-export function DmScreen({
-  view, room, campaignName, seats, prompts,
-  onLeave, onSay, onWhisper, onStartCombat, onEndCombat, onAdvanceTurn, onRest, onAnswerPrompt, onEffect, effect, fetchJson, rulings, onAskCheck, onRule, onAddCreature,
-}: DmScreenProps): ReactElement {
+export function DmScreen(props: DmScreenProps): ReactElement {
+  const {
+    view, room, campaignName, seats, prompts, rulings, effect, fetchJson,
+    onLeave, onSay, onSpeakAs, onWhisper, onStartCombat, onEndCombat, onAdvanceTurn,
+    onRest, onAnswerPrompt, onAskCheck, onRule, onAddCreature, onRemoveCreature, onEffect, onMove,
+  } = props;
+
   const [line, setLine] = useState('');
   const [spotlit, setSpotlit] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [rulesOpen, setRulesOpen] = useState(false);
-  const [whisperTo, setWhisperTo] = useState<string>('');
+  const [whisperTo, setWhisperTo] = useState('');
   const [whisperText, setWhisperText] = useState('');
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
+  /* Who the DM is performing as. Null is the DM narrating as themselves. */
+  const [voice, setVoice] = useState<{ creatureId?: string; name: string } | null>(null);
+  /* Moving a token by hand: tap somebody, then tap where they go. */
+  const [moving, setMoving] = useState<{ tokenId: string; from: Cell } | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   const exploring = view.turn.exploring;
-  /* Nobody has arrived yet is a different sentence from nobody has made a
-     character, and a DM staring at an empty table needs to know which. */
-  const waiting = seats.filter((s) => !s.here);
 
-  /* The newest line is the one you need. A journal that has to be scrolled to
-     be current is a journal nobody reads mid-sentence. */
+  /* The newest line is the one you need. A journal that must be scrolled to be
+     current is a journal nobody reads mid-sentence. */
   useEffect(() => {
     const el = logRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -104,7 +112,10 @@ export function DmScreen({
   const say = (): void => {
     const text = line.trim();
     if (!text) return;
-    onSay(text);
+    /* One composer, two acts: narrating the world, or performing in it. The
+       chosen voice decides which, so the DM never hunts for a second box. */
+    if (voice) onSpeakAs(voice, text);
+    else onSay(text);
     setLine('');
   };
 
@@ -115,13 +126,64 @@ export function DmScreen({
     setWhisperText('');
   };
 
-  return (
-    <div className="qa2-screen qa-dm">
-      <ScreenStyles />
-      <MapCanvas room={room} mode="play" fit="fill" />
+  /** Who each token is, to the DM: everybody by name, foes marked as foes. */
+  const present: Record<string, TokenPresentation> = {};
+  for (const c of view.cast) {
+    present[c.id] = {
+      name: c.name,
+      side: c.kind === 'foe' ? 'foe' : 'ally',
+      ...(c.status ? { tag: c.status } : c.hurt ? { tag: c.hurt } : {}),
+    };
+  }
 
-      {/* The scene, centred — the same anchor the player screen uses, so a DM
-          glancing between two devices finds the same thing in the same place. */}
+  return (
+    <div className="qa2-screen qa-dm qa-dm-desked">
+      <ScreenStyles />
+      <MapCanvas
+        room={room}
+        mode="play"
+        fit="fill"
+        present={present}
+        {...(moving ? { measureFrom: moving.from } : {})}
+        onTokenClick={(ref) => {
+          /* A DM moves anybody. Tapping picks up; tapping again puts down. */
+          const token = room.tokens.find((t) => t.creatureRef === ref || t.id === ref);
+          if (!token) return;
+          setSpotlit(ref);
+          setMoving((m) => (m && m.tokenId === token.id ? null : { tokenId: token.id, from: token.cell }));
+        }}
+        onCellClick={(cell) => {
+          if (!moving) return;
+          onMove(moving.tokenId, [moving.from, cell]);
+          setMoving(null);
+        }}
+      />
+
+      {moving && <p className="qa-map-hint">Tap a square to move them there</p>}
+
+      {/* Everything the DM presses, in one place that never covers the map. */}
+      <DirectorDesk
+        cast={view.cast}
+        seats={seats}
+        exploring={exploring}
+        round={view.scene.round}
+        speakingAs={voice}
+        onSpeakAs={setVoice}
+        spotlit={spotlit}
+        onSpotlight={setSpotlit}
+        onEffect={onEffect}
+        onStartCombat={onStartCombat}
+        onEndCombat={onEndCombat}
+        onAdvanceTurn={onAdvanceTurn}
+        onRest={onRest}
+        onAddCreature={() => { setAddOpen(true); }}
+        onAskCheck={() => { setAskOpen(true); }}
+        onRules={() => { setRulesOpen(true); }}
+        onRemoveCreature={onRemoveCreature}
+      />
+
+      {/* The scene name, centred over the map the way it is on a player's
+          screen, so a DM glancing between two devices finds it in one place. */}
       <div className="qa2-panel qa2-scene">
         <span className="qa-dm-scene-name">{campaignName}</span>
         <span className="qa-dm-scene-state">
@@ -130,96 +192,10 @@ export function DmScreen({
         </span>
       </div>
 
-      {/* ---- running the fight ------------------------------------------
-          The controls that move the whole table sit together, because they are
-          one decision: is this a fight, and whose turn is it? */}
-      <div className="qa2-controls qa-dm-controls">
-        {exploring ? (
-          <>
-            <button type="button" className="qa2-cta qa-dm-run" onClick={onStartCombat}>
-              Roll for initiative
-            </button>
-            {/* Only out of a fight: nobody rests mid-round, and offering it
-                there would be offering a mistake. */}
-            <button type="button" className="qa2-pill" onClick={() => { onRest('short'); }}>Short rest</button>
-            <button type="button" className="qa2-pill" onClick={() => { onRest('long'); }}>Long rest</button>
-          </>
-        ) : (
-          <>
-            <button type="button" className="qa2-cta qa-dm-run" onClick={onAdvanceTurn}>
-              Next turn
-            </button>
-            <button type="button" className="qa2-pill" onClick={onEndCombat}>End the fight</button>
-          </>
-        )}
-        {/* Asking for a roll is the most-used control on this screen and works
-            in or out of a fight, so it sits outside the combat branch. */}
-        <AskForCheck
-          targets={view.cast
-            .filter((c) => c.kind !== 'foe')
-            .map((c) => ({ creatureId: c.id, name: c.name }))}
-          onAsk={onAskCheck}
-        />
-        <AddCreature fetchJson={fetchJson} onAdd={onAddCreature} />
-        {/* A DM looks things up more than anyone — the rules sit one press
-            away rather than behind a menu. */}
-        <button type="button" className="qa2-pill" onClick={() => { setRulesOpen(true); }}>Rules</button>
+      <div className="qa2-controls">
         <button type="button" className="qa2-pill" onClick={onLeave}>Leave</button>
       </div>
 
-      {/* ---- the table: everyone, with what only you know sitting on them ---- */}
-      <aside className="qa2-panel qa-dm-table" aria-label="Everyone at the table">
-        <header className="qa-dm-head">
-          <span className="qa-dm-kicker">{exploring ? 'The table' : 'Turn order'}</span>
-          {waiting.length > 0 && <span className="qa-dm-away">{waiting.length} away</span>}
-        </header>
-
-        <ul className="qa-dm-list">
-          {view.cast.map((c) => {
-            const seat = seats.find((s) => s.characterName === c.name);
-            return (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  className={
-                    'qa-dm-row'
-                    + (c.acting ? ' is-acting' : '')
-                    + (spotlit === c.id ? ' is-spotlit' : '')
-                  }
-                  aria-pressed={spotlit === c.id}
-                  onClick={() => setSpotlit(spotlit === c.id ? null : c.id)}
-                >
-                  <span className="qa-dm-row-top">
-                    <span className="qa-dm-name">{c.name}</span>
-                    {/* A DM sees exact numbers for everyone — that IS the
-                        difference between this screen and a player's, where an
-                        enemy is only ever a word. */}
-                    <span className="qa-dm-hp">
-                      {c.hp ? `${String(c.hp.current)}/${String(c.hp.max)}` : (c.hurt ?? '')}
-                    </span>
-                  </span>
-                  <span className="qa-dm-row-bottom">
-                    <span className="qa-dm-who">
-                      {seat ? seat.displayName : c.kind === 'foe' ? 'You run this one' : '—'}
-                    </span>
-                    {c.status && <span className="qa-dm-status">{c.status}</span>}
-                    {seat && !seat.here && <span className="qa-dm-away-tag">Not connected</span>}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-
-        {view.cast.length === 0 && (
-          <p className="qa-dm-empty">
-            Nobody is seated yet. Players appear here as they make characters.
-          </p>
-        )}
-      </aside>
-
-      {/* Reaction cards queue where the holder is looking (Brief 08 §1): for
-          monsters, boss and lair, that is here. */}
       <PromptDock prompts={prompts} onAnswer={onAnswerPrompt} />
 
       {/* What a player described and is waiting to hear about. Law 2's escape
@@ -229,13 +205,12 @@ export function DmScreen({
         onRule={onRule}
         onAskRoll={(onSeq, skill, creatureIds) => {
           onAskCheck({ skill, creatureIds, secret: false });
-          /* Asking for the roll IS the answer — the request stops waiting. */
           onRule(onSeq, 'allow');
         }}
         creatureIdFor={(r) => view.cast.find((c) => c.name === r.who)?.id ?? null}
       />
 
-      {/* ---- Assistant · Journal: the table's record, and where you speak ---- */}
+      {/* ---- Assistant · Journal: the record, and where you speak from ---- */}
       <section className="qa2-panel qa-dm-journal" aria-label="Assistant and journal">
         <header className="qa-dm-head">
           <span className="qa-dm-kicker">Assistant · Journal</span>
@@ -243,29 +218,21 @@ export function DmScreen({
             type="button"
             className="qa-dm-drawer-toggle"
             aria-expanded={drawerOpen}
-            onClick={() => setDrawerOpen(!drawerOpen)}
+            onClick={() => { setDrawerOpen(!drawerOpen); }}
           >
             {drawerOpen ? 'Close' : 'Only you'}
           </button>
         </header>
 
-        {/**
-         * The drawer holds only what has no creature to sit on. A whisper is
-         * addressed to a PERSON rather than a character, which is why it cannot
-         * live on a row in the list above.
-         */}
         {drawerOpen && (
           <div className="qa-dm-drawer">
             <p className="qa-dm-drawer-note">Nobody else sees what you send from here.</p>
-            <form
-              className="qa-dm-whisper"
-              onSubmit={(e) => { e.preventDefault(); whisper(); }}
-            >
+            <form className="qa-dm-whisper" onSubmit={(e) => { e.preventDefault(); whisper(); }}>
               <select
                 className="qa-dm-select"
                 aria-label="Who to whisper to"
                 value={whisperTo}
-                onChange={(e) => setWhisperTo(e.target.value)}
+                onChange={(e) => { setWhisperTo(e.target.value); }}
               >
                 <option value="">Choose somebody…</option>
                 {seats.map((s) => (
@@ -279,13 +246,9 @@ export function DmScreen({
                 value={whisperText}
                 placeholder="Tell them something only they know"
                 aria-label="Whisper"
-                onChange={(e) => setWhisperText(e.target.value)}
+                onChange={(e) => { setWhisperText(e.target.value); }}
               />
-              <button
-                type="submit"
-                className="qa2-cta qa-dm-send"
-                disabled={!whisperText.trim() || !whisperTo}
-              >
+              <button type="submit" className="qa2-cta qa-dm-send" disabled={!whisperText.trim() || !whisperTo}>
                 Whisper
               </button>
             </form>
@@ -308,28 +271,42 @@ export function DmScreen({
           )}
         </div>
 
-        {/* One composer, three jobs (Brief 10 §4.1): narrate, speak in
-            character, or ask the assistant. There is no separate chat box —
-            the log IS the chat, so a DM never has to decide which field a
-            sentence belongs in. */}
+        {/* One composer, three jobs (Brief 10 §4.1) — and now a fourth: the
+            voice chosen in the cast deck turns narration into performance
+            without moving the DM to a different field. */}
         <form
-          className="qa-dm-compose"
+          className={'qa-dm-compose' + (voice ? ' is-voiced' : '')}
           onSubmit={(e) => { e.preventDefault(); say(); }}
         >
+          {voice && <span className="qa-dm-voicetag">As {voice.name}</span>}
           <input
             className="qa-dm-input"
             value={line}
-            placeholder="Tell them what happens, or ask the assistant"
-            aria-label="Tell them what happens, or ask the assistant"
-            onChange={(e) => setLine(e.target.value)}
+            placeholder={voice ? `What does ${voice.name} say?` : 'Tell them what happens, or ask the assistant'}
+            aria-label={voice ? `Speak as ${voice.name}` : 'Tell them what happens, or ask the assistant'}
+            onChange={(e) => { setLine(e.target.value); }}
           />
           <button type="submit" className="qa2-cta qa-dm-send" disabled={!line.trim()}>Say it</button>
         </form>
       </section>
 
-      <ImmersionConsole onEffect={onEffect} />
-      <EffectLayer effect={effect} />
+      {askOpen && (
+        <AskForCheck
+          targets={view.cast.filter((c) => c.kind !== 'foe').map((c) => ({ creatureId: c.id, name: c.name }))}
+          onAsk={(ask) => { onAskCheck(ask); setAskOpen(false); }}
+          onClose={() => { setAskOpen(false); }}
+        />
+      )}
+      {addOpen && (
+        <AddCreature
+          fetchJson={fetchJson}
+          onAdd={(c) => { onAddCreature(c); setAddOpen(false); }}
+          onClose={() => { setAddOpen(false); }}
+        />
+      )}
       {rulesOpen && <Compendium fetchJson={fetchJson} onClose={() => { setRulesOpen(false); }} />}
+
+      <EffectLayer effect={effect} />
     </div>
   );
 }

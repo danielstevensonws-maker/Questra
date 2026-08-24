@@ -27,10 +27,10 @@ interface MonsterRow {
 export interface AddCreatureProps {
   fetchJson: <T>(path: string) => Promise<T>;
   onAdd: (creature: { name: string; maxHp: number; ac: number; monsterId?: string }) => void;
+  onClose: () => void;
 }
 
-export function AddCreature({ fetchJson, onAdd }: AddCreatureProps): ReactElement {
-  const [open, setOpen] = useState(false);
+export function AddCreature({ fetchJson, onAdd, onClose }: AddCreatureProps): ReactElement {
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<MonsterRow[]>([]);
   const [byHand, setByHand] = useState(false);
@@ -39,7 +39,7 @@ export function AddCreature({ fetchJson, onAdd }: AddCreatureProps): ReactElemen
   const [ac, setAc] = useState('');
 
   useEffect(() => {
-    if (!open || byHand) return;
+    if (byHand) return;
     let cancelled = false;
     const params = new URLSearchParams({ type: 'monster' });
     if (query.trim()) params.set('q', query.trim());
@@ -47,7 +47,7 @@ export function AddCreature({ fetchJson, onAdd }: AddCreatureProps): ReactElemen
       .then((r) => { if (!cancelled) setRows(r.entries); })
       .catch(() => { if (!cancelled) setRows([]); });
     return () => { cancelled = true; };
-  }, [open, byHand, query, fetchJson]);
+  }, [byHand, query, fetchJson]);
 
   const addFromCompendium = (row: MonsterRow): void => {
     /* The list carries what a DM needs to choose; the full entry carries the
@@ -63,7 +63,6 @@ export function AddCreature({ fetchJson, onAdd }: AddCreatureProps): ReactElemen
           ac: entry.meta?.ac ?? 12,
           monsterId: entry.id,
         });
-        setOpen(false);
         setQuery('');
       })
       .catch(() => { /* the list stays open; nothing was placed */ });
@@ -75,24 +74,15 @@ export function AddCreature({ fetchJson, onAdd }: AddCreatureProps): ReactElemen
     const a = Number(ac);
     if (!n || !Number.isFinite(h) || h <= 0 || !Number.isFinite(a) || a <= 0) return;
     onAdd({ name: n, maxHp: h, ac: a });
-    setOpen(false);
     setByHand(false);
     setName(''); setHp(''); setAc('');
   };
-
-  if (!open) {
-    return (
-      <button type="button" className="qa2-pill" onClick={() => { setOpen(true); }}>
-        Add a creature
-      </button>
-    );
-  }
 
   return (
     <div className="qa2-panel qa-add">
       <header className="qa-ask-head">
         <span className="qa-dm-kicker">Add a creature</span>
-        <button type="button" className="qa-dm-drawer-toggle" onClick={() => { setOpen(false); }}>Close</button>
+        <button type="button" className="qa-dm-drawer-toggle" onClick={onClose}>Close</button>
       </header>
 
       {byHand ? (

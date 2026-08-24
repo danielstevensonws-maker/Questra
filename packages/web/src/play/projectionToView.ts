@@ -328,6 +328,7 @@ export function logFrom(
       order?: { creatureId: string; total: number }[];
       /* roll_made names its creature here rather than in a creatureId field. */
       sources?: string[];
+      as?: { name: string; creatureId?: string };
       creatureIds?: string[]; skill?: string; reason?: string;
       verdict?: string; note?: string; name?: string;
     };
@@ -335,10 +336,16 @@ export function logFrom(
     switch (body.t) {
       case 'narration':
         if (body.text) {
+          /**
+           * A DM PERFORMING IS NOT A DM NARRATING, and the journal has to say
+           * which. "The goblin boss says" reads as somebody speaking; "The DM"
+           * reads as the world being described. Flattening both into one voice
+           * is what makes a log feel like a chat window instead of a table.
+           */
           lines.push({
             id: String(e.seq),
-            tone: 'narration',
-            actor: body.from === 'dm' ? 'The DM' : 'The table',
+            tone: body.as ? 'chat' : 'narration',
+            actor: body.as ? body.as.name : body.from === 'dm' ? 'The DM' : 'The table',
             text: body.text,
           });
         }

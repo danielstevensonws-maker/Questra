@@ -169,6 +169,9 @@ export function checkIntent(
     case 'rule_on':
     case 'add_creature':
     case 'remove_creature':
+    /* Speaking is never a rules question — a DM performing is authorisation
+       (theirs), decided server-side by role. */
+    case 'speak_as':
       return LEGAL;
   }
 }
