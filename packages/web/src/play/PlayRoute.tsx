@@ -23,6 +23,7 @@ import type { CampaignSession, Intent, Room } from '@questra/contracts';
 import { PlayerViewV2 } from '../primitives/v2/PlayerViewV2.js';
 import { DmScreen } from './DmScreen.js';
 import { promptsFrom } from './promptsFrom.js';
+import { rulingsFrom } from './rulingsFrom.js';
 import { tilesFrom } from './tilesFrom.js';
 import { PromptDock, type PromptVM } from './PromptDock.js';
 import type { EffectId } from './ImmersionConsole.js';
@@ -133,7 +134,13 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
    * one is active and when it expires; this only holds what has arrived and
    * not yet been closed by a taken/declined event.
    */
-  const prompts = useMemo<PromptVM[]>(() => promptsFrom(sync.events), [sync.events]);
+  const prompts = useMemo<PromptVM[]>(
+    () => promptsFrom(sync.events, rosterNames, myCharacter?.id ?? null),
+    [sync.events, rosterNames, myCharacter],
+  );
+
+  /* What players have described and the DM has not answered. */
+  const rulings = useMemo(() => rulingsFrom(sync.events, rosterNames), [sync.events, rosterNames]);
 
   /* What this character can do, straight off their sheet. */
   const tiles = useMemo(() => tilesFrom(myCharacter?.sheet ?? null), [myCharacter]);
@@ -248,6 +255,16 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
         onEffect={(e) => { sync.sendEffect(e); }}
         effect={effect}
         fetchJson={fetchJson}
+        rulings={rulings}
+        onAskCheck={({ skill, creatureIds, secret }) => {
+          send({ kind: 'ask_for_check', skill: skill as never, creatureIds, secret });
+        }}
+        onRule={(onSeq, verdict) => { send({ kind: 'rule_on', onSeq, verdict }); }}
+        onAddCreature={(c) => {
+          send(c.monsterId === undefined
+            ? { kind: 'add_creature', name: c.name, maxHp: c.maxHp, ac: c.ac }
+            : { kind: 'add_creature', name: c.name, maxHp: c.maxHp, ac: c.ac, monsterId: c.monsterId });
+        }}
       />
     );
   }
@@ -309,9 +326,41 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
          * refuses anything illegal with a sentence the player can read.
          */
         onUse={(tileId) => {
-          if (!view.hero || !tileId.startsWith('attack:')) return;
+          if (!view.hero) return;
+
+          /**
+           * A FEATURE HAS NO TARGET AND NO MECHANICAL PATH YET, so it goes
+           * through the escape hatch as a described action — which is exactly
+           * what Law 2 is for. It reaches the DM's ruling dock and gets a real
+           * answer, rather than the silent nothing that used to happen when a
+           * tile did not start with "attack:" (owner, 2026-08-25: "the ability
+           * seemed not to work").
+           */
+          if (tileId.startsWith('feature:')) {
+            const tile = tiles.find((t) => t.id === tileId);
+            send({
+              kind: 'free_text',
+              creatureId: view.hero.id,
+              text: `uses ${tile?.name ?? 'a feature'}.`,
+            });
+            return;
+          }
+
+          if (!tileId.startsWith('attack:')) return;
           const foe = view.cast.find((c) => c.kind === 'foe' && c.status !== 'Down');
-          if (!foe) return;
+          /**
+           * Nothing to hit is a SENTENCE, not a silent no-op. Swinging at an
+           * empty room used to do nothing at all, which reads as a broken
+           * button rather than as an empty board.
+           */
+          if (!foe) {
+            send({
+              kind: 'free_text',
+              creatureId: view.hero.id,
+              text: `swings ${tileId.slice('attack:'.length)} — but there is nothing here to hit.`,
+            });
+            return;
+          }
           send({
             kind: 'attack',
             attackerId: view.hero.id,
@@ -347,6 +396,19 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
       <PromptDock
         prompts={prompts}
         onAnswer={(promptId, take, optionName) => {
+          /**
+           * A check and a reaction are both cards in this dock but they close
+           * differently: a reaction is answered by promptId, a check by
+           * actually rolling. Telling them apart on the id prefix keeps one
+           * dock for both rather than making the player learn two.
+           */
+          if (promptId.startsWith('ask-')) {
+            if (take && view.hero) {
+              const skill = (optionName ?? '').replace(/^Roll /, '').toLowerCase().replace(/ /g, '_');
+              send({ kind: 'roll_check', creatureId: view.hero.id, skill: skill as never, askId: promptId });
+            }
+            return;
+          }
           send(optionName === undefined
             ? { kind: 'prompt_reply', promptId, take }
             : { kind: 'prompt_reply', promptId, take, optionName });

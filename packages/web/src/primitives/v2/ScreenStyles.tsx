@@ -1041,6 +1041,125 @@ const CSS = `
   text-transform: uppercase;
   color: var(--qa-ink-faint);
 }
+
+/* ---- asking for a roll -----------------------------------------------------
+   The DM's most-used control. Opens over the map near the button that spawned
+   it, and closes the moment a skill is picked — one tap for the common ask. */
+.qa-ask, .qa-add {
+  position: absolute;
+  z-index: 4;
+  top: calc(var(--qa-hud-inset) + 44px);
+  right: var(--qa-hud-inset);
+  width: min(340px, calc(100% - var(--qa-hud-inset) * 2));
+  padding: var(--qa-s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s3);
+  max-height: 70vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.qa-ask-head { display: flex; align-items: baseline; justify-content: space-between; }
+.qa-ask-who { display: flex; flex-wrap: wrap; gap: var(--qa-s2); }
+.qa-ask-who .is-on { border-color: var(--qa-accent-line); color: var(--qa-accent); }
+
+.qa-ask-skills { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qa-s2); }
+.qa-ask-skill {
+  padding: var(--qa-s2) var(--qa-s3);
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-label);
+  color: var(--qa-ink);
+  text-align: left;
+  background: var(--qa-chip);
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-radius: var(--qa-radius);
+  cursor: pointer;
+  transition: border-color var(--qa-dur) var(--qa-ease), background var(--qa-dur) var(--qa-ease);
+}
+.qa-ask-skill:hover { border-color: var(--qa-accent-line); background: var(--qa-accent-soft); }
+
+.qa-ask-secret {
+  display: flex;
+  align-items: center;
+  gap: var(--qa-s2);
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+  cursor: pointer;
+}
+
+/* ---- adding a creature ----------------------------------------------------- */
+.qa-add-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.qa-add-hand { display: flex; flex-direction: column; gap: var(--qa-s2); }
+.qa-add-numbers { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qa-s2); }
+.qa-add-actions { display: flex; align-items: center; gap: var(--qa-s3); }
+
+/* ---- what a player wants to do ---------------------------------------------
+   Bottom-centre, where the prompt dock sits, because both answer the same
+   question: what is waiting on me? A ruling and a reaction never queue at the
+   same moment in practice — one is a fight interrupt, the other is somebody
+   describing something between beats. */
+.qa-ruling {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: var(--qa-hud-inset);
+  transform: translateX(-50%);
+  width: min(460px, calc(100% - var(--qa-hud-inset) * 2));
+  padding: var(--qa-s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s3);
+  border-color: var(--qa-accent-line);
+}
+.qa-ruling-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--qa-s3); }
+.qa-ruling-kicker {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-accent);
+}
+/* Their words, verbatim and given room — this is the thing being decided. */
+.qa-ruling-text {
+  margin: 0;
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-body);
+  line-height: 1.5;
+  color: var(--qa-ink);
+}
+.qa-ruling-hint {
+  margin: 0;
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-ink-faint);
+}
+.qa-ruling-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--qa-s3); }
+.qa-ruling-skills { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qa-s2); }
+
+@media (max-width: 900px) {
+  .qa-ask, .qa-add, .qa-ruling {
+    position: static;
+    transform: none;
+    width: auto;
+    margin: var(--qa-s3);
+    max-height: none;
+  }
+}
 `;
 
 /**

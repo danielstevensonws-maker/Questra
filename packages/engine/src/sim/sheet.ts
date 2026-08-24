@@ -79,6 +79,18 @@ function validateChoices(choices: CharacterChoices): void {
 }
 
 /** Compute the full sheet. Throws IllegalChoiceError (plain-language) on illegal input. */
+/**
+ * Which ability each skill leans on (SRD). Exported because the SERVER needs
+ * the same answer when it rolls a check for somebody: a second copy of this
+ * table is a second place for Perception to become Intelligence.
+ */
+export const SKILL_ABILITY: Partial<Record<Skill, Ability>> = {
+  athletics: 'str', acrobatics: 'dex', sleight_of_hand: 'dex', stealth: 'dex',
+  arcana: 'int', history: 'int', investigation: 'int', nature: 'int', religion: 'int',
+  animal_handling: 'wis', insight: 'wis', medicine: 'wis', perception: 'wis', survival: 'wis',
+  deception: 'cha', intimidation: 'cha', performance: 'cha', persuasion: 'cha',
+};
+
 export function computeSheet(choices: CharacterChoices, rules: SheetRulesData): ComputedSheet {
   validateChoices(choices);
 
@@ -160,12 +172,7 @@ export function computeSheet(choices: CharacterChoices, rules: SheetRulesData): 
 
   // ---- skills (chosen proficiencies) ----
   const skills = {} as ComputedSheet['skills'];
-  const skillAbility: Partial<Record<Skill, Ability>> = {
-    athletics: 'str', acrobatics: 'dex', sleight_of_hand: 'dex', stealth: 'dex',
-    arcana: 'int', history: 'int', investigation: 'int', nature: 'int', religion: 'int',
-    animal_handling: 'wis', insight: 'wis', medicine: 'wis', perception: 'wis', survival: 'wis',
-    deception: 'cha', intimidation: 'cha', performance: 'cha', persuasion: 'cha',
-  };
+  const skillAbility = SKILL_ABILITY;
   for (const sk of choices.skillChoices) {
     const ab = skillAbility[sk] ?? 'int';
     const m = mod(ab);

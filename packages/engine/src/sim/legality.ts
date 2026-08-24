@@ -152,6 +152,24 @@ export function checkIntent(
      */
     case 'death_save':
       return LEGAL;
+
+    /**
+     * Asking for a check, answering one, ruling on a description, and putting
+     * a creature on the board never grey.
+     *
+     * A check is not a rules gate — it is the DM asking a question, and the
+     * whole point of rolling is that you might fail. Rolling one you were
+     * asked for is likewise always allowed; a player who cannot roll when
+     * asked is a player who cannot play. Ruling and adding creatures are
+     * authorisation (the DM's), decided server-side by role, and answering
+     * them here too would give the question two answers free to disagree.
+     */
+    case 'ask_for_check':
+    case 'roll_check':
+    case 'rule_on':
+    case 'add_creature':
+    case 'remove_creature':
+      return LEGAL;
   }
 }
 

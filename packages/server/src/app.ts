@@ -23,6 +23,7 @@ import {
   declinedEvent,
   longRest,
   completeShortRest,
+  SKILL_ABILITY,
 } from '@questra/engine';
 import { SyncCore, type IntentResolver, type ResolvedToken } from './sync-core.js';
 import { InMemoryEventStore, type EventStore } from './store/event-store.js';
@@ -182,6 +183,11 @@ export function makeSliceResolver(): IntentResolver {
       attackerId?: string; targetId?: string; actionName?: string;
       creatureId?: string; text?: string;
       rest?: 'short' | 'long';
+      skill?: 'acrobatics' | 'animal_handling' | 'arcana' | 'athletics' | 'deception' | 'history' | 'insight' | 'intimidation' | 'investigation' | 'medicine' | 'nature' | 'perception' | 'performance' | 'persuasion' | 'religion' | 'sleight_of_hand' | 'stealth' | 'survival';
+      creatureIds?: string[]; dc?: number; reason?: string; secret?: boolean;
+      onSeq?: number; verdict?: 'allow' | 'refuse'; note?: string;
+      name?: string; maxHp?: number; ac?: number; monsterId?: string;
+      cell?: { x: number; y: number };
       tokenId?: string; path?: { x: number; y: number }[];
       toAccountId?: string;
       promptId?: string; take?: boolean; optionName?: string;
@@ -443,6 +449,175 @@ export function makeSliceResolver(): IntentResolver {
               outcome: die === 20 ? 'crit' : die === 1 ? 'fumble' : die >= 10 ? 'success' : 'failure',
               entry: 'server',
             },
+          }] as PlayEvent[],
+        };
+      }
+
+      /**
+       * "Give me a perception check." THE MOST COMMON THING THAT HAPPENS AT A
+       * TABLE, and until now there was no way to say it.
+       *
+       * Public by default because at a real table it is said out loud —
+       * everyone hears the ask and everyone watches the roll. A secret check
+       * goes dm_only instead: a real tool, since players should not know they
+       * failed to spot the ambush, but not the common case.
+       */
+      case 'ask_for_check': {
+        if (!isDm) return dmOnly();
+        if (!intent.skill) return { ok: false, reason: 'Pick what they are rolling.' };
+        /* Nobody named means everybody — "everyone give me a perception
+           check" is one of the most common asks there is. */
+        const who = intent.creatureIds?.length
+          ? intent.creatureIds
+          : Object.values(state.combatants).filter((c) => c.isPlayer).map((c) => c.id);
+        if (who.length === 0) return { ok: false, reason: 'There is nobody to ask.' };
+
+        n++;
+        return {
+          ok: true,
+          events: [{
+            ...stamp(),
+            causeId: `cause-ask-${String(n)}`,
+            actor: { kind: 'dm', accountId: actor.accountId },
+            visibility: intent.secret === true ? 'dm_only' : 'public',
+            body: {
+              t: 'check_asked',
+              askId: `ask-${String(n)}`,
+              skill: intent.skill,
+              creatureIds: who,
+              ...(intent.dc === undefined ? {} : { dc: intent.dc }),
+              ...(intent.reason === undefined ? {} : { reason: intent.reason }),
+            },
+          }] as PlayEvent[],
+        };
+      }
+
+      /**
+       * Rolling the check. The arithmetic is shown out loud — d20, the ability
+       * modifier, proficiency if they have it — because that is the whole
+       * learn-while-playing promise: you find out WHY you rolled a 17, not
+       * just that you did.
+       */
+      case 'roll_check': {
+        if (!intent.creatureId || !intent.skill) return { ok: false, reason: 'Nothing to roll.' };
+        const c = state.combatants[intent.creatureId];
+        if (!c) return { ok: false, reason: 'That character is not here.' };
+
+        const ability = SKILL_ABILITY[intent.skill] ?? 'int';
+        const abilityMod = Math.floor(((c.abilities[ability] ?? 10) - 10) / 2);
+        /* Proficiency is on the combatant, computed from the sheet when they
+           were seated — not guessed here. */
+        const trained = c.proficientSkills?.includes(intent.skill) ?? false;
+        const prof = trained ? c.profBonus : 0;
+        const die = Math.floor(rng() * 20) + 1;
+        const total = die + abilityMod + prof;
+
+        n++;
+        return {
+          ok: true,
+          events: [{
+            ...stamp(),
+            causeId: `cause-check-${String(n)}`,
+            actor: { kind: 'player', accountId: actor.accountId, creatureId: c.id },
+            visibility: 'public',
+            body: {
+              t: 'roll_made',
+              rollId: `check-${String(n)}`,
+              kind: 'ability_check',
+              d20: die,
+              collapsed: 'straight',
+              sources: [c.id],
+              modifiers: [
+                { label: ability.toUpperCase(), value: abilityMod },
+                ...(trained ? [{ label: 'Proficiency', value: prof }] : []),
+              ],
+              total,
+              /* Against a DC only when the DM set one. A check with no target
+                 number is the DM deciding after the fact, which is legitimate
+                 and common — showing "against undefined" would not be. */
+              ...(intent.dc === undefined ? {} : { vs: { type: 'dc' as const, value: intent.dc } }),
+              outcome: intent.dc === undefined
+                ? 'success'
+                : total >= intent.dc ? 'success' : 'failure',
+              entry: 'server',
+            },
+          }] as PlayEvent[],
+        };
+      }
+
+      /**
+       * The DM ruling on something a player described. This is what makes
+       * Law 2's escape hatch real rather than decorative: a typed line stops
+       * being a message in a log and becomes a request somebody answers.
+       */
+      case 'rule_on': {
+        if (!isDm) return dmOnly();
+        if (intent.onSeq === undefined || !intent.verdict) {
+          return { ok: false, reason: 'Nothing to rule on.' };
+        }
+        n++;
+        return {
+          ok: true,
+          events: [{
+            ...stamp(),
+            causeId: `cause-rule-${String(n)}`,
+            actor: { kind: 'dm', accountId: actor.accountId },
+            visibility: 'public',
+            body: {
+              t: 'ruled',
+              onSeq: intent.onSeq,
+              verdict: intent.verdict,
+              ...(intent.note === undefined ? {} : { note: intent.note }),
+            },
+          }] as PlayEvent[],
+        };
+      }
+
+      /**
+       * Putting a creature on the board. Without this the map is empty, every
+       * attack row is dead, and a fight is the party rolling initiative
+       * against nobody (owner, 2026-08-25).
+       */
+      case 'add_creature': {
+        if (!isDm) return dmOnly();
+        if (!intent.name || !intent.maxHp || !intent.ac) {
+          return { ok: false, reason: 'A creature needs a name, hit points and an armour class.' };
+        }
+        n++;
+        return {
+          ok: true,
+          events: [{
+            ...stamp(),
+            causeId: `cause-add-${String(n)}`,
+            actor: { kind: 'dm', accountId: actor.accountId },
+            visibility: 'public',
+            body: {
+              t: 'creature_added',
+              creatureId: `foe-${String(Date.now())}-${String(n)}`,
+              name: intent.name,
+              maxHp: intent.maxHp,
+              ac: intent.ac,
+              ...(intent.cell === undefined ? {} : { cell: intent.cell }),
+              ...(intent.monsterId === undefined ? {} : { monsterId: intent.monsterId }),
+            },
+          }] as PlayEvent[],
+        };
+      }
+
+      case 'remove_creature': {
+        if (!isDm) return dmOnly();
+        if (!intent.creatureId || !state.combatants[intent.creatureId]) {
+          return { ok: false, reason: 'That creature is not on the board.' };
+        }
+        n++;
+        return {
+          ok: true,
+          events: [{
+            ...stamp(),
+            causeId: `cause-rm-${String(n)}`,
+            actor: { kind: 'dm', accountId: actor.accountId },
+            visibility: 'public',
+            body: { t: 'creature_removed', creatureId: intent.creatureId },
           }] as PlayEvent[],
         };
       }

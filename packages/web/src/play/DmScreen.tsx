@@ -37,6 +37,10 @@ import { PromptDock, type PromptVM } from './PromptDock.js';
 import { ImmersionConsole, type EffectId } from './ImmersionConsole.js';
 import { EffectLayer } from './EffectLayer.js';
 import { Compendium } from './Compendium.js';
+import { AskForCheck } from './AskForCheck.js';
+import { AddCreature } from './AddCreature.js';
+import { RulingDock } from './RulingDock.js';
+import type { RulingRequestVM } from './rulingsFrom.js';
 import type { PlayView } from './projectionToView.js';
 
 export interface DmSeat {
@@ -64,13 +68,18 @@ export interface DmScreenProps {
   onEffect: (effect: EffectId) => void;
   /** The effect currently playing, if any — drawn over the map for everyone. */
   effect: EffectId | null;
-  /** Reads the rules API for the compendium sheet. */
+  /** Reads the rules API for the compendium sheet and the creature search. */
   fetchJson: <T>(path: string) => Promise<T>;
+  /** What players have described and are waiting to hear about. */
+  rulings: RulingRequestVM[];
+  onAskCheck: (ask: { skill: string; creatureIds: string[]; secret: boolean }) => void;
+  onRule: (onSeq: number, verdict: 'allow' | 'refuse') => void;
+  onAddCreature: (c: { name: string; maxHp: number; ac: number; monsterId?: string }) => void;
 }
 
 export function DmScreen({
   view, room, campaignName, seats, prompts,
-  onLeave, onSay, onWhisper, onStartCombat, onEndCombat, onAdvanceTurn, onRest, onAnswerPrompt, onEffect, effect, fetchJson,
+  onLeave, onSay, onWhisper, onStartCombat, onEndCombat, onAdvanceTurn, onRest, onAnswerPrompt, onEffect, effect, fetchJson, rulings, onAskCheck, onRule, onAddCreature,
 }: DmScreenProps): ReactElement {
   const [line, setLine] = useState('');
   const [spotlit, setSpotlit] = useState<string | null>(null);
@@ -143,6 +152,15 @@ export function DmScreen({
             <button type="button" className="qa2-pill" onClick={onEndCombat}>End the fight</button>
           </>
         )}
+        {/* Asking for a roll is the most-used control on this screen and works
+            in or out of a fight, so it sits outside the combat branch. */}
+        <AskForCheck
+          targets={view.cast
+            .filter((c) => c.kind !== 'foe')
+            .map((c) => ({ creatureId: c.id, name: c.name }))}
+          onAsk={onAskCheck}
+        />
+        <AddCreature fetchJson={fetchJson} onAdd={onAddCreature} />
         {/* A DM looks things up more than anyone — the rules sit one press
             away rather than behind a menu. */}
         <button type="button" className="qa2-pill" onClick={() => { setRulesOpen(true); }}>Rules</button>
@@ -203,6 +221,19 @@ export function DmScreen({
       {/* Reaction cards queue where the holder is looking (Brief 08 §1): for
           monsters, boss and lair, that is here. */}
       <PromptDock prompts={prompts} onAnswer={onAnswerPrompt} />
+
+      {/* What a player described and is waiting to hear about. Law 2's escape
+          hatch only works if somebody is on the other side of it. */}
+      <RulingDock
+        requests={rulings}
+        onRule={onRule}
+        onAskRoll={(onSeq, skill, creatureIds) => {
+          onAskCheck({ skill, creatureIds, secret: false });
+          /* Asking for the roll IS the answer — the request stops waiting. */
+          onRule(onSeq, 'allow');
+        }}
+        creatureIdFor={(r) => view.cast.find((c) => c.name === r.who)?.id ?? null}
+      />
 
       {/* ---- Assistant · Journal: the table's record, and where you speak ---- */}
       <section className="qa2-panel qa-dm-journal" aria-label="Assistant and journal">

@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import type { PlayEvent } from '@questra/contracts';
 import { promptsFrom } from '../src/play/promptsFrom.js';
 import { tilesFrom } from '../src/play/tilesFrom.js';
+import { rulingsFrom } from '../src/play/rulingsFrom.js';
 import { dyingFrom, logFrom, castFrom, type Combatant, type Projection } from '../src/play/projectionToView.js';
 
 const at = '2026-08-23T00:00:00.000Z';
@@ -223,5 +224,96 @@ describe('the cast list', () => {
     const p = projection({ order: ['zara'], activeCreatureId: 'zara' });
     const cast = castFrom(p, 'arn');
     expect(cast.map((c) => c.id)).toEqual(['zara', 'arn']);
+  });
+});
+
+describe('checks the DM asked for', () => {
+  const asked = (creatureIds: string[]) =>
+    ev(5, { t: 'check_asked', askId: 'ask-1', skill: 'animal_handling', creatureIds, reason: 'The horse is spooked' });
+
+  /**
+   * A check aimed at somebody is TAPPABLE only by them. Everyone else hears
+   * the ask in the journal and watches the roll — which is what a table does.
+   */
+  it('is a card for the person who owes the roll', () => {
+    const mine = promptsFrom([asked(['mira'])], { mira: 'Mira' }, 'mira');
+    expect(mine).toHaveLength(1);
+    expect(mine[0]!.context).toBe('The horse is spooked — roll Animal Handling.');
+    expect(mine[0]!.options[0]!.name).toBe('Roll Animal Handling');
+  });
+
+  it('is not a card for anybody else', () => {
+    expect(promptsFrom([asked(['mira'])], { mira: 'Mira' }, 'bren')).toHaveLength(0);
+  });
+
+  /** No countdown: a check waits for the player rather than interrupting them. */
+  it('carries no clock', () => {
+    expect(promptsFrom([asked(['mira'])], {}, 'mira')[0]!.timeoutSec).toBe(0);
+  });
+
+  it('closes once that player has rolled', () => {
+    const after = promptsFrom([
+      asked(['mira']),
+      ev(6, { t: 'roll_made', kind: 'ability_check', d20: 12, collapsed: 'straight', sources: ['mira'], modifiers: [], total: 14, outcome: 'success', entry: 'server' }),
+    ], {}, 'mira');
+    expect(after).toHaveLength(0);
+  });
+
+  it('stays open when somebody ELSE rolls theirs', () => {
+    const still = promptsFrom([
+      asked(['mira', 'bren']),
+      ev(6, { t: 'roll_made', kind: 'ability_check', d20: 12, collapsed: 'straight', sources: ['bren'], modifiers: [], total: 14, outcome: 'success', entry: 'server' }),
+    ], {}, 'mira');
+    expect(still, 'Mira still owes her own roll').toHaveLength(1);
+  });
+
+  it('tells the whole table what was asked', () => {
+    const [line] = logFrom([asked(['mira'])], { mira: 'Mira' });
+    expect(line!.actor).toBe('The DM asks');
+    expect(line!.text).toBe('Mira to roll Animal Handling — The horse is spooked.');
+  });
+});
+
+describe('what players want to do', () => {
+  const described = (seq: number, creatureId: string, text: string) =>
+    ({ seq, id: `e${String(seq)}`, at, actor: { kind: 'player', creatureId }, visibility: 'public',
+       body: { t: 'narration', text, from: 'engine' } } as PlayEvent);
+
+  /**
+   * Law 2's escape hatch only works if somebody is on the other side of it.
+   * A described action is a QUESTION, and this is what queues it for an answer.
+   */
+  it('queues a described action for the DM', () => {
+    const open = rulingsFrom([described(3, 'mira', 'I move my clones in a circle and heal')], { mira: 'Mira' });
+    expect(open).toHaveLength(1);
+    expect(open[0]!.who).toBe('Mira');
+    expect(open[0]!.text).toBe('I move my clones in a circle and heal');
+  });
+
+  it('stops waiting once the DM has answered it', () => {
+    const open = rulingsFrom([
+      described(3, 'mira', 'I climb the wall'),
+      ev(4, { t: 'ruled', onSeq: 3, verdict: 'allow' }),
+    ], { mira: 'Mira' });
+    expect(open).toHaveLength(0);
+  });
+
+  /** A DM narrating is talking to the table, not asking their own permission. */
+  it('never queues the DM’s own narration', () => {
+    const open = rulingsFrom([ev(3, { t: 'narration', text: 'The door gives.', from: 'dm' })]);
+    expect(open).toHaveLength(0);
+  });
+
+  it('answers in the order people asked', () => {
+    const open = rulingsFrom([
+      described(9, 'bren', 'second'),
+      described(3, 'mira', 'first'),
+    ], { mira: 'Mira', bren: 'Bren' });
+    expect(open.map((r) => r.text)).toEqual(['first', 'second']);
+  });
+
+  it('puts the ruling in the log, because the log is the play record', () => {
+    const [line] = logFrom([ev(4, { t: 'ruled', onSeq: 3, verdict: 'refuse', note: 'The door is iron.' })]);
+    expect(line!.text).toBe('says not this time. The door is iron.');
   });
 });

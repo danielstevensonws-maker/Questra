@@ -25,6 +25,12 @@ export function promptsFrom(
   events: readonly PlayEvent[],
   /** Creature id → name, so a prompt names people rather than ids. */
   names: Record<string, string> = {},
+  /**
+   * The character this viewer plays. A check asked of the whole party should
+   * only be TAPPABLE by the person whose roll it is — everyone else watches it
+   * happen in the journal, which is what a table does.
+   */
+  myCreatureId: string | null = null,
 ): PromptVM[] {
   const open = new Map<string, PromptVM>();
   const who = (id: string): string => names[id] ?? id;
@@ -35,7 +41,46 @@ export function promptsFrom(
       promptId?: string;
       context?: Record<string, unknown>;
       timeoutSec?: number;
+      askId?: string;
+      skill?: string;
+      creatureIds?: string[];
+      dc?: number;
+      reason?: string;
+      kind?: string;
+      sources?: string[];
     };
+
+    /**
+     * A check the DM asked for becomes a card on the screens of the people who
+     * owe the roll, and a line in everyone else's journal. Same event, two
+     * readings — which is exactly how it works at a table.
+     */
+    if (body.t === 'check_asked' && body.askId && body.skill) {
+      const mine = myCreatureId !== null && (body.creatureIds ?? []).includes(myCreatureId);
+      if (mine) {
+        open.set(body.askId, {
+          promptId: body.askId,
+          kind: 'Roll it',
+          context: body.reason
+            ? `${body.reason} — roll ${skillName(body.skill)}.`
+            : `Roll ${skillName(body.skill)}.`,
+          options: [{ name: `Roll ${skillName(body.skill)}` }],
+          /* No countdown on a check. A reaction interrupts a fight and has to
+             resolve; a check waits for the player, and a clock on it would
+             rush somebody who is deciding how to describe what they do. */
+          timeoutSec: 0,
+        });
+      }
+    }
+
+    /* Rolling it closes the card — for the person who rolled, and nobody else. */
+    if (body.t === 'roll_made' && body.kind === 'ability_check') {
+      const roller = body.sources?.[0];
+      if (roller !== undefined && roller === myCreatureId) {
+        for (const [id, p] of open) if (p.kind === 'Roll it') open.delete(id);
+      }
+    }
+    if (body.t === 'check_closed' && body.askId) open.delete(body.askId);
 
     if (body.t === 'reaction_prompted' && body.promptId && body.context) {
       open.set(body.promptId, {
@@ -56,6 +101,11 @@ export function promptsFrom(
   }
 
   return [...open.values()];
+}
+
+/** Skill ids read as words a person says: animal_handling → Animal Handling. */
+export function skillName(skill: string): string {
+  return skill.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 /** The six kinds, named as a DM would say them out loud. */

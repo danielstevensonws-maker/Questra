@@ -328,6 +328,8 @@ export function logFrom(
       order?: { creatureId: string; total: number }[];
       /* roll_made names its creature here rather than in a creatureId field. */
       sources?: string[];
+      creatureIds?: string[]; skill?: string; reason?: string;
+      verdict?: string; note?: string; name?: string;
     };
 
     switch (body.t) {
@@ -400,6 +402,59 @@ export function logFrom(
             text: `${who(body.activeCreatureId)} is up.`,
           });
         }
+        break;
+
+      /**
+       * The ask, heard by the whole table. This is what makes a check feel
+       * like a table rather than a form: everyone sees "Wren asks Mira for
+       * Perception" and then watches the roll land.
+       */
+      case 'check_asked': {
+        const asked = (body.creatureIds ?? []).map(who);
+        const names = asked.length === 0
+          ? 'everyone'
+          : asked.length === 1 ? asked[0]! : `${asked.slice(0, -1).join(', ')} and ${asked[asked.length - 1]!}`;
+        lines.push({
+          id: String(e.seq),
+          tone: 'system',
+          actor: 'The DM asks',
+          text: `${names} to roll ${skillWords(body.skill)}${body.reason ? ` — ${body.reason}` : ''}.`,
+        });
+        break;
+      }
+
+      /**
+       * The answer to something a player described. It belongs in the log
+       * because the log IS the play record — reading back later, a table wants
+       * to see what was attempted and what was allowed.
+       */
+      case 'ruled':
+        lines.push({
+          id: String(e.seq),
+          tone: 'system',
+          actor: 'The DM',
+          text: body.verdict === 'allow'
+            ? `says yes.${body.note ? ` ${body.note}` : ''}`
+            : `says not this time.${body.note ? ` ${body.note}` : ''}`,
+        });
+        break;
+
+      case 'creature_added':
+        lines.push({
+          id: String(e.seq),
+          tone: 'system',
+          actor: 'The table',
+          text: `${body.name ?? 'Something'} appears.`,
+        });
+        break;
+
+      case 'creature_removed':
+        lines.push({
+          id: String(e.seq),
+          tone: 'system',
+          actor: 'The table',
+          text: `${who(body.creatureId)} is gone.`,
+        });
         break;
 
       case 'initiative_rolled':
@@ -496,6 +551,12 @@ function dyingOf(me: Combatant | undefined, events: readonly PlayEvent[]): Pick<
   if (!me) return {};
   const d = dyingFrom(events, me.id, me.hp);
   return d ? { dying: d } : {};
+}
+
+/** animal_handling → Animal Handling, so the log reads as speech. */
+function skillWords(skill: string | undefined): string {
+  if (!skill) return 'something';
+  return skill.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 /** Roll kinds in words a first-timer reads without a glossary. */

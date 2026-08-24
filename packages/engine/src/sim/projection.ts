@@ -90,11 +90,57 @@ function apply(state: ProjectionState, event: PlayEvent): void {
       state.order = [...b.order]
         .sort((x, y) => y.total - x.total)
         .map((e) => e.creatureId);
+      /**
+       * AN EMPTY ORDER ENDS THE FIGHT, and that has to release the turn too.
+       *
+       * Clearing the order while leaving activeCreatureId pointing at whoever
+       * was last up left the table permanently mid-combat: every screen asks
+       * "is anybody's turn happening?" to decide whether we are fighting, so
+       * the DM's "Roll for initiative" never came back after the first fight
+       * (owner, 2026-08-25 — "it only appeared for the first time").
+       */
+      if (state.order.length === 0) delete state.activeCreatureId;
       break;
     }
     case 'turn_advanced': {
       state.round = b.round;
       state.activeCreatureId = b.activeCreatureId;
+      break;
+    }
+
+    /**
+     * A creature the DM put on the board. Folded rather than seated at session
+     * start, because monsters arrive mid-session — that is what an encounter
+     * IS — and a base that could only be set once would never see them.
+     */
+    case 'creature_added': {
+      state.combatants[b.creatureId] = {
+        id: b.creatureId,
+        name: b.name,
+        /* A monster's own scores are the compendium's; these are the SRD's
+           "average" defaults, used only when the DM invents something. The
+           add_creature intent supplies real ones when it has them. */
+        abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+        profBonus: 2,
+        maxHp: b.maxHp,
+        hp: b.maxHp,
+        tempHp: 0,
+        ac: b.ac,
+        conditions: [],
+        /* Not a player character: this is what makes the 0-HP branch kill it
+           outright rather than knocking it unconscious, and what makes a
+           player's screen show it as a word rather than a number. */
+        isPlayer: false,
+      };
+      break;
+    }
+
+    case 'creature_removed': {
+      delete state.combatants[b.creatureId];
+      /* Also out of the turn order, or the fight hands a turn to somebody who
+         is no longer on the board. */
+      if (state.order) state.order = state.order.filter((id) => id !== b.creatureId);
+      if (state.activeCreatureId === b.creatureId) delete state.activeCreatureId;
       break;
     }
     default:

@@ -50,7 +50,11 @@ export function PromptDock({ prompts, onAnswer }: PromptDockProps): ReactElement
     <div className="qa2-panel qa-prompt" role="alertdialog" aria-label={active.kind}>
       <header className="qa-prompt-head">
         <span className="qa-prompt-kind">{active.kind}</span>
-        <Countdown key={active.promptId} seconds={active.timeoutSec} />
+        {/* No clock on a card that is not interrupting anything. A reaction
+            pauses a fight and must resolve; a check waits for the player, and
+            a countdown would rush somebody deciding how to describe what they
+            do — the opposite of what this product is for. */}
+        {active.timeoutSec > 0 && <Countdown key={active.promptId} seconds={active.timeoutSec} />}
       </header>
 
       <p className="qa-prompt-context">{active.context}</p>
