@@ -662,6 +662,12 @@ export interface SpineEntryVM {
   hurt?: Hurt;
   /** an overriding state worth saying out loud: Dying, Stable, Away. */
   status?: string;
+  /**
+   * Armour class. Present on a DM's roster and absent on a player's spine: it
+   * is the number every attack in the room is measured against, which makes it
+   * the one a DM reads most and one a player has not earned about an enemy.
+   */
+  ac?: number;
   acted: boolean;
   acting: boolean;
 }

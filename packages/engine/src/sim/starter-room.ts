@@ -81,9 +81,16 @@ export function starterRoom({ roomId, creatureIds }: StarterRoomInput): Room {
 
   return {
     id: roomId,
-    /* No terrain art yet — the renderer draws its own grid when there is no
-       image, which is what the play screen already does for the shell. */
-    terrainImageRef: '',
+    /**
+     * The steading the party starts at.
+     *
+     * A bare id rather than a path: the renderer resolves it under /maps, so a
+     * DM can drop a different picture in without a rebuild. The grid is 20×14
+     * (1.43:1) and the art is close enough to that ratio that stretching it to
+     * the grid is imperceptible — which matters, because the GRID is the
+     * coordinate system and distances are measured in cells, not pixels.
+     */
+    terrainImageRef: 'steading.png',
     gridSize: grid,
     /* No difficult terrain and no darkness: an empty room has no features to
        tag, and inventing some would be inventing a dungeon. */

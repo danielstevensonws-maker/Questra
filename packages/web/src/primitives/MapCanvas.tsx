@@ -110,6 +110,17 @@ export function MapCanvas({
 
   // Range numbers and the table badge are chrome for the people running the
   // game; the spectator view stays clean.
+  /**
+   * Where the terrain art lives. A bare id becomes a file under /maps so a DM
+   * can drop a picture in without a build step; anything already looking like a
+   * path or a URL is used as it stands.
+   */
+  const terrainUrl = room.terrainImageRef
+    ? (/^(https?:|\/|data:)/.test(room.terrainImageRef)
+        ? room.terrainImageRef
+        : `/maps/${room.terrainImageRef}`)
+    : null;
+
   const chrome = mode !== 'table';
   const filling = fit === 'fill';
 
@@ -119,11 +130,30 @@ export function MapCanvas({
       style={{
         aspectRatio: `${w} / ${h}`,
         ...(filling ? { width: `min(100%, calc(100vh * ${w / h}))` } : { maxWidth: w * cellPx }),
+        /**
+         * THE TERRAIN ART, UNDER THE GRID.
+         *
+         * `terrainImageRef` has been in the room schema from the beginning and
+         * nothing ever drew it, so every table played on bare grid lines over a
+         * dark ground — which is why the game looked unfinished no matter what
+         * was built on top of it (owner, 2026-08-25: "the game looks plain
+         * without a map involved").
+         *
+         * The image is stretched to the grid deliberately: the grid IS the
+         * coordinate system, five feet a square, and `distFt` assumes square
+         * cells. A map drawn for a different aspect gets distorted rather than
+         * silently breaking every distance on the board.
+         */
         backgroundImage: [
           'linear-gradient(to right, transparent calc(100% - var(--qa-hairline)), var(--qa-map-grid) calc(100% - var(--qa-hairline)))',
           'linear-gradient(to bottom, transparent calc(100% - var(--qa-hairline)), var(--qa-map-grid) calc(100% - var(--qa-hairline)))',
+          ...(terrainUrl ? [`url("${terrainUrl}")`] : []),
         ].join(', '),
-        backgroundSize: `${cellPctX}% ${cellPctY}%, ${cellPctX}% ${cellPctY}%`,
+        backgroundSize: [
+          `${cellPctX}% ${cellPctY}%`,
+          `${cellPctX}% ${cellPctY}%`,
+          ...(terrainUrl ? ['100% 100%'] : []),
+        ].join(', '),
       }}
     >
       {/* cell states: fog, AoE, difficult terrain, and the measure rings */}

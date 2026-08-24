@@ -5,26 +5,25 @@
  * do?" — one character, deep. A DM's answers "what is going on, and what needs
  * me?" — every character, shallow, plus the things only they know.
  *
- * THREE ZONES, AND NOTHING FLOATS OVER THE MAP:
+ * FOUR SURFACES, EACH WHERE IT BELONGS:
  *
- *   the desk (left rail)  — every control, four decks, always in the same place
- *   the map (centre)      — never covered; it is what everyone is looking at
- *   the journal (right)   — the record, and the composer you speak from
+ *   what only you know   top-left, quiet — the private verbs
+ *   the roster           bottom-left, the player's own card language
+ *   the console          bottom-centre, tabs over the thing they control
+ *   the journal          the full right edge, collapsible to a spine
  *
- * The version this replaces had nine glass panels of equal weight, several of
- * which opened on top of the map. Nothing said where to look, and every control
- * was named for a NOUN rather than the act it performs (owner, 2026-08-25: "the
- * design feels flat and not engaging"). The desk is the fix: one home for the
- * eye, a verb on every button, and the map left alone.
+ * WHAT WENT WRONG BEFORE. The first pass was a left rail of full-width slabs
+ * in one flat caps voice, and a journal in a small floating box. It shared no
+ * vocabulary with the player's screen and had no hierarchy — everything was
+ * the same size and the same weight, so nothing had rank (owner, 2026-08-25).
  *
- * THE ACCENT MEANS NEEDS YOU. On a player's screen --qa-accent means YOU. A DM
- * has no token, so here it marks the thing waiting on a decision — a turn, a
- * prompt, a player who has described something. Reserving it that strictly is
- * what keeps a screen carrying everybody's information from reading as a wall.
+ * The fix was to stop inventing a second design language and match the one the
+ * player's screen already speaks: cards with a chip, a name in the story face,
+ * a mono line, and a bar. Three levels of contrast and no more.
  *
- * GOLD MEANS YOUR VOICE, and appears nowhere else. Pick somebody from the cast
- * deck and the composer turns gold, sets itself in the story face, and what
- * lands in the journal is the goblin speaking rather than the DM narrating.
+ * THE ACCENT IS RATIONED. Terracotta marks whoever the table is waiting for.
+ * --qa-danger carries hurt. Gold is the DM's own voice and appears only on a
+ * chosen NPC and the composer they speak from.
  *
  * The DM receives the WHOLE room — unrevealed cells, hidden creatures, the lot
  * — because filterRoomForViewer passes their payload through untouched. That
@@ -41,6 +40,7 @@ import { AskForCheck } from './AskForCheck.js';
 import { AddCreature } from './AddCreature.js';
 import { RulingDock } from './RulingDock.js';
 import { DirectorDesk } from './DirectorDesk.js';
+import { Console } from './Console.js';
 import type { EffectId } from './ImmersionConsole.js';
 import type { RulingRequestVM } from './rulingsFrom.js';
 import type { PlayView } from './projectionToView.js';
@@ -75,7 +75,6 @@ export interface DmScreenProps {
   onAddCreature: (c: { name: string; maxHp: number; ac: number; monsterId?: string }) => void;
   onRemoveCreature: (creatureId: string) => void;
   onEffect: (effect: EffectId) => void;
-  /** Moving somebody around the board by hand. */
   onMove: (tokenId: string, path: Cell[]) => void;
 }
 
@@ -88,22 +87,21 @@ export function DmScreen(props: DmScreenProps): ReactElement {
 
   const [line, setLine] = useState('');
   const [spotlit, setSpotlit] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [whisperOpen, setWhisperOpen] = useState(false);
   const [whisperTo, setWhisperTo] = useState('');
   const [whisperText, setWhisperText] = useState('');
   const [rulesOpen, setRulesOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
-  /* Who the DM is performing as. Null is the DM narrating as themselves. */
+  /* The journal starts open: it is the play record, and a DM reads it
+     constantly. Closing it is the deliberate act. */
+  const [railOpen, setRailOpen] = useState(true);
   const [voice, setVoice] = useState<{ creatureId?: string; name: string } | null>(null);
-  /* Moving a token by hand: tap somebody, then tap where they go. */
   const [moving, setMoving] = useState<{ tokenId: string; from: Cell } | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   const exploring = view.turn.exploring;
 
-  /* The newest line is the one you need. A journal that must be scrolled to be
-     current is a journal nobody reads mid-sentence. */
   useEffect(() => {
     const el = logRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -124,6 +122,7 @@ export function DmScreen(props: DmScreenProps): ReactElement {
     if (!text || !whisperTo) return;
     onWhisper(whisperTo, text);
     setWhisperText('');
+    setWhisperOpen(false);
   };
 
   /** Who each token is, to the DM: everybody by name, foes marked as foes. */
@@ -132,12 +131,15 @@ export function DmScreen(props: DmScreenProps): ReactElement {
     present[c.id] = {
       name: c.name,
       side: c.kind === 'foe' ? 'foe' : 'ally',
+      acting: c.acting,
       ...(c.status ? { tag: c.status } : c.hurt ? { tag: c.hurt } : {}),
     };
   }
 
+  const waiting = prompts.length + rulings.length;
+
   return (
-    <div className="qa2-screen qa-dm qa-dm-desked">
+    <div className="qa2-screen qa-dm">
       <ScreenStyles />
       <MapCanvas
         room={room}
@@ -161,29 +163,8 @@ export function DmScreen(props: DmScreenProps): ReactElement {
 
       {moving && <p className="qa-map-hint">Tap a square to move them there</p>}
 
-      {/* Everything the DM presses, in one place that never covers the map. */}
-      <DirectorDesk
-        cast={view.cast}
-        seats={seats}
-        exploring={exploring}
-        round={view.scene.round}
-        speakingAs={voice}
-        onSpeakAs={setVoice}
-        spotlit={spotlit}
-        onSpotlight={setSpotlit}
-        onEffect={onEffect}
-        onStartCombat={onStartCombat}
-        onEndCombat={onEndCombat}
-        onAdvanceTurn={onAdvanceTurn}
-        onRest={onRest}
-        onAddCreature={() => { setAddOpen(true); }}
-        onAskCheck={() => { setAskOpen(true); }}
-        onRules={() => { setRulesOpen(true); }}
-        onRemoveCreature={onRemoveCreature}
-      />
-
-      {/* The scene name, centred over the map the way it is on a player's
-          screen, so a DM glancing between two devices finds it in one place. */}
+      {/* The scene, centred over the map — the same anchor a player's screen
+          uses, so a DM glancing between two devices finds it in one place. */}
       <div className="qa2-panel qa2-scene">
         <span className="qa-dm-scene-name">{campaignName}</span>
         <span className="qa-dm-scene-state">
@@ -196,10 +177,37 @@ export function DmScreen(props: DmScreenProps): ReactElement {
         <button type="button" className="qa2-pill" onClick={onLeave}>Leave</button>
       </div>
 
+      <DirectorDesk
+        cast={view.cast}
+        seats={seats}
+        spotlit={spotlit}
+        onSpotlight={setSpotlit}
+        /* Override and undo are the engine's to implement (Brief 10 §3); until
+           they are, saying so beats a button that lies about working. */
+        onOverride={() => { onSay('(override is not wired yet)'); }}
+        onUndo={() => { onSay('(undo is not wired yet)'); }}
+        onSecretRoll={() => { setAskOpen(true); }}
+        onWhisper={() => { setWhisperOpen(true); }}
+      />
+
+      <Console
+        cast={view.cast}
+        exploring={exploring}
+        voice={voice}
+        onVoice={setVoice}
+        onEffect={onEffect}
+        onStartCombat={onStartCombat}
+        onEndCombat={onEndCombat}
+        onAdvanceTurn={onAdvanceTurn}
+        onRest={onRest}
+        onAddCreature={() => { setAddOpen(true); }}
+        onRemoveCreature={onRemoveCreature}
+        onAskCheck={() => { setAskOpen(true); }}
+        onRules={() => { setRulesOpen(true); }}
+      />
+
       <PromptDock prompts={prompts} onAnswer={onAnswerPrompt} />
 
-      {/* What a player described and is waiting to hear about. Law 2's escape
-          hatch only works if somebody is on the other side of it. */}
       <RulingDock
         requests={rulings}
         onRule={onRule}
@@ -210,85 +218,111 @@ export function DmScreen(props: DmScreenProps): ReactElement {
         creatureIdFor={(r) => view.cast.find((c) => c.name === r.who)?.id ?? null}
       />
 
-      {/* ---- Assistant · Journal: the record, and where you speak from ---- */}
-      <section className="qa2-panel qa-dm-journal" aria-label="Assistant and journal">
-        <header className="qa-dm-head">
-          <span className="qa-dm-kicker">Assistant · Journal</span>
+      {/* ---- the journal: the full right edge, collapsible ---------------- */}
+      <aside className={'qa-rail' + (railOpen ? '' : ' is-shut')} aria-label="Assistant and journal">
+        {railOpen ? (
+          <>
+            <header className="qa-rail-head">
+              <span className="qa-rail-title">Assistant · Journal</span>
+              <button
+                type="button"
+                className="qa-rail-toggle"
+                aria-expanded
+                aria-label="Close the journal"
+                onClick={() => { setRailOpen(false); }}
+              >
+                →
+              </button>
+            </header>
+
+            <div className="qa-rail-body">
+              <div className="qa-dm-log" ref={logRef}>
+                {view.entries.length === 0 ? (
+                  <p className="qa-dm-empty">
+                    Rolls, narration and anything anyone says gather here. Start by telling
+                    them what they can see.
+                  </p>
+                ) : (
+                  view.entries.map((e) => (
+                    <p key={e.id} className={`qa-dm-line is-${e.tone}`}>
+                      <span className="qa-dm-line-who">{e.actor}</span>
+                      {e.text}
+                    </p>
+                  ))
+                )}
+              </div>
+
+              {whisperOpen && (
+                <div className="qa-dm-drawer">
+                  <p className="qa-dm-drawer-note">Nobody else sees what you send from here.</p>
+                  <form className="qa-dm-whisper" onSubmit={(e) => { e.preventDefault(); whisper(); }}>
+                    <select
+                      className="qa-dm-select"
+                      aria-label="Who to whisper to"
+                      value={whisperTo}
+                      onChange={(e) => { setWhisperTo(e.target.value); }}
+                    >
+                      <option value="">Choose somebody…</option>
+                      {seats.map((s) => (
+                        <option key={s.accountId} value={s.accountId}>
+                          {s.displayName}{s.characterName ? ` (${s.characterName})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      className="qa-dm-input"
+                      value={whisperText}
+                      placeholder="Tell them something only they know"
+                      aria-label="Whisper"
+                      onChange={(e) => { setWhisperText(e.target.value); }}
+                    />
+                    <button
+                      type="submit"
+                      className="qa2-cta qa-dm-send"
+                      disabled={!whisperText.trim() || !whisperTo}
+                    >
+                      Whisper
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* One composer, and the chosen voice decides what it IS. */}
+              <form
+                className={'qa-dm-compose' + (voice ? ' is-voiced' : '')}
+                onSubmit={(e) => { e.preventDefault(); say(); }}
+              >
+                {voice && <span className="qa-dm-voicetag">As {voice.name}</span>}
+                <input
+                  className="qa-dm-input"
+                  value={line}
+                  placeholder={voice ? `What does ${voice.name} say?` : 'Prompt, roleplay, or ask the assistant'}
+                  aria-label={voice ? `Speak as ${voice.name}` : 'Prompt, roleplay, or ask the assistant'}
+                  onChange={(e) => { setLine(e.target.value); }}
+                />
+                <button type="submit" className="qa2-cta qa-dm-send" disabled={!line.trim()}>Say it</button>
+              </form>
+            </div>
+          </>
+        ) : (
+          /* Shut, it still reports what is waiting — closing the journal must
+             never mean losing track of a player who needs an answer. */
           <button
             type="button"
-            className="qa-dm-drawer-toggle"
-            aria-expanded={drawerOpen}
-            onClick={() => { setDrawerOpen(!drawerOpen); }}
+            className="qa-rail-spine"
+            aria-expanded={false}
+            aria-label="Open the journal"
+            onClick={() => { setRailOpen(true); }}
           >
-            {drawerOpen ? 'Close' : 'Only you'}
+            Assistant
+            {waiting > 0 && (
+              <span className="is-waiting">
+                {waiting === 1 ? '1 waiting' : `${String(waiting)} waiting`}
+              </span>
+            )}
           </button>
-        </header>
-
-        {drawerOpen && (
-          <div className="qa-dm-drawer">
-            <p className="qa-dm-drawer-note">Nobody else sees what you send from here.</p>
-            <form className="qa-dm-whisper" onSubmit={(e) => { e.preventDefault(); whisper(); }}>
-              <select
-                className="qa-dm-select"
-                aria-label="Who to whisper to"
-                value={whisperTo}
-                onChange={(e) => { setWhisperTo(e.target.value); }}
-              >
-                <option value="">Choose somebody…</option>
-                {seats.map((s) => (
-                  <option key={s.accountId} value={s.accountId}>
-                    {s.displayName}{s.characterName ? ` (${s.characterName})` : ''}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="qa-dm-input"
-                value={whisperText}
-                placeholder="Tell them something only they know"
-                aria-label="Whisper"
-                onChange={(e) => { setWhisperText(e.target.value); }}
-              />
-              <button type="submit" className="qa2-cta qa-dm-send" disabled={!whisperText.trim() || !whisperTo}>
-                Whisper
-              </button>
-            </form>
-          </div>
         )}
-
-        <div className="qa-dm-log" ref={logRef}>
-          {view.entries.length === 0 ? (
-            <p className="qa-dm-empty">
-              Rolls, narration and anything anyone says gather here. Start by telling
-              them what they can see.
-            </p>
-          ) : (
-            view.entries.map((e) => (
-              <p key={e.id} className={`qa-dm-line is-${e.tone}`}>
-                <span className="qa-dm-line-who">{e.actor}</span>
-                {e.text}
-              </p>
-            ))
-          )}
-        </div>
-
-        {/* One composer, three jobs (Brief 10 §4.1) — and now a fourth: the
-            voice chosen in the cast deck turns narration into performance
-            without moving the DM to a different field. */}
-        <form
-          className={'qa-dm-compose' + (voice ? ' is-voiced' : '')}
-          onSubmit={(e) => { e.preventDefault(); say(); }}
-        >
-          {voice && <span className="qa-dm-voicetag">As {voice.name}</span>}
-          <input
-            className="qa-dm-input"
-            value={line}
-            placeholder={voice ? `What does ${voice.name} say?` : 'Tell them what happens, or ask the assistant'}
-            aria-label={voice ? `Speak as ${voice.name}` : 'Tell them what happens, or ask the assistant'}
-            onChange={(e) => { setLine(e.target.value); }}
-          />
-          <button type="submit" className="qa2-cta qa-dm-send" disabled={!line.trim()}>Say it</button>
-        </form>
-      </section>
+      </aside>
 
       {askOpen && (
         <AskForCheck

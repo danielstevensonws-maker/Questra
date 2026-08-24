@@ -258,6 +258,8 @@ export function castFrom(
      keep whatever they were seated with when the session started, so a rebuilt
      character shows its old name there; the roster is re-read and is current. */
   names: Record<string, string> = {},
+  /** A DM's roster carries numbers a player's spine must not. */
+  forDm = false,
 ): SpineEntryVM[] {
   return Object.values(projection.combatants)
     .map((c): SpineEntryVM => {
@@ -273,6 +275,13 @@ export function castFrom(
         initiative: 0,
         name: names[c.id] ?? c.name,
         kind,
+        /**
+         * ARMOUR CLASS IS THE DM'S NUMBER. A player is owed a word for an
+         * enemy's health and nothing about their defences — finding out how
+         * hard something is to hit is what swinging at it is FOR. So this is
+         * present only when the viewer runs the game.
+         */
+        ...(forDm ? { ac: c.ac } : {}),
         /* Allies show real hit points; enemies show a word. */
         ...(c.isPlayer ? { hp: { current: c.hp, max: c.maxHp } } : { hurt: hurtOf(c) }),
         ...(down ? { status: c.isPlayer ? 'Dying' : 'Down' } : {}),
@@ -625,7 +634,7 @@ export function projectionToView(input: ViewInput): PlayView {
       elapsed: '',
     },
     hero: me && myCharacter ? heroFrom(me, myCharacter) : null,
-    cast: castFrom(projection, myCharacter?.id ?? null, rosterNames),
+    cast: castFrom(projection, myCharacter?.id ?? null, rosterNames, input.role === 'dm'),
     room,
     entries: logFrom(events, Object.fromEntries(Object.values(projection.combatants).map((c) => [c.id, rosterNames[c.id] ?? c.name]))),
     ...dyingOf(me, events),
