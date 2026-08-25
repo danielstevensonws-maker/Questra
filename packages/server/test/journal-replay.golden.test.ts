@@ -13,7 +13,7 @@
  * replayed event still passes eventVisibleTo.
  */
 import { describe, it, expect } from 'vitest';
-import type { PlayEvent, ServerMsg } from '@questra/contracts';
+import type { PlayEvent, ServerMsg, Visibility } from '@questra/contracts';
 import { SyncCore, type ResolvedToken } from '../src/sync-core.js';
 import { connectMemory } from '../src/transport.js';
 
@@ -24,8 +24,19 @@ const TOKENS: Record<string, ResolvedToken> = {
   'tok-mira': { accountId: 'acct-mira', role: 'player', playSessionId: PS },
 };
 
-/** A resolver that turns whatever it is handed into one narration event. */
-function narrationCore(visibility: 'public' | 'private' = 'public', to?: string) {
+/**
+ * A resolver that turns whatever it is handed into one narration event.
+ *
+ * THE EVENT IT BUILDS IS A REAL ONE. It used to assemble a shape the contracts
+ * do not define — `actor.kind: 'system'`, `visibility: 'private'`, a top-level
+ * `to` array — and cast the result to PlayEvent. The whisper test below then
+ * passed for the wrong reason: 'private' is not a visibility, so `eventVisibleTo`
+ * fell through to its whisper branch, read `.whisperTo` off a string, got
+ * undefined, and refused the event. It was asserting the right outcome without
+ * exercising the mechanism it names. A stub may be minimal; it may not be a
+ * shape the system cannot produce.
+ */
+function narrationCore(visibility: Visibility = 'public') {
   let n = 0;
   return new SyncCore({
     resolveToken: (token, playSessionId) => {
@@ -40,11 +51,10 @@ function narrationCore(visibility: 'public' | 'private' = 'public', to?: string)
         id: 'e-' + String(n),
         at: '2026-08-23T00:00:00.000Z',
         causeId: 'c-' + String(n),
-        actor: { kind: 'system' as const },
+        actor: { kind: 'engine' as const },
         visibility,
-        ...(to === undefined ? {} : { to: [to] }),
-        body: { t: 'narration' as const, text },
-      } as PlayEvent;
+        body: { t: 'narration' as const, text, from: 'engine' as const },
+      } satisfies PlayEvent;
       return { ok: true, events: [event] };
     },
   });
@@ -72,8 +82,9 @@ describe('joining a session already under way', () => {
   });
 
   it('replays nothing to somebody a whisper was not meant for', () => {
-    /* A private line addressed to the DM alone. */
-    const core = narrationCore('private', 'acct-dm');
+    /* A private line addressed to the DM alone — the real whisper visibility,
+       which is what puts this through the same filter live fan-out uses. */
+    const core = narrationCore({ whisperTo: 'acct-dm' });
 
     const dm = connectMemory(core);
     dm.send({ m: 'hello', playSessionId: PS, token: 'tok-dm' });

@@ -17,7 +17,7 @@ import type { Viewer } from '@questra/contracts';
 import { makeSliceResolver } from '../src/app.js';
 import { fold } from '@questra/engine';
 import type { Combatant, ProjectionState } from '@questra/engine';
-import type { PlayEvent } from '@questra/contracts';
+import type { EventBody, PlayEvent } from '@questra/contracts';
 
 const PLAYER: Viewer = { role: 'player', accountId: 'acct-mira' };
 
@@ -45,23 +45,39 @@ function rollOf(d20: number, s: ProjectionState) {
   try {
     return makeSliceResolver()(
       { idempotencyKey: 'k-death-1', intent: { kind: 'death_save', creatureId: 'mira' } },
-      s, PLAYER,
-    );
+      s, PLAYER, { playSessionId: 'ps_test' });
   } finally {
     Math.random = real;
   }
 }
 
-const bodies = (out: ReturnType<typeof rollOf>) =>
-  out.ok ? out.events.map((e) => e.body as { t: string; amount?: number }) : [];
+/**
+ * The bodies a roll produced, typed as the union the schema actually defines.
+ *
+ * It used to be projected onto a hand-written `{ t: string; amount?: number }`
+ * and then re-asserted field by field, which is how an assertion on `outcome`
+ * came to sit next to a `death_save_rolled` body whose field is called
+ * `result`. It reads the RIGHT event — the server announces every save as a
+ * `roll_made` first — but nothing in the types said so, and nothing could,
+ * because the projection had thrown the union away. Narrow by `t` instead.
+ */
+const bodies = (out: ReturnType<typeof rollOf>): EventBody[] =>
+  out.ok ? out.events.map((e) => e.body) : [];
+
+/** The roll the server announced, which is where a save's verdict is stated. */
+function announced(bs: EventBody[]): Extract<EventBody, { t: 'roll_made' }> {
+  const b = bs.find((x) => x.t === 'roll_made');
+  expect(b, 'the server announces every death save as a roll').toBeDefined();
+  return b as Extract<EventBody, { t: 'roll_made' }>;
+}
 
 describe('death saves follow the book', () => {
   /** SRD: "Roll 1d20. If the roll is 10 or higher, you succeed." */
   it('succeeds on a 10 and fails on a 9', () => {
     const ten = bodies(rollOf(10, state(dying())));
     const nine = bodies(rollOf(9, state(dying())));
-    expect((ten[0] as { outcome: string }).outcome).toBe('success');
-    expect((nine[0] as { outcome: string }).outcome).toBe('failure');
+    expect(announced(ten).outcome).toBe('success');
+    expect(announced(nine).outcome).toBe('failure');
   });
 
   /**
@@ -74,7 +90,7 @@ describe('death saves follow the book', () => {
     const out = bodies(rollOf(20, state(dying())));
     const healing = out.find((b) => b.t === 'healing_applied');
     expect(healing, 'a 20 must DO something, not just be labelled').toBeDefined();
-    expect(healing!.amount).toBe(1);
+    expect(healing?.t === 'healing_applied' ? healing.amount : 0).toBe(1);
   });
 
   /** SRD: "When you roll a 1 on the d20 … you suffer two failures." */

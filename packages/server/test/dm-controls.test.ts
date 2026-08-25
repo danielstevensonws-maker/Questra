@@ -35,7 +35,7 @@ const envelope = (intent: unknown) => ({ idempotencyKey: 'k-' + Math.random().to
 
 describe('the table controls belong to whoever runs the game', () => {
   it('refuses to let a player start the fight', () => {
-    const out = makeSliceResolver()(envelope({ kind: 'start_combat' }), state(), PLAYER);
+    const out = makeSliceResolver()(envelope({ kind: 'start_combat' }), state(), PLAYER, { playSessionId: 'ps_test' });
     expect(out.ok, 'a client can send any frame; the server decides').toBe(false);
     if (out.ok) return;
     /* The reason is shown to a person, so it has to read like one wrote it. */
@@ -44,11 +44,11 @@ describe('the table controls belong to whoever runs the game', () => {
 
   it('refuses to let a player skip a turn', () => {
     const s = state({ order: ['mira', 'goblin'], activeCreatureId: 'mira' });
-    expect(makeSliceResolver()(envelope({ kind: 'advance_turn' }), s, PLAYER).ok).toBe(false);
+    expect(makeSliceResolver()(envelope({ kind: 'advance_turn' }), s, PLAYER, { playSessionId: 'ps_test' }).ok).toBe(false);
   });
 
   it('lets the DM start the fight, and opens on somebody', () => {
-    const out = makeSliceResolver()(envelope({ kind: 'start_combat' }), state(), DM);
+    const out = makeSliceResolver()(envelope({ kind: 'start_combat' }), state(), DM, { playSessionId: 'ps_test' });
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     const turn = out.events.find((e) => e.body.t === 'turn_advanced')!.body as { round: number; activeCreatureId: string };
@@ -57,7 +57,7 @@ describe('the table controls belong to whoever runs the game', () => {
   });
 
   it('will not start a fight in an empty room', () => {
-    const out = makeSliceResolver()(envelope({ kind: 'start_combat' }), state({ combatants: {} }), DM);
+    const out = makeSliceResolver()(envelope({ kind: 'start_combat' }), state({ combatants: {} }), DM, { playSessionId: 'ps_test' });
     expect(out.ok).toBe(false);
     if (out.ok) return;
     expect(out.reason).toBe('There is nobody here to fight.');
@@ -65,7 +65,7 @@ describe('the table controls belong to whoever runs the game', () => {
 
   it('ends a fight by clearing the order, so exploring is one state not two', () => {
     const s = state({ order: ['mira', 'goblin'], activeCreatureId: 'mira' });
-    const out = makeSliceResolver()(envelope({ kind: 'end_combat' }), s, DM);
+    const out = makeSliceResolver()(envelope({ kind: 'end_combat' }), s, DM, { playSessionId: 'ps_test' });
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     const init = out.events.find((e) => e.body.t === 'initiative_rolled')!.body as { order: unknown[] };
@@ -73,7 +73,7 @@ describe('the table controls belong to whoever runs the game', () => {
   });
 
   it('will not end a fight nobody is in', () => {
-    expect(makeSliceResolver()(envelope({ kind: 'end_combat' }), state(), DM).ok).toBe(false);
+    expect(makeSliceResolver()(envelope({ kind: 'end_combat' }), state(), DM, { playSessionId: 'ps_test' }).ok).toBe(false);
   });
 });
 
@@ -82,8 +82,7 @@ describe('taking your turn', () => {
     const s = state({ order: ['mira', 'goblin'], activeCreatureId: 'goblin' });
     const out = makeSliceResolver()(
       envelope({ kind: 'attack', attackerId: 'mira', targetId: 'goblin', actionName: 'Longsword' }),
-      s, PLAYER,
-    );
+      s, PLAYER, { playSessionId: 'ps_test' });
     expect(out.ok).toBe(false);
     if (out.ok) return;
     expect(out.reason).toBe('It is not your turn.');
@@ -93,8 +92,7 @@ describe('taking your turn', () => {
     const s = state({ order: ['mira', 'goblin'], activeCreatureId: 'mira' });
     const out = makeSliceResolver()(
       envelope({ kind: 'attack', attackerId: 'mira', targetId: 'goblin', actionName: 'Longsword' }),
-      s, PLAYER,
-    );
+      s, PLAYER, { playSessionId: 'ps_test' });
     expect(out.ok).toBe(true);
   });
 
@@ -105,8 +103,7 @@ describe('taking your turn', () => {
   it('allows it while exploring, because that is how a fight starts', () => {
     const out = makeSliceResolver()(
       envelope({ kind: 'attack', attackerId: 'mira', targetId: 'goblin', actionName: 'Longsword' }),
-      state(), PLAYER,
-    );
+      state(), PLAYER, { playSessionId: 'ps_test' });
     expect(out.ok).toBe(true);
   });
 });
@@ -115,8 +112,7 @@ describe('whispering', () => {
   it('addresses the whisper through visibility, where the one filter reads it', () => {
     const out = makeSliceResolver()(
       envelope({ kind: 'whisper', toAccountId: 'acct-mira', text: 'The floor is a trap.' }),
-      state(), DM,
-    );
+      state(), DM, { playSessionId: 'ps_test' });
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     const e = out.events[0]!;

@@ -127,7 +127,12 @@ describe('the caster seam produces what the screen needs', () => {
 
   it('concentration reaches the hero view-model from the projection, not from the fixture text', () => {
     expect(toHero(miraSheet, mira, MIRA_IDENTITY).concentratingOn).toBe('Bless');
-    expect(toHero(miraSheet, { ...mira, concentratingOn: undefined }, MIRA_IDENTITY).concentratingOn).toBeUndefined();
+    /* NOT concentrating means the field is ABSENT, not present-and-undefined.
+       The engine's projection omits it; spreading `concentratingOn: undefined`
+       over the fixture builds a combatant the engine never emits, and under
+       exactOptionalPropertyTypes it is not even a legal Combatant. */
+    const { concentratingOn: _notHolding, ...idle } = mira;
+    expect(toHero(miraSheet, idle, MIRA_IDENTITY).concentratingOn).toBeUndefined();
   });
 
   /**

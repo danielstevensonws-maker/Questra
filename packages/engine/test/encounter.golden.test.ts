@@ -127,7 +127,7 @@ describe('going round', () => {
   });
 
   it('produces nothing when the fight is over', () => {
-    const s = state([], { order: [], activeCreatureId: undefined });
+    const s = state([], { order: [] });
     expect(advanceTurn(s, { seq: 1, id: 'e', at: opts.at, causeId: 'c' })).toEqual([]);
   });
 });

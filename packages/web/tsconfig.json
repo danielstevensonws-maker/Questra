@@ -14,5 +14,14 @@
     "skipLibCheck": true,
     "types": ["vite/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", ".storybook/**/*.ts", "*.ts"]
+  /* TESTS ARE SOURCE. The src tree was already covered because these tests sit
+     beside the code they test, but the root test/ directory was not — "*.ts"
+     matches root-level files only, so ten suites went unchecked. This config
+     never emits (noEmit is on for the whole package; vite does the building),
+     so widening it costs nothing but coverage. */
+  "include": [
+    "src/**/*.ts", "src/**/*.tsx",
+    "test/**/*.ts", "test/**/*.tsx",
+    ".storybook/**/*.ts", "*.ts"
+  ]
 }

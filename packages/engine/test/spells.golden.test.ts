@@ -58,7 +58,7 @@ describe('spell ingestion — the full SRD spell list', () => {
   });
 
   it('covers every spell level 0-9', () => {
-    const levels = new Set(spells.map((s) => s.meta.level));
+    const levels = new Set(spells.map((s) => Number(s.meta.level)));
     expect([...levels].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 

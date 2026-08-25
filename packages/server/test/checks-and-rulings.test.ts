@@ -34,7 +34,7 @@ const state = (over: Partial<ProjectionState> = {}): ProjectionState => ({
 });
 
 const envelope = (intent: unknown) => ({ idempotencyKey: 'k-' + Math.random().toString(36).slice(2, 12), intent });
-const resolve = (intent: unknown, actor: Viewer, s = state()) => makeSliceResolver()(envelope(intent), s, actor);
+const resolve = (intent: unknown, actor: Viewer, s = state()) => makeSliceResolver()(envelope(intent), s, actor, { playSessionId: 'ps_test' });
 
 describe('asking for a check', () => {
   it('is the DM\'s to ask, not a player\'s', () => {

@@ -166,7 +166,21 @@ export class InMemoryAuthRepo implements AuthRepo {
     const campaignId = this.joinTokens.get(tokenHash);
     return campaignId ? (this.campaigns.get(campaignId) ?? null) : null;
   }
-  async createPlaySession(id: string, campaignId: string): Promise<void> {
+  /**
+   * `createdAt` is accepted and not stored, and the parameter is written out
+   * rather than dropped.
+   *
+   * TypeScript lets a two-parameter function satisfy a three-parameter
+   * interface, so omitting it conformed — but every CALLER is then typed
+   * against the concrete class rather than the interface, and passing the third
+   * argument became an error at the call site. Nineteen test files were passing
+   * it happily because none of them were typechecked (see tsconfig.check.json).
+   *
+   * Nothing reads a play session's creation time out of this store; the
+   * Postgres one records it because the column exists. Naming the parameter is
+   * how the two stay substitutable.
+   */
+  async createPlaySession(id: string, campaignId: string, _createdAt: string): Promise<void> {
     this.sessions.set(id, campaignId);
   }
 
