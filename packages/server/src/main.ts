@@ -69,14 +69,31 @@ export async function start(opts: StartOptions): Promise<{ port: number; stop: (
       const parsed = ClientMsgSchema.safeParse(json);
       if (!parsed.success) return conn.send({ m: 'error', code: 'bad_message' });
 
-      /* A session seats its characters when it is first created, and creation
-         happens inside onMessage's hello path, which cannot await. So the
-         roster is loaded HERE — before the message is handed on — and cached
-         for the synchronous seam to read. Only hello needs it; every other
-         message goes straight through. */
+      /* TWO THINGS HAVE TO HAPPEN BEFORE A HELLO IS HANDLED, and both are async
+         while the seam that needs them is not.
+
+         The roster first: a session seats its characters when it is created,
+         and creation happens inside onMessage's hello path, which cannot await.
+         So it is loaded here and cached for the synchronous seam to read.
+
+         Then the DURABLE LOG. SyncCore.hydrate loads a session's events back out
+         of the store, and until 2026-08-25 nothing called it — the method
+         existed, its own comment said "the transport awaits this on the first
+         hello", and the transport did not. Only the durability test called it,
+         directly, so the test passed while the real server started every session
+         from an empty log: with Postgres wired, a DM could bring a monster in,
+         see it written to play_event, restart, and find the board empty.
+
+         Ordered, not parallel: hydrate creates the session if it does not exist,
+         and creating it reads the roster cache. Priming after that would seat
+         nobody. Both are best-effort — a table that cannot reach the store
+         should still open, empty, rather than refuse the connection. */
       if (parsed.data.m === 'hello') {
-        void primeRoster(parsed.data.playSessionId)
+        const { playSessionId } = parsed.data;
+        void primeRoster(playSessionId)
           .catch(() => { /* an unprimed session seats nobody; the next hello retries */ })
+          .then(() => opts.core.hydrate(playSessionId))
+          .catch((err: unknown) => { console.error('[questra] could not restore the log for', playSessionId, err); })
           .then(() => opts.core.onMessage(conn, parsed.data));
         return;
       }
@@ -85,8 +102,16 @@ export async function start(opts: StartOptions): Promise<{ port: number; stop: (
     socket.on('close', () => opts.core.onDisconnect(conn));
   });
 
-  const port = opts.port ?? 8787;
-  await app.listen({ port, host: '0.0.0.0' });
+  const requested = opts.port ?? 8787;
+  await app.listen({ port: requested, host: '0.0.0.0' });
+
+  /* The port it ACTUALLY got, not the one it was asked for. They differ for
+     exactly one input — 0, meaning "any free port" — and that is the input a
+     test needs, so returning the request made start() impossible to connect to
+     from a test and left main.ts with no coverage at all. */
+  const bound = app.server.address();
+  const port = typeof bound === 'object' && bound !== null ? bound.port : requested;
+
   return {
     port,
     stop: async () => {
