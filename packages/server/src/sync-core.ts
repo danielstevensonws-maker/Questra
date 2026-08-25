@@ -51,6 +51,19 @@ export type IntentResolver = (
    * on a client that can simply send the message anyway.
    */
   actor: Viewer,
+  /**
+   * WHICH TABLE. The projection carries combatants, turns and rounds and
+   * nothing else — so an intent whose answer depends on per-session data the
+   * projection does not hold has no way to find it. Placing an arriving
+   * creature is the first: it needs the MAP, to know which squares are already
+   * spoken for, and the map is stored per campaign rather than folded from the
+   * log.
+   *
+   * An id rather than the room itself, deliberately. This module stays engine-
+   * agnostic and knows nothing about geometry; it hands over the one fact it
+   * already owns and lets whoever wired the resolver decide what to look up.
+   */
+  context: { playSessionId: string },
 ) => { ok: true; events: PlayEvent[] } | { ok: false; reason: string };
 
 export interface SyncCoreOptions {
@@ -278,7 +291,7 @@ export class SyncCore {
     /* The viewer was established at hello and is the server's own record of
        who this connection is — not anything the client asserted in the frame. */
     const viewer = s.viewers.get(conn.connId)!.viewer;
-    const result = this.opts.resolveIntent(envelope, state, viewer);
+    const result = this.opts.resolveIntent(envelope, state, viewer, { playSessionId: sid });
     if (!result.ok) {
       conn.send({ m: 'intent_rejected', idempotencyKey: envelope.idempotencyKey, reason: result.reason });
       return;

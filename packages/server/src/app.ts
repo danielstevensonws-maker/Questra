@@ -12,7 +12,7 @@
  * every-intent engine resolver is the play-slice's job, not the dev-env's.
  */
 import {
-  RulesEntitySchema, type PlayEvent,
+  RulesEntitySchema, RoomSchema, type Cell, type PlayEvent, type Room,
 } from '@questra/contracts';
 import {
   buildRulesData, resolveAttack, CONDITIONS, type Combatant, type RulesData,
@@ -26,6 +26,7 @@ import {
   SKILL_ABILITY,
   deathSave,
 } from '@questra/engine';
+import { arrivalCell } from '@questra/engine';
 import { SyncCore, type IntentResolver, type ResolvedToken } from './sync-core.js';
 import { InMemoryEventStore, type EventStore } from './store/event-store.js';
 import { PostgresEventStore } from './store/postgres-event-store.js';
@@ -108,9 +109,34 @@ export function createApp(config: ServerConfig): App {
    */
   const seatedByCampaign = new Map<string, Combatant[]>();
 
+  /**
+   * The map each live session is playing on, cached for the resolver.
+   *
+   * SAME SEAM, SAME REASON as the roster above: placing an arriving creature
+   * needs to know which squares are taken, the room is stored per campaign, and
+   * the resolver is synchronous. So it is loaded here, on the same connect path
+   * that primes the roster, and read from the cache when an intent arrives.
+   *
+   * THE UNFILTERED ROOM, deliberately. This is the server choosing a square,
+   * not a payload going anywhere: it has to see hidden tokens, or it will place
+   * a goblin on top of the one the DM has already hidden there. Nothing from
+   * this cache is ever sent to a client — only the CELL it produces reaches the
+   * log, and that is a square, not a secret.
+   */
+  const roomBySession = new Map<string, Room>();
+
   const primeCampaignRoster = async (playSessionId: string): Promise<void> => {
     const campaignId = await repo.campaignIdForSession(playSessionId);
     if (!campaignId) return;
+
+    const storedRoom = await repo.currentRoom(campaignId);
+    if (storedRoom) {
+      const parsed = RoomSchema.safeParse(storedRoom.body);
+      /* A room that fails validation costs the table its placement heuristic,
+         not its session — the same trade the roster makes one line down. */
+      if (parsed.success) roomBySession.set(playSessionId, parsed.data);
+    }
+
     const characters = await repo.charactersOfCampaign(campaignId);
     const seated: Combatant[] = [];
     for (const row of characters) {
@@ -128,7 +154,7 @@ export function createApp(config: ServerConfig): App {
   // --- SyncCore with the REAL resolveToken (stub is dead) + the slice resolver ---
   const core = new SyncCore({
     resolveToken: makeResolveToken(repo, tokens),
-    resolveIntent: makeSliceResolver(),
+    resolveIntent: makeSliceResolver({ roomFor: (playSessionId) => roomBySession.get(playSessionId) ?? null }),
     store: eventStore,
     initialCombatants: (playSessionId) => seatedByCampaign.get(playSessionId) ?? [],
   });
@@ -168,7 +194,21 @@ export function createApp(config: ServerConfig): App {
  */
 /** Exported so its behaviour can be asserted directly — the alternative is
     driving a socket to observe a pure function. */
-export function makeSliceResolver(): IntentResolver {
+export interface SliceResolverDeps {
+  /**
+   * The map this table is playing on, or null if it has not been opened yet.
+   *
+   * SYNCHRONOUS BY NECESSITY, for exactly the reason `initialCombatants` is —
+   * the resolver runs inside the intent path and cannot await, so the room is
+   * loaded ahead of time by `primeCampaignRoster` and read from a cache here.
+   * A session whose room has not been primed places by the grid's own defaults,
+   * which is recoverable: the DM sees the creature land somewhere plain and can
+   * move it, rather than seeing nothing land at all.
+   */
+  roomFor?: (playSessionId: string) => Room | null;
+}
+
+export function makeSliceResolver(deps: SliceResolverDeps = {}): IntentResolver {
   const rules: RulesData = buildRulesData(CONDITIONS.map((c) => RulesEntitySchema.parse(c)));
   /**
    * Real dice. A fixed rng made every fight identical, which is fine for a
@@ -178,7 +218,36 @@ export function makeSliceResolver(): IntentResolver {
   const rng = () => Math.random();
   let n = 0;
 
-  return (envelope, state, actor) => {
+  /**
+   * Squares this resolver has handed out, per table, since it started.
+   *
+   * THE ROOM IT READS IS A SNAPSHOT taken when the connection said hello, and
+   * it never hears about the creatures placed on top of it — so without this,
+   * every monster of a pack lands on the square the first one took. The room
+   * knows what was there at load; this knows what has happened since; together
+   * they are the board.
+   *
+   * A removal gives its square back. A MOVE does not — a creature that walks
+   * away leaves its arrival square marked, so a later arrival steps one along
+   * rather than into a square that is genuinely empty. That is deliberately the
+   * conservative error: crowding the next monster one cell east is invisible at
+   * the table, and two creatures in one square is not.
+   */
+  const placedBySession = new Map<string, Map<string, Cell>>();
+
+  /**
+   * The context is defaulted rather than required HERE, while staying required
+   * on `IntentResolver` itself.
+   *
+   * SyncCore always passes it — that contract is the one that matters and it
+   * stays honest. But the resolver is also called directly by the golden suites
+   * with three arguments, and those files are outside this package's tsconfig
+   * `include`, so nothing would have told them: the first run after the
+   * parameter landed failed at RUNTIME on a session id that was undefined.
+   * An empty session id is not a lie either — it genuinely has no room primed,
+   * which is exactly the case the placement fallback below already handles.
+   */
+  return (envelope, state, actor, context = { playSessionId: '' }) => {
     const intent = envelope.intent as {
       kind?: string;
       attackerId?: string; targetId?: string; actionName?: string;
@@ -652,6 +721,18 @@ export function makeSliceResolver(): IntentResolver {
        * Putting a creature on the board. Without this the map is empty, every
        * attack row is dead, and a fight is the party rolling initiative
        * against nobody (owner, 2026-08-25).
+       *
+       * IT NOW SAYS WHERE, WHICH IS THE HALF THAT WAS MISSING. Until
+       * 2026-08-25 the cell was emitted only when the client had named one, and
+       * no client ever did — so every creature a DM brought in joined the turn
+       * order and stood nowhere. The map stayed empty through reloads and
+       * restarts, because there was never a square in the log to replay.
+       *
+       * The SERVER picks it, and that is not an implementation detail: choosing
+       * a square means knowing what is already on the board, and two clients
+       * with different ideas of the room would each pick confidently and
+       * disagree. Same division as a move — the server settles where, the
+       * clients draw it.
        */
       case 'add_creature': {
         if (!isDm) return dmOnly();
@@ -659,6 +740,20 @@ export function makeSliceResolver(): IntentResolver {
           return { ok: false, reason: 'A creature needs a name, hit points and an armour class.' };
         }
         n++;
+        const room = deps.roomFor?.(context.playSessionId) ?? null;
+        let placed = placedBySession.get(context.playSessionId);
+        if (!placed) {
+          placed = new Map<string, Cell>();
+          placedBySession.set(context.playSessionId, placed);
+        }
+        /* No room primed yet ⇒ place by the grid's own defaults rather than
+           refuse. A creature standing somewhere plain can be moved; a creature
+           that never arrived cannot. */
+        const cell = room
+          ? arrivalCell(room, { preferred: intent.cell, taken: [...placed.values()] })
+          : intent.cell ?? { x: 0, y: 0 };
+        const creatureId = `foe-${String(Date.now())}-${String(n)}`;
+        placed.set(creatureId, cell);
         return {
           ok: true,
           events: [{
@@ -668,11 +763,11 @@ export function makeSliceResolver(): IntentResolver {
             visibility: 'public',
             body: {
               t: 'creature_added',
-              creatureId: `foe-${String(Date.now())}-${String(n)}`,
+              creatureId,
               name: intent.name,
               maxHp: intent.maxHp,
               ac: intent.ac,
-              ...(intent.cell === undefined ? {} : { cell: intent.cell }),
+              cell,
               ...(intent.monsterId === undefined ? {} : { monsterId: intent.monsterId }),
             },
           }] as PlayEvent[],
@@ -685,6 +780,8 @@ export function makeSliceResolver(): IntentResolver {
           return { ok: false, reason: 'That creature is not on the board.' };
         }
         n++;
+        /* The square goes back into circulation — see placedBySession. */
+        placedBySession.get(context.playSessionId)?.delete(intent.creatureId);
         return {
           ok: true,
           events: [{

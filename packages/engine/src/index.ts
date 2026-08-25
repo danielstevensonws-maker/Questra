@@ -33,6 +33,7 @@ export * from './sim/cascade.js';
 export * from './sim/sheet.js';
 export * from './sim/combatant-from-character.js';
 export * from './sim/starter-room.js';
+export * from './sim/placement.js';
 export * from './sim/narration.js';
 export * from './sim/duration.js';
 export * from './sim/dying.js';
