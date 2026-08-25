@@ -59,6 +59,16 @@ const HUD_FILES = [
   'primitives/v2/RoundSpine.tsx',
   'primitives/v2/SceneRail.tsx',
   'primitives/v2/ScreenStyles.tsx',
+  // the DM screen, rebuilt on the same language rather than beside it. It was
+  // OUTSIDE this list until 2026-08-25, which is the whole reason it drifted:
+  // its CSS lived inside ScreenStyles (scanned) while its components did not,
+  // so a hardcoded size in a component was invisible and a design-layer button
+  // reset silently overrode every control's type for weeks with nothing failing.
+  'play/DirectorBar.tsx',
+  'play/DmScreen.tsx',
+  'play/AskForCheck.tsx',
+  'play/RulingDock.tsx',
+  'play/PromptDock.tsx',
   // the primitives, now built from the same language as the play screen
   'primitives/AcceptTweakRejectCard.tsx',
   'primitives/CardSequencer.tsx',

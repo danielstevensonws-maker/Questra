@@ -31,12 +31,14 @@ import { PromptDock, type PromptVM } from './PromptDock.js';
 import type { EffectId } from './ImmersionConsole.js';
 import { EffectLayer } from './EffectLayer.js';
 import { Compendium } from './Compendium.js';
+import { Eyebrow, Glyph } from '../design/index.js';
 import { ShellStyles } from '../shell/ShellStyles.js';
 import { Road } from '../shell/road/Road.js';
 import { usePrefersReducedMotion } from '../shell/shared.js';
 import type { SessionApi } from '../shell/session.js';
 import { useSync } from './useSync.js';
 import { projectionToView, type MyCharacter, type Projection } from './projectionToView.js';
+import { castWithArrivals } from './castWithArrivals.js';
 
 export interface PlayRouteProps {
   campaignId: string;
@@ -199,7 +201,11 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
     /* The snapshot is the engine's projection, opaque to contracts — the sync
        client deliberately does not fold it, so this is where it becomes a
        shape the screen understands. */
-    const projection = (sync.snapshot ?? { combatants: {}, round: 1, nextSeq: 0 }) as Projection;
+    const snapshot = (sync.snapshot ?? { combatants: {}, round: 1, nextSeq: 0 }) as Projection;
+    /* Plus everybody who has arrived since the snapshot was taken. The snapshot
+       comes once at hello and creature_added streams past afterwards, exactly
+       as token_moved does for the room — see castWithArrivals. */
+    const projection = castWithArrivals(snapshot, sync.events);
     return projectionToView({
       projection,
       room: liveRoom,
@@ -282,6 +288,8 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
           }))}
         prompts={prompts}
         onLeave={onLeave}
+        notice={sync.error}
+        onDismissNotice={sync.clearError}
         onSay={(text) => {
           /* Straight onto the shared log, where every connected player sees it.
              The DM narrating and a player describing an action take the SAME
@@ -302,10 +310,35 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
         effect={effect}
         fetchJson={fetchJson}
         rulings={rulings}
-        onAskCheck={({ skill, creatureIds, secret }) => {
-          send({ kind: 'ask_for_check', skill: skill as never, creatureIds, secret });
+        onAskCheck={({ skill, creatureIds, secret, dc, reason }) => {
+          /* dc and reason have been in the intent schema since the beginning
+             and had no control on the screen, so every ask went out bare. Both
+             are still optional: deciding a number before hearing what somebody
+             is trying is the habit this product exists to break. */
+          send({
+            kind: 'ask_for_check',
+            skill: skill as never,
+            creatureIds,
+            secret,
+            ...(dc !== undefined ? { dc } : {}),
+            ...(reason !== undefined ? { reason } : {}),
+          });
         }}
-        onRule={(onSeq, verdict) => { send({ kind: 'rule_on', onSeq, verdict }); }}
+        onRule={(onSeq, verdict, note) => {
+          send(note === undefined
+            ? { kind: 'rule_on', onSeq, verdict }
+            : { kind: 'rule_on', onSeq, verdict, note });
+        }}
+        /* The link for a screen in the middle of the table. It was mintable
+           only from the lobby, which meant a DM who decided mid-session to put
+           the map on the television had to leave the table to do it. Asking
+           again mints a fresh one and revokes every prior link, which is how a
+           display gets cut off when a session moves house. */
+        onTableScreenLink={() =>
+          session
+            .authedRequest<{ token: string }>(`/campaigns/${campaignId}/table-display-token`, { method: 'POST' })
+            .then(({ token }) => `${window.location.origin}/display/${table.playSessionId}?t=${token}`)
+        }
         onSpeakAs={(as, text) => {
           send(as.creatureId === undefined
             ? { kind: 'speak_as', name: as.name, text }
@@ -452,7 +485,28 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
           if (action === 'help') setRulesOpen(true);
         }}
       />
-      {rulesOpen && <Compendium fetchJson={fetchJson} onClose={() => { setRulesOpen(false); }} />}
+      {/**
+       * THE PLAYER GETS THE COMPENDIUM AS AN OVERLAY, because they have nowhere
+       * else to put it — the DM's screen has a workbench in the left rail and
+       * this one does not. Compendium itself is content with no frame, so the
+       * caller decides: a panel on the bench there, a sheet over the map here.
+       * Same split the design layer keeps everywhere — chrome is shared,
+       * placement belongs to whoever is composing the screen.
+       */}
+      {rulesOpen && (
+        <div className="qa2-over">
+          <div className="qa2-scrim" onClick={() => { setRulesOpen(false); }} aria-hidden="true" />
+          <div className="qa2-panel qa2-rulesheet" role="dialog" aria-label="Rules">
+            <div className="qa2-bench-head">
+              <Eyebrow>Rules</Eyebrow>
+              <button type="button" className="qa2-ctl" onClick={() => { setRulesOpen(false); }} aria-label="Close">
+                <Glyph name="close" size={13} />
+              </button>
+            </div>
+            <Compendium fetchJson={fetchJson} />
+          </div>
+        </div>
+      )}
       {/* A player answers their own reactions — an opportunity attack is theirs
           to take or let pass, and the card queues where they are looking. */}
       <PromptDock

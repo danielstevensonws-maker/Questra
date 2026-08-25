@@ -17,9 +17,26 @@ import { Glyph, type GlyphName } from './glyphs.js';
 import { eyebrow, micro, prose, statMeta, statValue } from './type.js';
 import type { ExplainVM } from './explain.js';
 
-/** A small caps heading. Faint by contract — it never competes with what it names. */
-export function Eyebrow({ children, style }: { children: ReactNode; style?: CSSProperties }): ReactElement {
-  return <span style={{ ...eyebrow, ...style }}>{children}</span>;
+/**
+ * A small caps heading. Faint by default — it never competes with what it names.
+ *
+ * THE TONE IS A NAMED SET OF THREE, not a colour a caller passes in. Two things
+ * on the play screens need an eyebrow that is not faint: a panel that is WAITING
+ * ON somebody takes the accent, and something only the DM can see takes gold.
+ * Both were previously done by hand-rolling a second caps span beside the real
+ * one, which is how a screen ends up with four spellings of the same label.
+ */
+export function Eyebrow({
+  children,
+  tone = 'faint',
+  style,
+}: {
+  children: ReactNode;
+  tone?: 'faint' | 'accent' | 'gold';
+  style?: CSSProperties;
+}): ReactElement {
+  const colour = tone === 'accent' ? 'var(--qa-accent)' : tone === 'gold' ? 'var(--qa-gold)' : undefined;
+  return <span style={{ ...eyebrow, ...(colour !== undefined ? { color: colour } : {}), ...style }}>{children}</span>;
 }
 
 /**

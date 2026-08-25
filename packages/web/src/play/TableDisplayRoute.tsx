@@ -27,6 +27,8 @@ import { ShellStyles } from '../shell/ShellStyles.js';
 import { Road } from '../shell/road/Road.js';
 import { useSync, API_BASE } from './useSync.js';
 import { projectionToView, type Projection } from './projectionToView.js';
+import { roomWithMoves } from './roomWithMoves.js';
+import { castWithArrivals } from './castWithArrivals.js';
 import type { EffectId } from './ImmersionConsole.js';
 
 export interface TableDisplayRouteProps {
@@ -63,20 +65,32 @@ export function TableDisplayRoute({ playSessionId, token }: TableDisplayRoutePro
     return () => { cancelled = true; };
   }, [playSessionId, token]);
 
+  /**
+   * The room with the log applied — the same derivation the play screen uses.
+   *
+   * THE TELEVISION HAD THE FROZEN MAP TOO. It fetches the room once over HTTP
+   * and nothing replayed the socket on top of it, so the screen in the middle
+   * of the table showed tokens wherever they stood when it was switched on: no
+   * movement, and no creature the DM brought in. It is the one screen everybody
+   * is looking at, which made it the worst place for that to be true.
+   */
+  const liveRoom = useMemo(() => roomWithMoves(room, sync.events), [room, sync.events]);
+
   const view = useMemo(() => {
-    const projection = (sync.snapshot ?? { combatants: {}, round: 1, nextSeq: 0 }) as Projection;
+    const snapshot = (sync.snapshot ?? { combatants: {}, round: 1, nextSeq: 0 }) as Projection;
+    const projection = castWithArrivals(snapshot, sync.events);
     return projectionToView({
       projection,
-      room,
+      room: liveRoom,
       /* A display plays nobody — the same as a DM, for a different reason. */
       myCharacter: null,
       role: 'table_display',
       events: sync.events,
       campaignName: '',
     });
-  }, [sync.snapshot, sync.events, room]);
+  }, [sync.snapshot, sync.events, liveRoom]);
 
-  if (error ?? !room) {
+  if (error ?? !liveRoom) {
     return (
       <div className="rd qa-make is-still">
         <ShellStyles />
@@ -91,5 +105,5 @@ export function TableDisplayRoute({ playSessionId, token }: TableDisplayRoutePro
     );
   }
 
-  return <TableDisplay view={view} room={room} campaignName="" effect={effect} />;
+  return <TableDisplay view={view} room={liveRoom} campaignName="" effect={effect} />;
 }

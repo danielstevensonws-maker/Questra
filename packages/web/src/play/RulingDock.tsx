@@ -17,6 +17,7 @@
  * scrolls away is the thing this component exists to prevent.
  */
 import { useState, type ReactElement } from 'react';
+import { Eyebrow, quote } from '../design/index.js';
 import { skillName } from './promptsFrom.js';
 import type { RulingRequestVM } from './rulingsFrom.js';
 
@@ -27,7 +28,15 @@ const FOR_ATTEMPTS = [
 
 export interface RulingDockProps {
   requests: RulingRequestVM[];
-  onRule: (onSeq: number, verdict: 'allow' | 'refuse') => void;
+  /**
+   * The third argument is the sentence said back to the table — "you can try,
+   * but the floor is slick". It has been in the intent schema from the start
+   * and had no control, so every ruling landed as a bare yes or no: a player
+   * whose idea was refused found out that it was, and never why. A refusal
+   * without a reason is the thing most likely to make somebody stop offering
+   * ideas, which is the opposite of what this dock is for.
+   */
+  onRule: (onSeq: number, verdict: 'allow' | 'refuse', note?: string) => void;
   onAskRoll: (onSeq: number, skill: string, creatureIds: string[]) => void;
   /** Who described it, so a roll can be asked of the right person. */
   creatureIdFor: (request: RulingRequestVM) => string | null;
@@ -35,6 +44,13 @@ export interface RulingDockProps {
 
 export function RulingDock({ requests, onRule, onAskRoll, creatureIdFor }: RulingDockProps): ReactElement | null {
   const [pickingFor, setPickingFor] = useState<number | null>(null);
+  const [note, setNote] = useState('');
+
+  const rule = (seq: number, verdict: 'allow' | 'refuse'): void => {
+    const said = note.trim();
+    onRule(seq, verdict, said.length > 0 ? said : undefined);
+    setNote('');
+  };
 
   const active = requests[0];
   if (!active) return null;
@@ -43,27 +59,29 @@ export function RulingDock({ requests, onRule, onAskRoll, creatureIdFor }: Rulin
   const creatureId = creatureIdFor(active);
 
   return (
-    <div className="qa2-panel qa-ruling" aria-label="Waiting on you">
-      <header className="qa-ruling-head">
-        <span className="qa-ruling-kicker">{active.who} wants to</span>
+    <div className="qa2-panel qa2-ruling" aria-label="Waiting on you">
+      <header className="qa2-ruling-head">
+        <Eyebrow tone="accent">{active.who} wants to</Eyebrow>
         {waiting > 0 && (
-          <span className="qa-prompt-queued">
+          <span className="qa2-ruling-queued">
             {waiting === 1 ? 'One more' : `${String(waiting)} more`}
           </span>
         )}
       </header>
 
-      <p className="qa-ruling-text">{active.text}</p>
+      {/* Quoted back in the story face, because it is the player's own words —
+          the one piece of fiction in a panel otherwise full of controls. */}
+      <p style={{ ...quote, margin: 0 }}>{active.text}</p>
 
       {pickingFor === active.seq ? (
         <>
-          <p className="qa-ruling-hint">What do they roll?</p>
-          <div className="qa-ruling-skills">
+          <Eyebrow>What do they roll?</Eyebrow>
+          <div className="qa2-ruling-skills">
             {FOR_ATTEMPTS.map((s) => (
               <button
                 key={s}
                 type="button"
-                className="qa-ask-skill"
+                className="qa2-ask-skill"
                 onClick={() => {
                   onAskRoll(active.seq, s, creatureId ? [creatureId] : []);
                   setPickingFor(null);
@@ -78,18 +96,32 @@ export function RulingDock({ requests, onRule, onAskRoll, creatureIdFor }: Rulin
           </button>
         </>
       ) : (
-        <div className="qa-ruling-actions">
-          {/* First, because "try it and we will see" is the commonest answer. */}
-          <button type="button" className="qa2-cta" onClick={() => { setPickingFor(active.seq); }}>
-            Ask for a roll
-          </button>
-          <button type="button" className="qa2-pill" onClick={() => { onRule(active.seq, 'allow'); }}>
-            It works
-          </button>
-          <button type="button" className="qa2-quiet-link" onClick={() => { onRule(active.seq, 'refuse'); }}>
-            Not this time
-          </button>
-        </div>
+        <>
+          {/* "Yes, but" is the answer a table hears most, and it needs somewhere
+              to put the "but". Optional and quiet — a bare yes is still one tap. */}
+          <span className="qa2-open">
+            <input
+              className="qa2-input"
+              value={note}
+              placeholder="Say something back — optional"
+              aria-label="What you say back to the table"
+              onChange={(e) => { setNote(e.target.value); }}
+            />
+          </span>
+
+          <div className="qa2-ruling-actions">
+            {/* First, because "try it and we will see" is the commonest answer. */}
+            <button type="button" className="qa2-cta" onClick={() => { setPickingFor(active.seq); }}>
+              Ask for a roll
+            </button>
+            <button type="button" className="qa2-pill" onClick={() => { rule(active.seq, 'allow'); }}>
+              It works
+            </button>
+            <button type="button" className="qa2-quiet-link" onClick={() => { rule(active.seq, 'refuse'); }}>
+              Not this time
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

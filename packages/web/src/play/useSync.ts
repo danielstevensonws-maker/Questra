@@ -65,6 +65,8 @@ export interface SyncState {
   events: PlayEvent[];
   /** Set when the server refused the connection — auth, not_member, and so on. */
   error: string | null;
+  /** Dismiss the last refusal. The screen showing it needs a way to stop. */
+  clearError: () => void;
   /** Send a player intent. No-ops while not live. */
   sendIntent: (envelope: ClientIntentEnvelope, onAck?: () => void) => void;
   sendEffect: (effect: EffectId) => void;
@@ -90,6 +92,7 @@ export function useSync({ playSessionId, token, enabled = true }: UseSyncOptions
   const [snapshot, setSnapshot] = useState<unknown>(null);
   const [events, setEvents] = useState<PlayEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const clearError = useCallback(() => { setError(null); }, []);
 
   const socketRef = useRef<WebSocket | null>(null);
   /* The highest seq THIS VIEWER has seen. Survives reconnects deliberately —
@@ -238,5 +241,5 @@ export function useSync({ playSessionId, token, enabled = true }: UseSyncOptions
     effectRef.current = fn;
   }, []);
 
-  return { status, present, activeCreatureId, snapshot, events, error, sendIntent, sendEffect, onEffect };
+  return { status, present, activeCreatureId, snapshot, events, error, clearError, sendIntent, sendEffect, onEffect };
 }

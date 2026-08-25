@@ -40,6 +40,7 @@
  * open and close the literal.
  */
 import type { ReactElement } from 'react';
+import { ThemeFonts } from '../theme/fonts.js';
 
 const CSS = `
 /* ---- the shared chrome contract -------------------------------------------
@@ -712,10 +713,29 @@ const CSS = `
 .qa2-map { position: relative; overflow: hidden; user-select: none; }
 .qa2-map.is-contain { border-radius: var(--qa-radius); border: var(--qa-hairline) solid var(--qa-glass-border); box-shadow: var(--qa-shadow); }
 .qa2-map.is-fill { position: absolute; inset: 0; z-index: 0; display: grid; place-items: center; }
+/*
+ * THE GROUND UNDER THE GRID, AND WHY IT IS LAYERED RATHER THAN FLAT.
+ *
+ * A room whose terrainImageRef resolves to a real picture never shows this —
+ * the art covers it. But most rooms do not have art yet, and until 2026-08-25
+ * those played on one flat radial wash, which is what made both play screens
+ * read as panels floating over nothing. The map is meant to be the hero of both
+ * of them; a hero cannot be an empty field.
+ *
+ * Soft patches of the warm map tone, unevenly placed, so the ground has grain
+ * and a sense of somewhere rather than a single vignette. Every value is a
+ * --qa-map-* token, so dropping a real terrain image in as the top layer
+ * changes nothing above it and nothing here.
+ */
 .qa2-map-ground {
   position: absolute;
   inset: 0;
-  background: radial-gradient(130% 105% at 52% 36%, var(--qa-map-hi) 0%, var(--qa-map-mid) 42%, var(--qa-map-lo) 100%);
+  background-image:
+    radial-gradient(34% 42% at 24% 30%, var(--qa-map-hi) 0%, transparent 68%),
+    radial-gradient(28% 34% at 74% 60%, var(--qa-map-hi) 0%, transparent 70%),
+    radial-gradient(42% 38% at 56% 88%, var(--qa-map-mid) 0%, transparent 72%),
+    radial-gradient(30% 30% at 88% 18%, var(--qa-map-mid) 0%, transparent 74%),
+    radial-gradient(130% 105% at 52% 36%, var(--qa-map-hi) 0%, var(--qa-map-mid) 42%, var(--qa-map-lo) 100%);
 }
 .qa2-map.is-fill .qa2-map-ground::after {
   content: "";
@@ -821,10 +841,21 @@ const CSS = `
 /* Normalise a bare button so it inherits the surface it sits in rather than
    the browser's default. The :not() is load-bearing: a descendant selector
    out-specifies a single class, so without it this quietly overrode the font
-   of every design-layer control that is ITSELF a button — qa2-chip lost its
-   mono caps and rendered as large serif the moment one was placed inside any
-   qa2- container. Reset the buttons nobody has styled; leave the rest alone. */
-[class*="qa2-"] button:not([class*="qa2-"]) { font: inherit; color: inherit; }
+   of every control that is ITSELF a styled button — qa2-chip lost its mono
+   caps and rendered as large serif the moment one was placed inside any qa2-
+   container. Reset the buttons nobody has styled; leave the rest alone.
+
+   THE ESCAPE HATCH IS THE WHOLE qa FAMILY, NOT JUST qa2- (2026-08-25). It used
+   to read :not([class*=qa2-]), which spared this layer's own controls and
+   caught EVERY control on the DM screen, because those carry the single-a qa-
+   prefix — and qa-console2-tab does not contain the substring qa2-. The result
+   was that a rule meant to normalise unstyled buttons silently overrode the
+   declared font-family AND font-size of the entire DM control set, which then
+   inherited 16px body serif from whatever panel it sat in. That is what the
+   owner was looking at when they said the DM screen's type was inconsistent
+   with the player's: it literally was, by one selector. Any button carrying a
+   class in the qa family styles itself and is left alone. */
+[class*="qa2-"] button:not([class*="qa"]) { font: inherit; color: inherit; }
 .qa2-sr {
   position: absolute;
   width: 1px;
@@ -865,7 +896,22 @@ const CSS = `
  * Injected by any surface built from this layer. Idempotent — duplicate
  * <style> tags are harmless, so a screen and a standalone primitive can both
  * render it without coordinating.
+ *
+ * IT CARRIES THE TYPEFACES, and that is not a detail. @questra/theme has always
+ * named three families, and until now the only thing in the repo that LOADED
+ * them was the shell — so every play surface resolved --qa-font-display and
+ * --qa-font-body to the same Georgia fallback and --qa-font-mono to whatever
+ * the system had. Measured on 2026-08-25: the display stack and the body stack
+ * rendered to identical widths, which means the ramp's central rule (prose is a
+ * serif, data is mono) and the display-vs-body distinction underneath it had
+ * never once been visible. A layer that owns the type ramp has to own its
+ * delivery too, or the ramp is a description of a screen nobody has seen.
  */
 export function DesignStyles(): ReactElement {
-  return <style>{CSS}</style>;
+  return (
+    <>
+      <ThemeFonts />
+      <style>{CSS}</style>
+    </>
+  );
 }

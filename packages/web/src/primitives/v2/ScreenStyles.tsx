@@ -203,13 +203,16 @@ const CSS = `
      modest-widen choice, not the full-bleed-bar one. Below 820px of actual
      track space the width shrinks to fit it exactly, so the margins never go
      negative. */
-  width: min(820px, calc(100% - (var(--qa-hud-inset) + var(--qa2-you)) - (var(--qa-hud-inset) + var(--qa2-journal))));
+  /* Plus a minimum gap either side: the track alone as the ceiling means the
+     bar sits flush against the You panel and the journal at any width where
+     the track is under 820, which is every laptop at 1280 and below. */
+  width: min(820px, calc(100% - (var(--qa-hud-inset) + var(--qa2-you)) - (var(--qa-hud-inset) + var(--qa2-journal)) - var(--qa-hud-inset) * 2));
   margin: 0 auto;
   min-width: 0;
 }
 .qa2-screen.is-journal-closed .qa2-act {
   right: calc(var(--qa-hud-inset) + var(--qa2-journal-closed));
-  width: min(820px, calc(100% - (var(--qa-hud-inset) + var(--qa2-you)) - (var(--qa-hud-inset) + var(--qa2-journal-closed))));
+  width: min(820px, calc(100% - (var(--qa-hud-inset) + var(--qa2-you)) - (var(--qa-hud-inset) + var(--qa2-journal-closed)) - var(--qa-hud-inset) * 2));
 }
 /* The collapsed pill sits in exactly the same track, for the same reason —
    collapsing the action panel should not make it jump sideways. */
@@ -496,260 +499,498 @@ const CSS = `
   .qa2-spine { max-height: calc(100% - var(--qa-hud-inset) * 2 - 268px); }
 }
 
-/* ---- The DM screen ----------------------------------------------------------
-   Same map, same glass, same anchors as the player screen — a DM glancing
-   between two devices should find the same things in the same places. What
-   differs is what the panels HOLD.
+/* ============================================================================
+   THE DM SCREEN — THE HEAD OF THE TABLE
 
-   Two panels, not five. The obvious build gives the DM a box per concern
-   (combatants, secrets, prompts, effects) and produces a wall nobody can read
-   under time pressure. Everything about the creatures lives on the creatures;
-   everything about the story lives in the journal. */
-.qa-dm { position: relative; height: 100vh; overflow: hidden; }
+   THIRD PASS, AND THE FIRST ONE THAT DOES NOT INVENT A SECOND LANGUAGE.
 
-.qa-dm-scene-name {
-  font-family: var(--qa-font-display);
-  font-size: var(--qa-text-lg);
-  color: var(--qa-ink);
-  line-height: 1.1;
+   Pass one was a left rail of full-width caps slabs. Pass two replaced it with
+   hand-rolled panels, a five-tab console and a journal welded to the window
+   edge — different chrome, a compressed type ramp, and three surfaces that
+   physically overlapped each other at 1600x900. Both passes were arrangements
+   of a vocabulary that only this screen spoke.
+
+   THIS PASS HAS ALMOST NO CSS OF ITS OWN, WHICH IS THE POINT. The turn order is
+   the player's RoundSpine. The journal is the player's JournalRail. The chrome
+   is qa2-panel. The tiles, the eyebrows, the detail strip and the escape-hatch
+   footer are the player action bar's own parts. What is left below is the
+   placement of four surfaces, and the internals of the one thing the DM screen
+   genuinely invents: the director's bar.
+
+   TWO MECHANICAL FAULTS SAT UNDER THE COMPOSITION AND ARE FIXED AT SOURCE, NOT
+   HERE — a design-layer button reset whose selector out-specified every rule on
+   this screen and silently reset its type, and three typefaces that nothing in
+   the repo ever loaded. Rearranging panels would not have touched either.
+
+   THE TRACK SYSTEM IS THE PLAYER SCREEN'S. Panel widths are custom properties
+   on the root, the bar is centred between its real neighbours with auto
+   margins, and nothing is positioned against the viewport where a neighbour is
+   what actually bounds it. That is what stops the overlap returning the next
+   time a panel changes width.
+   ========================================================================= */
+.qa-dm {
+  /* The three tracks the bar has to fit between. Same names and same job as
+     the player screen's, so the two layouts stay legible side by side. */
+  --qa2-spine: 340px;
+  --qa2-journal: 336px;
+  --qa2-journal-closed: 244px;
+  position: relative;
+  /* The viewport, not a percentage. This element is the route's own root and
+     has no sized ancestor to take 100% OF — the player screen gets away with
+     the percentage only because PlayerViewV2 sets an inline 100vh over the top
+     of it. Same result, said once, here. */
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
 }
-.qa-dm-scene-state {
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-faint);
-}
 
-/* The table sits where the round spine sits on a player's screen: same corner,
-   same width, because it answers the same question — who is here and in what
-   order — for somebody who needs more of the answer. */
-.qa-dm-table {
+/* ---- the left rail ---------------------------------------------------------
+   THE ROUND ON TOP, THE WORKBENCH UNDER IT, IN ONE FLEX COLUMN.
+
+   Both used to be absolutely positioned with hand-written heights, which is
+   how a spine holding ten combatants ran under whatever sat below it. Here the
+   turn order takes what it needs up to a share of the column, the workbench
+   takes the rest, and neither has to know how tall the other is. */
+.qa2-leftrail {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   top: var(--qa-hud-inset);
+  bottom: var(--qa-hud-inset);
   left: var(--qa-hud-inset);
-  width: 300px;
-  max-height: calc(100% - var(--qa-hud-inset) * 2);
-  padding: var(--qa-s3) 0;
-  gap: 0;
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-
-.qa-dm-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--qa-s3);
-  padding: 0 var(--qa-s4) var(--qa-s3);
-  border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
-}
-.qa-dm-kicker {
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-faint);
-}
-.qa-dm-away {
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  color: var(--qa-ink-faint);
-}
-
-.qa-dm-list { list-style: none; margin: 0; padding: var(--qa-s2) var(--qa-s2) 0; display: flex; flex-direction: column; gap: 2px; }
-
-/* A row is a button because it spotlights — tap somebody to bring them forward
-   on the map. Two lines: who they are and how they are, then whose they are. */
-.qa-dm-row {
-  width: 100%;
+  width: var(--qa2-spine);
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: var(--qa-s2) var(--qa-s3);
-  text-align: left;
-  background: none;
-  border: var(--qa-hairline) solid transparent;
-  border-left: 2px solid transparent;
-  border-radius: var(--qa-radius);
-  cursor: pointer;
-  transition: background var(--qa-dur) var(--qa-ease), border-color var(--qa-dur) var(--qa-ease);
+  gap: var(--qa-s3);
+  min-height: 0;
+  /* The gap between the two panels is map, and the map is clickable. */
+  pointer-events: none;
 }
-.qa-dm-row:hover { background: var(--qa-chip); }
-.qa-dm-row.is-spotlit { background: var(--qa-chip); border-color: var(--qa-glass-border); }
-/* THE ACCENT MEANS "NEEDS YOU" ON THIS SCREEN. A player's screen spends it on
-   YOU; a DM has no token, so it marks the thing waiting on a decision. */
-.qa-dm-row.is-acting { border-left-color: var(--qa-accent); background: var(--qa-accent-soft); }
+.qa2-leftrail > * { pointer-events: auto; }
 
-.qa-dm-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--qa-s3); }
-.qa-dm-name { font-family: var(--qa-font-display); font-size: var(--qa-text-body); color: var(--qa-ink); }
-/* Exact numbers for everyone — the difference between this screen and a
-   player's, where an enemy is only ever a word. */
-.qa-dm-hp {
+/* Inside the rail the spine is an ordinary flex child rather than a floating
+   box: it hugs its cast, and stops at half the column so the workbench is
+   never squeezed out by a big encounter. */
+.qa-dm .qa2-leftrail .qa2-spine,
+.qa-dm .qa2-leftrail .qa2-pill.is-spine {
+  position: static;
+  width: auto;
+  /* Sizes to its cast and refuses to be shrunk below that by the bench; the
+     cap is what stops a ten-creature encounter taking the whole column. */
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: 58%;
+}
+
+/* ---- the workbench ---------------------------------------------------------
+   Where every tool opens, one at a time. It takes whatever height the turn
+   order leaves and scrolls inside itself, so a long rules list never pushes the
+   column off the bottom of the window. */
+/*
+ * flex-basis ZERO, not auto. With auto, the workbench asks for as much height as
+ * its content wants — and the glossary is long — so the flex algorithm hands it
+ * the column and squeezes the turn order down to a single row. A basis of zero
+ * says "I have no opinion about my height, give me what is left", which is the
+ * actual relationship: the round takes what it needs, the bench takes the rest,
+ * and the bench scrolls inside itself.
+ */
+.qa2-bench {
+  flex: 1 1 0;
+  min-height: 0;
+  gap: var(--qa-s3);
+  overflow: hidden;
+}
+.qa2-bench-head {
   flex: none;
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-label);
-  color: var(--qa-ink-dim);
-  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--qa-s2);
+  padding-bottom: var(--qa-s2);
+  border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
 }
-.qa-dm-row.is-acting .qa-dm-hp { color: var(--qa-accent); }
-
-.qa-dm-row-bottom { display: flex; align-items: baseline; gap: var(--qa-s2); flex-wrap: wrap; }
-.qa-dm-who, .qa-dm-status, .qa-dm-away-tag {
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-}
-.qa-dm-who { color: var(--qa-ink-faint); }
-.qa-dm-status { color: var(--qa-danger); }
-.qa-dm-away-tag { color: var(--qa-ink-faint); opacity: 0.7; }
-
-.qa-dm-empty {
-  margin: 0;
-  padding: var(--qa-s4);
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-label);
-  line-height: 1.5;
-  color: var(--qa-ink-faint);
-}
-
-/* The journal takes the same corner and width as a player's, for the same
-   reason the table does — muscle memory across two screens is worth more than
-   a novel layout. */
-.qa-dm-log {
-  flex: 1;
+.qa2-bench-body {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
-  padding: var(--qa-s3) var(--qa-s4);
   display: flex;
   flex-direction: column;
   gap: var(--qa-s3);
 }
-/* Body size, not label: the rail is full height and this is PROSE, read
-   continuously rather than scanned. The old floating box could not afford it. */
-.qa-dm-line {
-  margin: 0;
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-body);
-  line-height: 1.5;
-  color: var(--qa-ink-dim);
+/* A tool that is a paragraph and a field rather than a list of choices. */
+.qa2-bench-note { display: flex; flex-direction: column; gap: var(--qa-s3); }
+
+/* The tile whose tool is open. Gold rather than accent: this marks what the DM
+   is looking at, not what the table is waiting for. */
+.qa2-tile.is-open {
+  border-color: var(--qa-gold);
+  background: var(--qa-gold-soft);
 }
-/* What the engine says is what the table checks; what people say is what they
-   read. Dimming the mechanical lines is what lets the story sit forward. */
-.qa-dm-line.is-narration { color: var(--qa-ink); }
-.qa-dm-line.is-roll, .qa-dm-line.is-system { font-size: var(--qa-text-label); }
-.qa-dm-line-who {
-  display: block;
+.qa2-tile.is-open .qa2-glyph { color: var(--qa-gold); }
+.qa2-tile.is-open:hover { border-color: var(--qa-gold); background: var(--qa-gold-soft); }
+
+/* ---- the glossary ----------------------------------------------------------
+   The workbench at rest. It is a reference rather than a control surface, so it
+   is set as prose with the terms leading, and nothing in it is a button except
+   the one link out to the full rules. */
+.qa2-gloss { display: flex; flex-direction: column; gap: var(--qa-s3); min-height: 0; }
+.qa2-gloss-find { flex: none; }
+.qa2-gloss-list { display: flex; flex-direction: column; gap: var(--qa-s4); }
+.qa2-gloss-group { display: flex; flex-direction: column; gap: var(--qa-s2); }
+.qa2-gloss-term { display: flex; flex-direction: column; gap: 2px; }
+.qa2-gloss-name {
+  font-family: var(--qa-font-display);
+  font-size: var(--qa-text-body);
+  color: var(--qa-ink);
+  line-height: 1.2;
+}
+/* The correction, set apart from the explanation: this is the bit a DM gets
+   wrong, and it should not read as more of the same sentence. */
+.qa2-gloss-note {
+  margin: var(--qa-s1) 0 0;
+  padding-left: var(--qa-s3);
+  border-left: 2px solid var(--qa-gold-soft);
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-label);
+  line-height: 1.4;
+  color: var(--qa-ink-faint);
+}
+.qa2-gloss-more { align-self: flex-start; }
+
+/* ---- the rules, for a player ----------------------------------------------
+   They have no workbench, so the compendium arrives as a sheet over the map. */
+.qa2-rulesheet {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, calc(100% - var(--qa-hud-inset) * 2));
+  max-height: min(680px, calc(100% - var(--qa-hud-inset) * 2));
+  overflow: hidden;
+  box-shadow: var(--qa-shadow-pop);
+  animation: qa2-rise var(--qa-dur) var(--qa-ease);
+}
+.qa2-rulesheet .qa-comp { min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+/* A foe in the DM's order. The mark is a hairline on the left rather than a
+   fill, because the accent on this screen belongs to whoever is UP, and a
+   roomful of tinted monsters would take it away from them. */
+.qa2-notch.is-foe .qa2-dot { border-color: var(--qa-danger); }
+/* The one the director's bar is showing. Gold, because on this screen gold is
+   the DM's own attention rather than the table's. */
+.qa2-notch.is-open { background: var(--qa-gold-soft); }
+
+/* ---- the baton -------------------------------------------------------------
+   The end of the timeline, and the control that moves it. A DM presses this
+   more than anything else during a fight; it used to sit in a bottom strip at
+   the same weight as eight other things. Full width of the spine so it reads as
+   the line continuing rather than as a button parked underneath it. */
+.qa2-baton {
+  display: flex;
+  align-items: center;
+  gap: var(--qa-s3);
+  width: 100%;
+  margin-top: var(--qa-s3);
+  padding: var(--qa-s3) var(--qa-s4);
   font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-label);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-accent-ink);
+  background: var(--qa-accent);
+  border: none;
+  border-radius: var(--qa-radius);
+  cursor: pointer;
+  transition: filter var(--qa-dur-fast) var(--qa-ease), transform var(--qa-dur-fast) var(--qa-ease);
+}
+.qa2-baton:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.qa2-baton:active { transform: translateY(0); }
+/* Refused: the accent drains out of it, because on this screen the accent means
+   the table is waiting on you, and a control that cannot fire is not waiting. */
+.qa2-baton[aria-disabled="true"] {
+  color: var(--qa-ink-faint);
+  background: var(--qa-chip);
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  cursor: not-allowed;
+}
+.qa2-baton[aria-disabled="true"]:hover { filter: none; transform: none; }
+.qa2-baton[aria-disabled="true"] .qa2-baton-mark { background: var(--qa-ink-faint); }
+
+.qa2-cast-empty { padding: var(--qa-s3) var(--qa-s4); }
+
+/* Something the server refused. Danger rather than accent: the accent means the
+   table is waiting on you, and this is the opposite — the table did not hear
+   you. It sits at the top of the bottom stack, above whatever is waiting,
+   because it is about the thing you just pressed. */
+.qa2-notice {
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--qa-s3);
+  border-color: var(--qa-danger);
+  color: var(--qa-danger);
+  animation: qa2-rise var(--qa-dur) var(--qa-ease);
+}
+.qa2-notice .qa2-glyph { color: var(--qa-danger); }
+/* The dot sits where a notch's dot sits, one step further down the line: the
+   button is drawn as the next entry in the running order, because pressing it
+   is what makes there be one. */
+.qa2-baton-mark {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: var(--qa-radius-round);
+  background: var(--qa-accent-ink);
+}
+
+/* Ending a fight is the OPPOSITE of the baton, so it is nowhere near it. Given
+   equal weight beside a control pressed every thirty seconds, a fight ends by
+   accident sooner or later. */
+.qa2-pill.is-endfight {
+  position: absolute;
+  z-index: 2;
+  left: var(--qa-hud-inset);
+  bottom: var(--qa-hud-inset);
+}
+
+/* ---- the scene nameplate ---------------------------------------------------
+   The same anchor, the same shape and the same two-line structure the player's
+   screen uses. A DM glancing between their laptop and a player's phone should
+   find the round in the same place on both. */
+.qa2-scene-line {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--qa-s3);
   font-size: var(--qa-text-whisper);
   letter-spacing: var(--qa-tracking-caps);
   text-transform: uppercase;
-  color: var(--qa-ink-faint);
 }
 
-/* One composer, three jobs: narrate, speak in character, ask the assistant.
-   There is no separate chat box, so a DM never has to decide which field a
-   sentence belongs in. */
-.qa-dm-compose {
-  flex: none;
-  display: flex;
-  gap: var(--qa-s2);
-  padding: var(--qa-s3) var(--qa-s4);
-  border-top: var(--qa-hairline) solid var(--qa-glass-border);
-}
-.qa-dm-input {
-  flex: 1;
-  min-width: 0;
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-label);
-  padding: var(--qa-s2) var(--qa-s3);
-  color: var(--qa-ink);
-  background: var(--qa-chip);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-}
-.qa-dm-input::placeholder { color: var(--qa-ink-faint); }
-.qa-dm-input:focus { outline: none; border-color: var(--qa-accent-line); }
-.qa-dm-send { flex: none; }
-.qa-dm-send:disabled { opacity: 0.4; cursor: not-allowed; }
-
-@media (max-width: 900px) {
-  /* Stacked rather than floating: two overlapping panels on a phone is two
-     panels you cannot read. */
-  .qa-dm { height: auto; overflow: visible; }
-  .qa-dm-table {
-    position: static;
-    width: auto;
-    max-height: none;
-    height: auto;
-    margin: var(--qa-s3);
-  }
-  .qa-dm-log { max-height: 320px; }
-}
-
-
-
-/* ---- running the fight -----------------------------------------------------
-   The controls that move the whole table sit together, top-right, because they
-   are one question: is this a fight, and whose turn is it? */
-.qa-dm-controls { display: flex; align-items: center; gap: var(--qa-s2); }
-.qa-dm-run { flex: none; }
-
-/* ---- the prompt dock -------------------------------------------------------
-   Centre-bottom, over the map, because a prompt is the one thing on this screen
-   that must be answered before anything else happens. Everything else on the
-   DM's screen can wait; this cannot, so it takes the position the eye returns
-   to and nothing else is allowed to sit there. */
-.qa-prompt {
+/* ---- carrying somebody -----------------------------------------------------
+   Not decoration: a DM who has picked a token up has no other way of knowing
+   the next tap will put it down. */
+.qa2-hint {
   position: absolute;
-  z-index: 4;
+  z-index: 3;
   left: 50%;
-  bottom: var(--qa-hud-inset);
+  top: calc(var(--qa-hud-inset) + 84px);
   transform: translateX(-50%);
-  width: min(440px, calc(100% - var(--qa-hud-inset) * 2));
-  padding: var(--qa-s4);
   display: flex;
-  flex-direction: column;
-  gap: var(--qa-s3);
-  border-color: var(--qa-accent-line);
-}
-.qa-prompt-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--qa-s3); }
-.qa-prompt-kind {
+  align-items: center;
+  gap: var(--qa-s2);
+  margin: 0;
+  padding: var(--qa-s2) var(--qa-s4);
   font-family: var(--qa-font-mono);
   font-size: var(--qa-text-whisper);
   letter-spacing: var(--qa-tracking-caps);
   text-transform: uppercase;
   color: var(--qa-accent);
+  background: var(--qa-glass-solid);
+  border: var(--qa-hairline) solid var(--qa-accent-line);
+  border-radius: var(--qa-radius-round);
+  backdrop-filter: blur(var(--qa-glass-blur));
+  pointer-events: none;
 }
-.qa-prompt-clock {
+.qa2-hint .qa2-glyph { color: var(--qa-accent); }
+
+/* ---- the director's bar ----------------------------------------------------
+   THE PLAYER'S ACTION BAR POSITION, EXACTLY. Centred between its two real
+   neighbours with auto margins rather than on the viewport, which is what makes
+   the gap either side identical even though the spine and the journal are
+   different widths (CSS2.1 10.3.7 — specified behaviour, not an approximation).
+   The previous console was centred on the window and sat under the roster. */
+.qa2-deskstack {
+  position: absolute;
+  z-index: 3;
+  left: calc(var(--qa-hud-inset) + var(--qa2-spine));
+  right: calc(var(--qa-hud-inset) + var(--qa2-journal));
+  bottom: var(--qa-hud-inset);
+  /* The extra inset*2 is a MINIMUM GAP, not decoration. Without it the ceiling
+     is the whole track, so at any width where the track is under 760 the bar
+     grows flush against the spine and the journal and the three read as one
+     welded bar — measured at 1280, where the gap either side came out at
+     exactly zero. Below that the bar shrinks instead of touching. */
+  width: min(760px, calc(100% - (var(--qa-hud-inset) + var(--qa2-spine)) - (var(--qa-hud-inset) + var(--qa2-journal)) - var(--qa-hud-inset) * 2));
+  margin: 0 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--qa-s3);
+  max-height: calc(100% - var(--qa-hud-inset) * 2);
+  /* The gaps between the stacked panels are map, and the map is clickable. */
+  pointer-events: none;
+}
+.qa2-deskstack > * { pointer-events: auto; }
+.qa-dm.is-journal-closed .qa2-deskstack {
+  right: calc(var(--qa-hud-inset) + var(--qa2-journal-closed));
+  width: min(760px, calc(100% - (var(--qa-hud-inset) + var(--qa2-spine)) - (var(--qa-hud-inset) + var(--qa2-journal-closed)) - var(--qa-hud-inset) * 2));
+}
+.qa2-desk { min-width: 0; gap: var(--qa-s3); }
+
+/* With nobody chosen the bar opens with the one sentence that teaches the
+   screen: the turn order is how you get at a creature. */
+.qa2-desk-hint {
+  padding-bottom: var(--qa-s2);
+  border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
+}
+
+/* Who you are working on. The player's identity block, at the DM's resolution:
+   exact numbers for everybody, including the monsters. */
+.qa2-desk-head {
+  display: flex;
+  align-items: center;
+  gap: var(--qa-s3);
+  padding-bottom: var(--qa-s3);
+  border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
+}
+.qa2-desk-chip {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-family: var(--qa-font-display);
+  font-size: var(--qa-text-lg);
+  color: var(--qa-ink-dim);
+  background: var(--qa-chip);
+  border: var(--qa-hairline) solid var(--qa-glass-border);
+  border-radius: var(--qa-radius);
+}
+.qa2-desk-chip.is-foe { color: var(--qa-danger); border-color: var(--qa-danger); }
+.qa2-desk-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.qa2-desk-line {
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qa2-desk-vitals {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--qa-s2);
+  justify-content: flex-end;
+}
+.qa2-desk-hp { display: block; width: 200px; }
+
+/* The escape hatch, in the same place the player's is — theirs is the story the
+   rules cannot resolve, this is the person the board does not contain. */
+.qa2-desk-voice {
+  display: flex;
+  align-items: center;
+  gap: var(--qa-s2);
+  padding-top: var(--qa-s3);
+  border-top: var(--qa-hairline) solid var(--qa-glass-border);
+  color: var(--qa-gold);
+}
+.qa2-desk-voice .qa2-open:focus-within { border-color: var(--qa-gold); }
+
+/* ---- yours alone -----------------------------------------------------------
+   Gold is the DM's own colour on this screen and it means one thing: nobody
+   else can see this. The whisper sheet, the table-screen link and their pinned
+   notes all carry it, so the rule is learnable rather than decorative. */
+.qa2-secret {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(460px, calc(100% - var(--qa-hud-inset) * 2));
+  border-color: var(--qa-gold-soft);
+  box-shadow: var(--qa-shadow-pop);
+  animation: qa2-rise var(--qa-dur) var(--qa-ease);
+}
+.qa2-secret-head { display: flex; align-items: center; justify-content: space-between; gap: var(--qa-s3); }
+.qa2-secret-actions { display: flex; align-items: center; gap: var(--qa-s3); }
+.qa2-secret .qa2-open:focus-within { border-color: var(--qa-gold); }
+.qa2-notes.is-private { border-color: var(--qa-gold-soft); }
+
+/* A voice chosen in the composer: the DM is performing rather than narrating,
+   and the table is about to hear somebody who is not them. */
+.qa2-compose.is-voiced { border-top-color: var(--qa-gold); }
+.qa2-compose.is-voiced .qa2-open { border-color: var(--qa-gold-soft); }
+.qa2-voicetag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--qa-s1);
+  flex: none;
+  align-self: center;
+  padding: 2px var(--qa-s2);
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+  color: var(--qa-gold);
+  background: var(--qa-gold-soft);
+  border-radius: var(--qa-radius-sm);
+  white-space: nowrap;
+}
+.qa2-voicetag-x {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--qa-gold);
+  cursor: pointer;
+}
+
+/* ---- what is waiting on you ------------------------------------------------
+   A reaction prompt and a player's ruling request answer the same question —
+   what needs me — so they share a place. That place is ABOVE the director's
+   bar rather than on top of it, which is where the previous version put both of
+   them: same coordinates, same z-index, one covering the other. */
+.qa2-prompt, .qa2-ruling {
+  flex: none;
+  border-color: var(--qa-accent-line);
+  animation: qa2-rise var(--qa-dur) var(--qa-ease);
+}
+.qa2-prompt-head, .qa2-ruling-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--qa-s3);
+}
+.qa2-prompt-kind { color: var(--qa-accent); }
+.qa2-prompt-kind {
+  font-family: var(--qa-font-mono);
+  font-size: var(--qa-text-whisper);
+  letter-spacing: var(--qa-tracking-caps);
+  text-transform: uppercase;
+}
+.qa2-prompt-clock {
   font-family: var(--qa-font-mono);
   font-size: var(--qa-text-label);
   color: var(--qa-ink-faint);
   font-variant-numeric: tabular-nums;
 }
-/* Ten seconds left is the moment it stops being information and starts being
+/* Ten seconds left is where it stops being information and starts being
    pressure, so that is where the colour changes. */
-.qa-prompt-clock.is-urgent { color: var(--qa-danger); }
-.qa-prompt-context {
+.qa2-prompt-clock.is-urgent { color: var(--qa-danger); }
+.qa2-prompt-context {
   margin: 0;
   font-family: var(--qa-font-body);
   font-size: var(--qa-text-body);
   line-height: 1.5;
   color: var(--qa-ink);
 }
-.qa-prompt-options { display: flex; flex-wrap: wrap; align-items: center; gap: var(--qa-s2); }
-.qa-prompt-take { display: inline-flex; align-items: baseline; gap: var(--qa-s2); }
-.qa-prompt-cost {
+.qa2-prompt-options, .qa2-ruling-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--qa-s3);
+}
+.qa2-prompt-take { display: inline-flex; align-items: baseline; gap: var(--qa-s2); }
+.qa2-prompt-cost {
   font-family: var(--qa-font-mono);
   font-size: var(--qa-text-whisper);
   letter-spacing: var(--qa-tracking-caps);
   opacity: 0.75;
 }
-.qa-prompt-queued {
+.qa2-prompt-queued, .qa2-ruling-queued {
   margin: 0;
   font-family: var(--qa-font-mono);
   font-size: var(--qa-text-whisper);
@@ -757,84 +998,32 @@ const CSS = `
   text-transform: uppercase;
   color: var(--qa-ink-faint);
 }
+.qa2-ruling-skills { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qa-s2); }
 
-/* ---- what only you know ----------------------------------------------------
-   A drawer inside the journal rather than a panel of its own: it holds only the
-   things with no creature to sit on, and it opens where a DM is already typing. */
-.qa-dm-drawer-toggle {
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-faint);
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
+/* ---- asking for a roll -----------------------------------------------------
+   The DM's most-used control. Opens over the map on the side the journal is
+   NOT, and closes the moment a skill is picked — one tap for the common ask. */
+/* The tools are CONTENT now, not floating sheets — the workbench places them
+   and owns their heading, their close and their scroll. What is left here is
+   only the internal shape of each one. */
+.qa2-ask, .qa-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s3);
+  min-width: 0;
 }
-.qa-dm-drawer-toggle:hover { color: var(--qa-accent); }
-.qa-dm-drawer {
-  flex: none;
-  padding: var(--qa-s3) var(--qa-s4);
-  border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
-  background: var(--qa-chip);
-}
-.qa-dm-drawer-note {
-  margin: 0 0 var(--qa-s2);
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-faint);
-}
-.qa-dm-whisper { display: flex; flex-direction: column; gap: var(--qa-s2); }
-.qa-dm-select {
+.qa2-ask-who { display: flex; flex-wrap: wrap; gap: var(--qa-s2); }
+/* A quiet link in a stacked panel is still a sentence, so it starts where the
+   sentences above it start. Buttons centre their text by default, which put
+   these in the middle of the sheet looking like headings. */
+.qa2-ask > .qa2-quiet-link { align-self: flex-start; }
+.qa2-ask-who .is-on { border-color: var(--qa-accent-line); color: var(--qa-accent); }
+.qa2-ask-skills { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qa-s2); }
+.qa2-ask-skill {
+  padding: var(--qa-s2) var(--qa-s3);
   font-family: var(--qa-font-body);
   font-size: var(--qa-text-label);
-  padding: var(--qa-s2) var(--qa-s3);
   color: var(--qa-ink);
-  background: var(--qa-glass);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-}
-
-/* Tones in the journal. A whisper is set apart because reading one aloud by
-   mistake is a real way to spoil a secret. */
-.qa-dm-line.is-chat { color: var(--qa-accent); }
-.qa-dm-line.is-roll .qa-dm-line-who { color: var(--qa-ink-dim); }
-.qa-dm-line.is-system { color: var(--qa-ink-faint); }
-
-/* ---- the atmosphere console ------------------------------------------------
-   Bottom-left, opposite the journal, collapsed to a single pill. A DM's
-   attention is the scarcest thing at the table; an open panel of effects is a
-   tab open on a decision nobody is making. */
-.qa-console {
-  position: absolute;
-  z-index: 3;
-  left: var(--qa-hud-inset);
-  bottom: var(--qa-hud-inset);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--qa-s2);
-}
-.qa-console-toggle { flex: none; }
-.qa-console-panel { width: 280px; padding: var(--qa-s3); display: flex; flex-direction: column; gap: var(--qa-s3); }
-.qa-console-note {
-  margin: 0;
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-faint);
-  line-height: 1.4;
-}
-.qa-console-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qa-s2); }
-.qa-console-effect {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--qa-s2) var(--qa-s3);
   text-align: left;
   background: var(--qa-chip);
   border: var(--qa-hairline) solid var(--qa-glass-border);
@@ -842,44 +1031,95 @@ const CSS = `
   cursor: pointer;
   transition: border-color var(--qa-dur) var(--qa-ease), background var(--qa-dur) var(--qa-ease);
 }
-.qa-console-effect:hover { border-color: var(--qa-accent-line); background: var(--qa-accent-soft); }
-.qa-console-label { font-family: var(--qa-font-body); font-size: var(--qa-text-label); color: var(--qa-ink); }
-.qa-console-hint {
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
+.qa2-ask-skill:hover { border-color: var(--qa-accent-line); background: var(--qa-accent-soft); }
+.qa2-ask-more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qa-s3);
+  padding: var(--qa-s3);
+  background: var(--qa-chip);
+  border-radius: var(--qa-radius);
+}
+.qa2-ask-row { display: flex; flex-direction: column; gap: var(--qa-s2); }
+/* Nothing found, nothing yet, nothing wrong — the one empty-state voice the
+   DM's authoring surfaces share. It replaces qa-dm-empty, which was one of five
+   spellings of the same faint line. */
+.qa2-empty {
+  margin: 0;
+  padding: var(--qa-s3) 0;
+  font-family: var(--qa-font-body);
+  font-size: var(--qa-text-label);
+  line-height: 1.5;
   color: var(--qa-ink-faint);
+}
+.qa2-ask-secret {
+  display: flex;
+  align-items: center;
+  gap: var(--qa-s2);
+  cursor: pointer;
+}
+
+/* ---- narrower ---------------------------------------------------------------
+   The two REFERENCE surfaces give ground first and the bar keeps its size, for
+   the same reason as on the player screen: it is the only one anybody operates.
+   Below 900 the whole thing stacks — three floating surfaces on a phone is
+   three surfaces you cannot read. */
+@media (max-width: 1179px) {
+  .qa-dm { --qa2-spine: 232px; --qa2-journal: 268px; }
+  .qa-dm .qa2-spine { max-height: calc(100% - var(--qa-hud-inset) * 2 - 320px); }
 }
 
 @media (max-width: 900px) {
-  .qa-prompt, .qa-console { position: static; transform: none; width: auto; margin: var(--qa-s3); }
-  .qa-console-panel { width: auto; }
+  .qa-dm { height: auto; overflow: visible; }
+  /* The map stops being the ground and becomes the first thing in the column.
+     A DM on a phone with no board at all is worse than a small board — this is
+     the one screen where the map IS the shared fact. */
+  .qa-dm .qa2-map.is-fill { position: relative; inset: auto; height: 46vh; }
+  /* The nameplate and the frame controls were the two surfaces still pinned to
+     the viewport once everything else stacked, so they landed on top of the
+     turn order. */
+  .qa-dm .qa2-scene,
+  .qa-dm .qa2-controls,
+  .qa2-leftrail,
+  .qa-dm .qa2-journal,
+  .qa2-deskstack,
+  .qa2-pill.is-endfight {
+    position: static;
+    transform: none;
+    width: auto;
+    max-height: none;
+    margin: var(--qa-s3);
+  }
+  /* The rail stops being a column of its own height and becomes two panels in
+     the page's flow — so the turn order can be as long as the cast is, and the
+     workbench as long as whatever is open, rather than both fighting over a
+     viewport that is mostly keyboard. */
+  .qa2-leftrail { display: block; }
+  .qa2-leftrail > * { margin-bottom: var(--qa-s3); }
+  .qa-dm .qa2-leftrail .qa2-spine,
+  .qa-dm .qa2-leftrail .qa2-pill.is-spine { max-height: none; }
+  .qa2-bench { overflow: visible; }
+  .qa2-bench-body { overflow: visible; }
+  .qa2-ask-skills, .qa2-ruling-skills { grid-template-columns: 1fr; }
+  .qa-dm .qa2-scene { align-items: flex-start; text-align: left; }
+  .qa-dm .qa2-controls { justify-content: flex-end; }
+  .qa2-desk-hp { width: 120px; }
 }
 
 
 /* ---- the compendium --------------------------------------------------------
    Opens OVER the table, never instead of it: looking a rule up must not cost
    you the game. The map, the log and whose turn it is all stay where they were. */
+/* The rules, as CONTENT. This used to be its own full-screen scrim and panel;
+   now the DM's workbench and the player's sheet each supply their own frame, so
+   what is left is the search, the filters and the list. */
 .qa-comp {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--qa-s4);
-  background: var(--qa-scrim);
-}
-.qa-comp-panel {
-  width: min(560px, 100%);
-  max-height: 100%;
-  padding: var(--qa-s4);
   display: flex;
   flex-direction: column;
   gap: var(--qa-s3);
-  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
 }
-.qa-comp-head { display: flex; align-items: baseline; justify-content: space-between; }
 .qa-comp-search { flex: none; }
 .qa-comp-types { display: flex; flex-wrap: wrap; gap: var(--qa-s2); flex: none; }
 .qa-comp-types .is-on { border-color: var(--qa-accent-line); color: var(--qa-accent); }
@@ -1036,53 +1276,6 @@ const CSS = `
   color: var(--qa-ink-faint);
 }
 
-/* ---- asking for a roll -----------------------------------------------------
-   The DM's most-used control. Opens over the map near the button that spawned
-   it, and closes the moment a skill is picked — one tap for the common ask. */
-.qa-ask, .qa-add {
-  position: absolute;
-  z-index: 4;
-  top: calc(var(--qa-hud-inset) + 44px);
-  right: var(--qa-hud-inset);
-  width: min(340px, calc(100% - var(--qa-hud-inset) * 2));
-  padding: var(--qa-s4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--qa-s3);
-  max-height: 70vh;
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-.qa-ask-head { display: flex; align-items: baseline; justify-content: space-between; }
-.qa-ask-who { display: flex; flex-wrap: wrap; gap: var(--qa-s2); }
-.qa-ask-who .is-on { border-color: var(--qa-accent-line); color: var(--qa-accent); }
-
-.qa-ask-skills { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qa-s2); }
-.qa-ask-skill {
-  padding: var(--qa-s2) var(--qa-s3);
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-label);
-  color: var(--qa-ink);
-  text-align: left;
-  background: var(--qa-chip);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-  cursor: pointer;
-  transition: border-color var(--qa-dur) var(--qa-ease), background var(--qa-dur) var(--qa-ease);
-}
-.qa-ask-skill:hover { border-color: var(--qa-accent-line); background: var(--qa-accent-soft); }
-
-.qa-ask-secret {
-  display: flex;
-  align-items: center;
-  gap: var(--qa-s2);
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-faint);
-  cursor: pointer;
-}
 
 /* ---- adding a creature ----------------------------------------------------- */
 .qa-add-list {
@@ -1100,634 +1293,7 @@ const CSS = `
 .qa-add-numbers { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qa-s2); }
 .qa-add-actions { display: flex; align-items: center; gap: var(--qa-s3); }
 
-/* ---- what a player wants to do ---------------------------------------------
-   Bottom-centre, where the prompt dock sits, because both answer the same
-   question: what is waiting on me? A ruling and a reaction never queue at the
-   same moment in practice — one is a fight interrupt, the other is somebody
-   describing something between beats. */
-.qa-ruling {
-  position: absolute;
-  z-index: 4;
-  left: 50%;
-  bottom: var(--qa-hud-inset);
-  transform: translateX(-50%);
-  width: min(460px, calc(100% - var(--qa-hud-inset) * 2));
-  padding: var(--qa-s4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--qa-s3);
-  border-color: var(--qa-accent-line);
-}
-.qa-ruling-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--qa-s3); }
-.qa-ruling-kicker {
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-accent);
-}
-/* Their words, verbatim and given room — this is the thing being decided. */
-.qa-ruling-text {
-  margin: 0;
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-body);
-  line-height: 1.5;
-  color: var(--qa-ink);
-}
-.qa-ruling-hint {
-  margin: 0;
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-faint);
-}
-.qa-ruling-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--qa-s3); }
-.qa-ruling-skills { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qa-s2); }
 
-@media (max-width: 900px) {
-  .qa-ask, .qa-add, .qa-ruling {
-    position: static;
-    transform: none;
-    width: auto;
-    margin: var(--qa-s3);
-    max-height: none;
-  }
-}
-
-/* ---- speaking as somebody --------------------------------------------------
-   The composer changes when a voice is chosen: gold rule, gold caret, and the
-   line itself set in the story face. The DM is performing, and the input says
-   so before a word is typed. */
-.qa-dm-compose.is-voiced { border-top-color: var(--qa-gold); }
-.qa-dm-compose.is-voiced .qa-dm-input {
-  font-family: var(--qa-font-display);
-  font-size: var(--qa-text-body);
-  color: var(--qa-gold);
-  border-color: var(--qa-gold);
-  caret-color: var(--qa-gold);
-}
-.qa-dm-voicetag {
-  flex: none;
-  align-self: center;
-  padding-right: var(--qa-s2);
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-gold);
-}
-/* A spoken line in the journal, so a table can tell narration from performance
-   at a glance rather than by reading. */
-.qa-dm-line.is-spoken { color: var(--qa-gold); font-family: var(--qa-font-display); font-size: var(--qa-text-body); }
-.qa-dm-line.is-spoken .qa-dm-line-who { color: var(--qa-gold); opacity: 0.8; }
-
-/* ---- moving and aiming on the map ------------------------------------------
-   A square you can reach, and the enemy you have chosen. Both are hints: the
-   server decides what is legal, and a client that enforced it would be a
-   second rules engine free to disagree. */
-.qa-map-hint {
-  position: absolute;
-  z-index: 2;
-  left: 50%;
-  top: var(--qa-hud-inset);
-  transform: translateX(-50%);
-  padding: var(--qa-s2) var(--qa-s4);
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-label);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-accent);
-  background: var(--qa-glass-solid);
-  border: var(--qa-hairline) solid var(--qa-accent-line);
-  border-radius: var(--qa-radius-round);
-  pointer-events: none;
-}
-
-/* The desk owns the left edge, so everything that used to float there moves
-   over to clear it. */
-.qa-dm-desked .qa2-scene { left: calc(50% + 150px); }
-.qa-dm-desked .qa-console { display: none; }
-
-@media (max-width: 900px) {
-  /* A rail on a phone is most of the phone. It becomes a strip at the top and
-     the map takes what is left. */
-  .qa-desk {
-    position: static;
-    width: auto;
-    max-height: 45vh;
-    border-right: none;
-    border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
-  }
-  .qa-dm-desked .qa2-scene { left: 50%; }
-}
-
-/* ============================================================================
-   THE DM SCREEN, SECOND PASS
-
-   The first attempt was a left rail of full-width slabs in one flat caps voice
-   — a mobile menu, sharing no vocabulary with the player's screen. This pass
-   matches the player's own card language instead of inventing a second one.
-
-   HIERARCHY IS THREE LEVELS AND NO MORE:
-     name      story face, full ink      what you read first
-     numbers   mono, dim, tabular        what you check
-     labels    mono caps, faint          what you almost never read
-   Everything used to be at level three, which is exactly why nothing had rank.
-
-   THE ACCENT IS RATIONED: terracotta marks whoever the table is waiting for.
-   Danger carries hurt. Gold is the DM's voice and lives only in the composer.
-   ========================================================================= */
-
-/* ---- what only you know ----------------------------------------------------
-   Top-left, quiet, and each verb carries its own explanation because a DM uses
-   these rarely and needs to remember what they do when they do. */
-.qa-only {
-  position: absolute;
-  z-index: 3;
-  top: var(--qa-hud-inset);
-  left: var(--qa-hud-inset);
-  width: 220px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--qa-hairline);
-}
-.qa-only-head {
-  padding: var(--qa-s2) var(--qa-s3);
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-faint);
-  background: var(--qa-glass);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius) var(--qa-radius) 0 0;
-  backdrop-filter: blur(var(--qa-glass-blur));
-}
-.qa-only-row {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: var(--qa-s2) var(--qa-s3);
-  text-align: left;
-  background: var(--qa-glass);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-top: none;
-  cursor: pointer;
-  backdrop-filter: blur(var(--qa-glass-blur));
-  transition: background var(--qa-dur-fast) var(--qa-ease);
-}
-.qa-only-row:last-child { border-radius: 0 0 var(--qa-radius) var(--qa-radius); }
-.qa-only-row:hover { background: var(--qa-glass-solid); }
-.qa-only-name {
-  font-family: var(--qa-font-display);
-  font-size: var(--qa-text-body);
-  color: var(--qa-ink);
-}
-.qa-only-hint {
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-label);
-  line-height: 1.35;
-  color: var(--qa-ink-faint);
-}
-
-/* ---- the roster ------------------------------------------------------------
-   Bottom-left, two columns, in the player's own card language: a chip, a name
-   in the story face, a class line, and a bar. Six cards in one column is a
-   scroll; six in two is a glance. */
-.qa-roster {
-  position: absolute;
-  z-index: 3;
-  left: var(--qa-hud-inset);
-  bottom: var(--qa-hud-inset);
-  width: 470px;
-  max-height: 46vh;
-  display: flex;
-  flex-direction: column;
-  gap: var(--qa-hairline);
-}
-.qa-roster-head {
-  padding: var(--qa-s2) var(--qa-s3);
-  background: var(--qa-glass);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius) var(--qa-radius) 0 0;
-  backdrop-filter: blur(var(--qa-glass-blur));
-}
-.qa-roster-kicker {
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-faint);
-}
-.qa-roster-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--qa-s2);
-  padding: var(--qa-s2);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  background: var(--qa-glass);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-top: none;
-  border-radius: 0 0 var(--qa-radius) var(--qa-radius);
-  backdrop-filter: blur(var(--qa-glass-blur));
-}
-.qa-roster-empty {
-  margin: 0;
-  padding: var(--qa-s4);
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-label);
-  line-height: 1.5;
-  color: var(--qa-ink-faint);
-  background: var(--qa-glass);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-top: none;
-  border-radius: 0 0 var(--qa-radius) var(--qa-radius);
-}
-
-/* One combatant. The grid is the hierarchy: name and armour class share the
-   top line because they are what you read; everything else sits under them. */
-.qa-card {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-areas:
-    "chip name ac"
-    "chip sub sub"
-    "bar  bar  hp"
-    "note note note";
-  align-items: center;
-  gap: 2px var(--qa-s2);
-  padding: var(--qa-s2) var(--qa-s3);
-  text-align: left;
-  background: var(--qa-glass-solid);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-left: 2px solid transparent;
-  border-radius: var(--qa-radius);
-  cursor: pointer;
-  transition: border-color var(--qa-dur-fast) var(--qa-ease);
-}
-.qa-card:hover { border-color: var(--qa-ink-faint); }
-.qa-card.is-spotlit { border-color: var(--qa-ink-dim); }
-/* Spent once per screen: on whoever the table is waiting for. */
-.qa-card.is-acting { border-left-color: var(--qa-accent); }
-.qa-card.is-foe .qa-card-chip { border-color: var(--qa-danger); color: var(--qa-danger); }
-
-.qa-card-chip {
-  grid-area: chip;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--qa-font-display);
-  font-size: var(--qa-text-body);
-  color: var(--qa-ink-dim);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius-sm);
-  background: var(--qa-chip);
-}
-/* Level one: the story face, full ink. */
-.qa-card-name {
-  grid-area: name;
-  font-family: var(--qa-font-display);
-  font-size: var(--qa-text-body);
-  line-height: 1.1;
-  color: var(--qa-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* Level two: mono, dim, tabular — the numbers you check. */
-.qa-card-ac {
-  grid-area: ac;
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  color: var(--qa-ink-dim);
-  font-variant-numeric: tabular-nums;
-}
-/* Level three: faint, and almost never read. */
-.qa-card-sub {
-  grid-area: sub;
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-faint);
-}
-.qa-card-bar {
-  grid-area: bar;
-  height: 3px;
-  margin-top: var(--qa-s1);
-  border-radius: var(--qa-radius-round);
-  background: var(--qa-chip);
-  overflow: hidden;
-}
-.qa-card-fill {
-  display: block;
-  height: 100%;
-  background: var(--qa-accent);
-  transition: width var(--qa-dur) var(--qa-ease);
-}
-/* Bloodied at half or under (SRD) — the bar says it before the number does. */
-.qa-card-fill.is-low { background: var(--qa-danger); }
-.qa-card-hp {
-  grid-area: hp;
-  margin-top: var(--qa-s1);
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  color: var(--qa-ink-dim);
-  font-variant-numeric: tabular-nums;
-}
-.qa-card-note {
-  grid-area: note;
-  margin-top: var(--qa-s1);
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-danger);
-}
-.qa-card-note.is-quiet { color: var(--qa-ink-faint); }
-
-/* ---- the console -----------------------------------------------------------
-   Bottom-centre, over the map, because a control surface belongs beneath the
-   thing it controls. Five concerns that are each occasionally the whole job and
-   never two at once, so tabs rather than a rail: the one you are using gets all
-   the width instead of the four you are not. */
-.qa-console2 {
-  position: absolute;
-  z-index: 3;
-  left: 50%;
-  bottom: var(--qa-hud-inset);
-  transform: translateX(-50%);
-  width: min(720px, calc(100% - 560px));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--qa-s2);
-}
-.qa-console2-tabs {
-  display: flex;
-  gap: var(--qa-hairline);
-  padding: var(--qa-s1);
-  background: var(--qa-glass-solid);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-  backdrop-filter: blur(var(--qa-glass-blur));
-}
-.qa-console2-tab {
-  padding: var(--qa-s2) var(--qa-s4);
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-label);
-  color: var(--qa-ink-dim);
-  background: none;
-  border: var(--qa-hairline) solid transparent;
-  border-radius: var(--qa-radius-sm);
-  cursor: pointer;
-  transition: color var(--qa-dur-fast) var(--qa-ease), border-color var(--qa-dur-fast) var(--qa-ease);
-}
-.qa-console2-tab:hover { color: var(--qa-ink); }
-.qa-console2-tab.is-on { color: var(--qa-ink); border-color: var(--qa-accent-line); background: var(--qa-chip); }
-
-.qa-console2-body {
-  width: 100%;
-  padding: var(--qa-s3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--qa-s3);
-  background: var(--qa-glass-solid);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-  backdrop-filter: blur(var(--qa-glass-blur));
-  max-height: 32vh;
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-.qa-console2-soon {
-  margin: 0;
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-label);
-  line-height: 1.5;
-  color: var(--qa-ink-faint);
-}
-.qa-console2-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--qa-s2); }
-
-/* An NPC card: who they are, how they sound, and the verb. */
-.qa-npc {
-  display: flex;
-  flex-direction: column;
-  gap: var(--qa-s1);
-  padding: var(--qa-s3);
-  text-align: left;
-  background: var(--qa-chip);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-  cursor: pointer;
-  transition: border-color var(--qa-dur-fast) var(--qa-ease);
-}
-.qa-npc:hover { border-color: var(--qa-ink-faint); }
-/* Gold is the DM's voice, and a chosen one is the only gold on the screen. */
-.qa-npc.is-on { border-color: var(--qa-gold); }
-.qa-npc.is-on .qa-npc-name { color: var(--qa-gold); }
-.qa-npc.is-on .qa-npc-do { color: var(--qa-gold); border-color: var(--qa-gold); }
-.qa-npc-name { font-family: var(--qa-font-display); font-size: var(--qa-text-body); color: var(--qa-ink); }
-.qa-npc-voice {
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-label);
-  color: var(--qa-ink-faint);
-}
-.qa-npc-do {
-  margin-top: var(--qa-s1);
-  padding: var(--qa-s1) 0;
-  text-align: center;
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-dim);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius-sm);
-}
-
-.qa-console2-row { display: flex; align-items: center; gap: var(--qa-s2); flex-wrap: wrap; }
-.qa-console2-input {
-  flex: 1;
-  min-width: 180px;
-  padding: var(--qa-s2) var(--qa-s3);
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-label);
-  color: var(--qa-ink);
-  background: var(--qa-chip);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-}
-.qa-console2-input::placeholder { color: var(--qa-ink-faint); }
-.qa-console2-input:focus { outline: none; border-color: var(--qa-gold); }
-
-.qa-console2-do {
-  padding: var(--qa-s2) var(--qa-s3);
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-dim);
-  background: var(--qa-chip);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-  cursor: pointer;
-  transition: color var(--qa-dur-fast) var(--qa-ease), border-color var(--qa-dur-fast) var(--qa-ease);
-}
-.qa-console2-do:hover { color: var(--qa-ink); border-color: var(--qa-ink-faint); }
-.qa-console2-do:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* The scene controls never hide behind a tab: whose turn it is cannot be
-   two clicks away. One loud button, the rest quiet beside it. */
-.qa-console2-scene {
-  display: flex;
-  align-items: center;
-  gap: var(--qa-s2);
-  padding: var(--qa-s2);
-  background: var(--qa-glass-solid);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-  backdrop-filter: blur(var(--qa-glass-blur));
-}
-.qa-console2-go {
-  padding: var(--qa-s2) var(--qa-s4);
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-accent-ink);
-  background: var(--qa-accent);
-  border: none;
-  border-radius: var(--qa-radius);
-  cursor: pointer;
-  transition: filter var(--qa-dur-fast) var(--qa-ease);
-}
-.qa-console2-go:hover { filter: brightness(1.08); }
-
-/* ---- the journal, full height ----------------------------------------------
-   It owns the right edge rather than floating as a box, because the log IS the
-   play record and a DM reads it constantly. Collapsed it becomes a spine that
-   still reports what is waiting, so closing it never means losing track. */
-.qa-rail {
-  position: absolute;
-  z-index: 4;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 380px;
-  display: flex;
-  flex-direction: column;
-  background: var(--qa-glass-solid);
-  border-left: var(--qa-hairline) solid var(--qa-glass-border);
-  backdrop-filter: blur(var(--qa-glass-blur));
-  transition: width var(--qa-dur) var(--qa-ease);
-}
-.qa-rail.is-shut { width: 44px; }
-.qa-rail-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--qa-s3);
-  padding: var(--qa-s4);
-  border-bottom: var(--qa-hairline) solid var(--qa-glass-border);
-}
-.qa-rail-title {
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-label);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-dim);
-}
-.qa-rail-toggle {
-  flex: none;
-  padding: var(--qa-s1) var(--qa-s2);
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-label);
-  color: var(--qa-ink-faint);
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-.qa-rail-toggle:hover { color: var(--qa-ink); }
-
-/* The closed spine: vertical, and still carrying the count that matters. */
-.qa-rail-spine {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--qa-s3);
-  padding: var(--qa-s4) 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-  writing-mode: vertical-rl;
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-faint);
-}
-.qa-rail-spine:hover { color: var(--qa-ink); }
-.qa-rail-spine .is-waiting { color: var(--qa-accent); }
-
-.qa-rail-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-
-/* The DM's own notes, at the top of the stream where a director's eye starts. */
-.qa-rail-notes {
-  flex: none;
-  margin: var(--qa-s4);
-  padding: var(--qa-s3);
-  background: var(--qa-chip);
-  border: var(--qa-hairline) solid var(--qa-glass-border);
-  border-radius: var(--qa-radius);
-}
-.qa-rail-notes-head {
-  display: block;
-  margin-bottom: var(--qa-s2);
-  font-family: var(--qa-font-mono);
-  font-size: var(--qa-text-whisper);
-  letter-spacing: var(--qa-tracking-caps);
-  text-transform: uppercase;
-  color: var(--qa-ink-faint);
-}
-.qa-rail-note {
-  margin: 0 0 var(--qa-s2);
-  padding-left: var(--qa-s3);
-  font-family: var(--qa-font-body);
-  font-size: var(--qa-text-label);
-  line-height: 1.5;
-  color: var(--qa-ink-dim);
-  text-indent: calc(var(--qa-s3) * -1);
-}
-.qa-rail-note:last-child { margin-bottom: 0; }
-
-@media (max-width: 1200px) {
-  /* The console loses the roster's width allowance once the screen is narrow
-     enough that they would overlap. */
-  .qa-console2 { width: min(560px, calc(100% - 80px)); }
-}
-
-@media (max-width: 900px) {
-  /* Everything stacks: three floating surfaces on a phone is three surfaces
-     you cannot read. */
-  .qa-only, .qa-roster, .qa-console2, .qa-rail {
-    position: static;
-    transform: none;
-    width: auto;
-    max-height: none;
-    margin: var(--qa-s3);
-    border-left: none;
-  }
-  .qa-roster-grid { grid-template-columns: 1fr; }
-  .qa-console2-cards { grid-template-columns: 1fr; }
-}
 `;
 
 /**

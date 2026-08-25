@@ -40,9 +40,36 @@ export interface JournalRailProps {
   pendingCount?: number;
   onSend?: (text: string) => void;
   onReact?: (emoji: string) => void;
+  /**
+   * WHAT THIS RAIL IS CALLED AND WHAT THE COMPOSER DOES. Both people at the
+   * table read the same stream in the same order, so it is the same component
+   * — but a player is SAYING something into it and a DM is NARRATING the world
+   * from it, and the placeholder has to tell the truth about which.
+   */
+  title?: string;
+  placeholder?: string;
+  /**
+   * The DM performing rather than narrating. Present ⇒ the composer takes the
+   * gold border that means "this is your voice, not the world's", and the
+   * placeholder names who is talking. One composer, two acts — a DM should
+   * never hunt for a second box to be a goblin in.
+   */
+  speakingAs?: string | null;
+  onStopSpeaking?: () => void;
+  /**
+   * Marks the pinned notes as DM-only. The lines themselves never reach a
+   * player — filterStream settles that server-side — but a DM glancing at
+   * their own screen mid-sentence needs to know at a look which half of it is
+   * safe to read out loud.
+   */
+  notesArePrivate?: boolean;
 }
 
-export function JournalRail({ entries, notes, open, onToggle, pendingCount = 0, onSend, onReact }: JournalRailProps): ReactElement {
+export function JournalRail({
+  entries, notes, open, onToggle, pendingCount = 0, onSend, onReact,
+  title = 'Assistant · Journal', placeholder = 'Say something, or ask the assistant',
+  speakingAs = null, onStopSpeaking, notesArePrivate = false,
+}: JournalRailProps): ReactElement {
   const [draft, setDraft] = useState('');
 
   // Collapsed, a pill in the corner rather than a strip down the window edge —
@@ -52,7 +79,7 @@ export function JournalRail({ entries, notes, open, onToggle, pendingCount = 0, 
     return (
       <button type="button" className="qa2-pill is-journal" onClick={onToggle} aria-expanded={false} aria-label="Show the journal">
         {pendingCount > 0 && <span className="qa2-pill-dot" />}
-        {pendingCount > 0 ? `Assistant · ${pendingCount} waiting` : 'Assistant · Journal'}
+        {pendingCount > 0 ? `${title} · ${pendingCount} waiting` : title}
       </button>
     );
   }
@@ -68,7 +95,7 @@ export function JournalRail({ entries, notes, open, onToggle, pendingCount = 0, 
   return (
     <aside className="qa2-panel qa2-journal" aria-label="Journal">
       <div className="qa2-journal-head">
-        <Eyebrow>Assistant · Journal</Eyebrow>
+        <Eyebrow>{title}</Eyebrow>
         <button type="button" className="qa2-ctl" style={{ width: 24, height: 24 }} onClick={onToggle} aria-label="Hide the journal" aria-expanded>
           <Glyph name="chevronRight" size={13} />
         </button>
@@ -76,8 +103,8 @@ export function JournalRail({ entries, notes, open, onToggle, pendingCount = 0, 
 
       <div className="qa2-feed">
         {notes !== undefined && (
-          <div className="qa2-notes">
-            <Eyebrow>{notes.title}</Eyebrow>
+          <div className={notesArePrivate ? 'qa2-notes is-private' : 'qa2-notes'}>
+            <Eyebrow tone={notesArePrivate ? 'gold' : 'faint'}>{notesArePrivate ? `${notes.title} · yours alone` : notes.title}</Eyebrow>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--qa-s2)' }}>
               {notes.lines.map((line) => (
                 <li key={line} style={prose}>{line}</li>
@@ -114,19 +141,34 @@ export function JournalRail({ entries, notes, open, onToggle, pendingCount = 0, 
       )}
 
       {onSend !== undefined && (
-        <form className="qa2-compose" onSubmit={send}>
-          <label className="qa2-sr" htmlFor="qa2-journal-input">Say something to the table</label>
+        <form className={speakingAs !== null ? 'qa2-compose is-voiced' : 'qa2-compose'} onSubmit={send}>
+          <label className="qa2-sr" htmlFor="qa2-journal-input">
+            {speakingAs !== null ? `Speak as ${speakingAs}` : 'Say something to the table'}
+          </label>
+          {/* The voice tag sits INSIDE the composer rather than above it, so
+              there is no moment where a DM has typed a line and cannot see
+              whose mouth it is about to come out of. */}
+          {speakingAs !== null && (
+            <span className="qa2-voicetag">
+              {speakingAs}
+              {onStopSpeaking !== undefined && (
+                <button type="button" className="qa2-voicetag-x" onClick={onStopSpeaking} aria-label={`Stop speaking as ${speakingAs}`}>
+                  <Glyph name="close" size={9} />
+                </button>
+              )}
+            </span>
+          )}
           <span className="qa2-open" style={{ flex: 1 }}>
             <input
               id="qa2-journal-input"
               className="qa2-input"
               value={draft}
               onChange={(ev) => setDraft(ev.target.value)}
-              placeholder="Say something, or ask the assistant"
+              placeholder={speakingAs !== null ? `What does ${speakingAs} say?` : placeholder}
               autoComplete="off"
             />
           </span>
-          <button type="submit" className="qa2-ctl" aria-label="Send">
+          <button type="submit" className="qa2-ctl" aria-label={speakingAs !== null ? `Say it as ${speakingAs}` : 'Send'}>
             <Glyph name="send" size={14} />
           </button>
         </form>

@@ -47,9 +47,9 @@ export function PromptDock({ prompts, onAnswer }: PromptDockProps): ReactElement
   if (!active) return null;
 
   return (
-    <div className="qa2-panel qa-prompt" role="alertdialog" aria-label={active.kind}>
-      <header className="qa-prompt-head">
-        <span className="qa-prompt-kind">{active.kind}</span>
+    <div className="qa2-panel qa2-prompt" role="alertdialog" aria-label={active.kind}>
+      <header className="qa2-prompt-head">
+        <span className="qa2-prompt-kind">{active.kind}</span>
         {/* No clock on a card that is not interrupting anything. A reaction
             pauses a fight and must resolve; a check waits for the player, and
             a countdown would rush somebody deciding how to describe what they
@@ -57,18 +57,18 @@ export function PromptDock({ prompts, onAnswer }: PromptDockProps): ReactElement
         {active.timeoutSec > 0 && <Countdown key={active.promptId} seconds={active.timeoutSec} />}
       </header>
 
-      <p className="qa-prompt-context">{active.context}</p>
+      <p className="qa2-prompt-context">{active.context}</p>
 
-      <div className="qa-prompt-options">
+      <div className="qa2-prompt-options">
         {active.options.map((o) => (
           <button
             key={o.name}
             type="button"
-            className="qa2-cta qa-prompt-take"
+            className="qa2-cta qa2-prompt-take"
             onClick={() => onAnswer(active.promptId, true, o.name)}
           >
             {o.name}
-            {o.cost && <span className="qa-prompt-cost">{o.cost}</span>}
+            {o.cost && <span className="qa2-prompt-cost">{o.cost}</span>}
           </button>
         ))}
         {/* Declining is a real choice, not a dismissal — it spends nothing and
@@ -83,7 +83,7 @@ export function PromptDock({ prompts, onAnswer }: PromptDockProps): ReactElement
       </div>
 
       {queued > 0 && (
-        <p className="qa-prompt-queued">
+        <p className="qa2-prompt-queued">
           {queued === 1 ? 'One more waiting' : `${String(queued)} more waiting`}
         </p>
       )}
@@ -109,7 +109,7 @@ function Countdown({ seconds }: { seconds: number }): ReactElement {
   }, [seconds]);
 
   return (
-    <span className={'qa-prompt-clock' + (left <= 10 ? ' is-urgent' : '')}>
+    <span className={'qa2-prompt-clock' + (left <= 10 ? ' is-urgent' : '')}>
       {left > 0 ? `${String(left)}s` : 'Time'}
     </span>
   );

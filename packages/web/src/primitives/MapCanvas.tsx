@@ -144,12 +144,28 @@ export function MapCanvas({
          * cells. A map drawn for a different aspect gets distorted rather than
          * silently breaking every distance on the board.
          */
+        /*
+         * FOUR LINE LAYERS, NOT TWO. The first pair is every cell; the second
+         * is every FIFTH cell, drawn in the same token so it costs no new
+         * value. A grid of uniform hairlines reads as graph paper, and a
+         * battle mat is what a table actually plays on — five feet a square,
+         * twenty-five to a major block, which is also how anybody counts
+         * distance by eye. It is the cheapest thing on either play screen that
+         * makes the ground look like somewhere.
+         *
+         * The major lines come FIRST so the terrain art, when there is any,
+         * paints over the lot of them.
+         */
         backgroundImage: [
+          'linear-gradient(to right, transparent calc(100% - var(--qa-hairline)), var(--qa-map-grid) calc(100% - var(--qa-hairline)))',
+          'linear-gradient(to bottom, transparent calc(100% - var(--qa-hairline)), var(--qa-map-grid) calc(100% - var(--qa-hairline)))',
           'linear-gradient(to right, transparent calc(100% - var(--qa-hairline)), var(--qa-map-grid) calc(100% - var(--qa-hairline)))',
           'linear-gradient(to bottom, transparent calc(100% - var(--qa-hairline)), var(--qa-map-grid) calc(100% - var(--qa-hairline)))',
           ...(terrainUrl ? [`url("${terrainUrl}")`] : []),
         ].join(', '),
         backgroundSize: [
+          `${cellPctX * 5}% ${cellPctY * 5}%`,
+          `${cellPctX * 5}% ${cellPctY * 5}%`,
           `${cellPctX}% ${cellPctY}%`,
           `${cellPctX}% ${cellPctY}%`,
           ...(terrainUrl ? ['100% 100%'] : []),

@@ -22,7 +22,8 @@ export type GlyphName =
   | 'heal' | 'bolt' | 'flame' | 'ward' | 'bless' | 'sidestep'
   | 'eye' | 'hand' | 'plus' | 'send' | 'gear' | 'quill' | 'sound' | 'menu'
   | 'close' | 'chevronLeft' | 'chevronRight' | 'chevronUp' | 'chevronDown' | 'pause' | 'die'
-  | 'lock' | 'search' | 'check' | 'grip';
+  | 'lock' | 'search' | 'check' | 'grip'
+  | 'rain' | 'tremor' | 'blood' | 'eclipse' | 'screen';
 
 /**
  * ONE AUTHORING CONSTRAINT. This file is scanned by the HUD type-hygiene suite,
@@ -87,6 +88,30 @@ const PATHS: Record<GlyphName, ReactElement> = {
   // Two columns of dots: the universal "this row can be dragged" mark, and
   // deliberately quiet — the buttons beside it are the real mechanism.
   grip: <><circle cx="6" cy="4" r=".9" /><circle cx="10" cy="4" r=".9" /><circle cx="6" cy="8" r=".9" /><circle cx="10" cy="8" r=".9" /><circle cx="6" cy="12" r=".9" /><circle cx="10" cy="12" r=".9" /></>,
+
+  // ---- the weather -----------------------------------------------------------
+  // The DM's mood row pushes an effect to every screen at the table, and it was
+  // reaching for emoji to label them. Emoji carry their own palette and their own
+  // era, which is the one thing the header of this file rules out. These are the
+  // same hairline marks as everything else, so they take the accent on hover
+  // along with the rest of the row.
+  //
+  // Curves are written with the explicit C/Q forms, never the s/t shorthands —
+  // see the authoring note above: a lowercase smooth-curve command produces
+  // literal strings like -3.8s-2 that the hygiene scanner cannot tell from a
+  // 3.8-second animation.
+  rain: <><path d="M4 8.4A3 3 0 0 1 4.5 2.5 4.2 4.2 0 0 1 12 4.2a2.4 2.4 0 0 1 0 4.2" /><path d="M5.4 11v2.4M8 10.4v3.2M10.6 11v2.4" /></>,
+  // The ground moving: a flat line that has been shaken out of true.
+  tremor: <><path d="M1.6 6.4h2.2l1.6-3 2.4 6 2.2-4.4 1.4 1.4h2.8" /><path d="M2.4 11.4h11.2" /><path d="M4.4 13.8h2M9.6 13.8h2" /></>,
+  // A drop, and the ring it lands in. Not a splatter: this marks a moment in
+  // the fiction, and a splatter reads as damage taken.
+  blood: <><path d="M8 1.8C8 1.8 11.6 6 11.6 8.4A3.6 3.6 0 0 1 4.4 8.4C4.4 6 8 1.8 8 1.8Z" /><path d="M3 13.6Q8 15.2 13 13.6" /></>,
+  // The light going out: a disc with the dark already over most of it.
+  // No rays: with them it read as a sun, which is the opposite instruction.
+  // A disc with the dark already across most of it, and nothing else.
+  eclipse: <><circle cx="8" cy="8" r="5.6" /><path d="M8 2.4A5.6 5.6 0 0 0 8 13.6Z" fill="currentColor" stroke="none" /></>,
+  // The screen in the middle of the table: a panel on a stand.
+  screen: <><rect x="1.8" y="2.6" width="12.4" height="8.2" rx="1.4" /><path d="M8 10.8v2.6" /><path d="M5.4 13.4h5.2" /></>,
 };
 
 export function Glyph({ name, size = 16 }: { name: GlyphName; size?: number }): ReactElement {

@@ -23,7 +23,7 @@
  */
 import type { ReactElement } from 'react';
 import type { Room } from '@questra/contracts';
-import { MapCanvas } from '../primitives/MapCanvas.js';
+import { MapCanvas, type TokenPresentation } from '../primitives/MapCanvas.js';
 import { ScreenStyles } from '../primitives/v2/ScreenStyles.js';
 import { EffectLayer } from './EffectLayer.js';
 import type { EffectId } from './ImmersionConsole.js';
@@ -43,10 +43,33 @@ export function TableDisplay({ view, room, campaignName, effect }: TableDisplayP
   const exploring = view.turn.exploring;
   const recent = view.entries.slice(-LINES);
 
+  /**
+   * WHO EACH DISC IS. The room stores a creature reference and nothing else, so
+   * a map drawn without this labels every token from the raw id — which is how
+   * a screen in the middle of the table came to show a pair of goblins as
+   * "FO FO" (found by running the app once monsters could reach this screen at
+   * all, 2026-08-25). The cast already carries the names and the hurt words a
+   * player is owed; this is the same join the play screens make.
+   *
+   * It says no more than the cast does. An enemy's exact hit points are not in
+   * here because they are not in the cast either — `filterStream` and
+   * `castFrom` settle that upstream, and a television is the last place to
+   * start making exceptions.
+   */
+  const present: Record<string, TokenPresentation> = {};
+  for (const c of view.cast) {
+    present[c.id] = {
+      name: c.name,
+      side: c.kind === 'foe' ? 'foe' : 'ally',
+      acting: c.acting,
+      ...(c.status ? { tag: c.status } : c.hurt ? { tag: c.hurt } : {}),
+    };
+  }
+
   return (
     <div className="qa2-screen qa-td">
       <ScreenStyles />
-      <MapCanvas room={room} mode="play" fit="fill" />
+      <MapCanvas room={room} mode="play" fit="fill" present={present} />
 
       {/* The one thing everybody looks up to check: whose turn is it. */}
       <div className="qa2-panel qa-td-scene">

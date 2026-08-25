@@ -34,7 +34,6 @@ interface CompendiumEntry extends CompendiumRow {
 export interface CompendiumProps {
   /** Reads the API; injected so the sheet can be told about a server. */
   fetchJson: <T>(path: string) => Promise<T>;
-  onClose: () => void;
 }
 
 /** The kinds, named as a player would ask for them. */
@@ -52,7 +51,7 @@ function typeLabel(t: string): string {
   }
 }
 
-export function Compendium({ fetchJson, onClose }: CompendiumProps): ReactElement {
+export function Compendium({ fetchJson }: CompendiumProps): ReactElement {
   const [query, setQuery] = useState('');
   const [type, setType] = useState<string | null>(null);
   const [rows, setRows] = useState<CompendiumRow[]>([]);
@@ -72,8 +71,13 @@ export function Compendium({ fetchJson, onClose }: CompendiumProps): ReactElemen
     fetchJson<{ entries: CompendiumRow[]; types: string[] }>(`/compendium?${params.toString()}`)
       .then((r) => {
         if (cancelled) return;
-        setRows(r.entries);
-        setTypes(r.types);
+        /* Defaulted rather than trusted. A payload without entries used to set
+           rows to undefined and the next render called .map on it, which took
+           the WHOLE DM screen down — mid-session, over a rules lookup. A
+           surface that opens over a live game has to survive a bad response
+           from the thing it is reading. */
+        setRows(Array.isArray(r?.entries) ? r.entries : []);
+        setTypes(Array.isArray(r?.types) ? r.types : []);
         setError(null);
       })
       .catch(() => { if (!cancelled) setError('Could not reach the rules just now.'); });
@@ -88,15 +92,9 @@ export function Compendium({ fetchJson, onClose }: CompendiumProps): ReactElemen
   };
 
   return (
-    <div className="qa-comp" role="dialog" aria-label="Rules">
-      <div className="qa2-panel qa-comp-panel">
-        <header className="qa-comp-head">
-          <span className="qa-dm-kicker">Rules</span>
-          <button type="button" className="qa-dm-drawer-toggle" onClick={onClose}>Close</button>
-        </header>
-
+    <div className="qa-comp">
         <input
-          className="qa-dm-input qa-comp-search"
+          className="qa2-input qa-comp-search"
           value={query}
           placeholder="Search — a name, or what it does"
           aria-label="Search the rules"
@@ -123,7 +121,7 @@ export function Compendium({ fetchJson, onClose }: CompendiumProps): ReactElemen
           ))}
         </div>
 
-        {error && <p className="qa-dm-empty">{error}</p>}
+        {error && <p className="qa2-empty">{error}</p>}
 
         {/**
          * The opened entry replaces the list rather than sitting beside it: at
@@ -152,11 +150,10 @@ export function Compendium({ fetchJson, onClose }: CompendiumProps): ReactElemen
               </li>
             ))}
             {rows.length === 0 && !error && (
-              <li><p className="qa-dm-empty">Nothing matches that. Try a shorter word.</p></li>
+              <li><p className="qa2-empty">Nothing matches that. Try a shorter word.</p></li>
             )}
           </ul>
         )}
       </div>
-    </div>
   );
 }
