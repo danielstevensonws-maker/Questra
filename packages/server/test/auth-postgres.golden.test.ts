@@ -43,14 +43,37 @@ describe.skipIf(!WANTS_POSTGRES)('accounts + tokens round-trip against live Post
     repo = new PostgresAuthRepo(DATABASE_URL!);
   });
 
+  /**
+   * Clean up the rows this run created, CHILDREN FIRST.
+   *
+   * The order used to delete the account before the campaign that references it
+   * (`campaign.owner_account_id`), so that statement failed every single time —
+   * and the `.catch(() => {})` swallowed it, leaving one orphaned account behind
+   * per run. Invisible for as long as this suite never ran; the moment CI got a
+   * database, the Postgres service log started printing the foreign-key
+   * violation on every build.
+   *
+   * A failure is now WARNED rather than swallowed. Cleanup still must not fail
+   * the suite — a test that already failed leaves rows in an order this cannot
+   * predict, and turning that into a second red herring helps nobody — but a
+   * statement that cannot do its job should say so rather than being silently
+   * fine forever.
+   */
   afterAll(async () => {
-    // clean up rows this run created (best-effort; FKs cascade from account/campaign)
     if (pool) {
-      await pool.query(`DELETE FROM membership WHERE campaign_id = $1`, [CAMPAIGN]).catch(() => {});
-      await pool.query(`DELETE FROM play_session WHERE id = $1`, [SESSION]).catch(() => {});
-      await pool.query(`DELETE FROM account WHERE email = $1`, [email]).catch(() => {});
-      await pool.query(`DELETE FROM campaign WHERE id = $1`, [CAMPAIGN]).catch(() => {});
-      await pool.end().catch(() => {});
+      const cleanup: [string, unknown[]][] = [
+        [`DELETE FROM membership WHERE campaign_id = $1`, [CAMPAIGN]],
+        [`DELETE FROM play_session WHERE id = $1`, [SESSION]],
+        /* Campaign before account: the campaign is what references it. */
+        [`DELETE FROM campaign WHERE id = $1`, [CAMPAIGN]],
+        [`DELETE FROM account WHERE email = $1`, [email]],
+      ];
+      for (const [sql, params] of cleanup) {
+        await pool.query(sql, params).catch((err: unknown) => {
+          console.warn(`[auth-postgres] cleanup failed — leaving rows behind: ${sql}`, err);
+        });
+      }
+      await pool.end().catch(() => { /* closing a pool we are already leaving */ });
     }
     await repo?.close();
   });
