@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { PlayEvent, Room } from '@questra/contracts';
-import { roomWithMoves } from './roomWithMoves.js';
+import { roomWithMoves } from '../src/sim/room-replay.js';
 
 const room: Room = {
   id: 'room_1',

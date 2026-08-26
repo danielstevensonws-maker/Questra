@@ -24,7 +24,7 @@ import { PlayerViewV2 } from '../primitives/v2/PlayerViewV2.js';
 import { DmScreen } from './DmScreen.js';
 import { promptsFrom } from './promptsFrom.js';
 import { rulingsFrom } from './rulingsFrom.js';
-import { roomWithMoves } from './roomWithMoves.js';
+import { roomWithMoves } from '@questra/engine';
 import { useMapAction } from './useMapAction.js';
 import { tilesFrom } from './tilesFrom.js';
 import { PromptDock, type PromptVM } from './PromptDock.js';

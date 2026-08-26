@@ -26,7 +26,11 @@ import {
   SKILL_ABILITY,
   deathSave,
 } from '@questra/engine';
-import { arrivalCell } from '@questra/engine';
+import {
+  arrivalCell, roomWithMoves, positionsOf, creatureForToken, provocations,
+  reactionsFrom, hasReaction, openPromptsFrom, opportunityPrompts, promptedEvent,
+  DEFAULT_REACH_FT, type Threat, type ProjectionState,
+} from '@questra/engine';
 import { SyncCore, type IntentResolver, type ResolvedToken } from './sync-core.js';
 import { InMemoryEventStore, type EventStore } from './store/event-store.js';
 import { PostgresEventStore } from './store/postgres-event-store.js';
@@ -247,7 +251,58 @@ export function makeSliceResolver(deps: SliceResolverDeps = {}): IntentResolver 
    * An empty session id is not a lie either — it genuinely has no room primed,
    * which is exactly the case the placement fallback below already handles.
    */
-  return (envelope, state, actor, context = { playSessionId: '' }) => {
+  /**
+   * The board as it stands right now: the room the table opened, with every
+   * move and arrival since replayed onto it (`roomWithMoves` — the same
+   * function the screens draw with, which is why they cannot disagree).
+   *
+   * A session with no room primed has no geometry, and everything that reads
+   * this treats that as "nobody threatens anybody" rather than guessing.
+   */
+  const liveRoom = (playSessionId: string, log: readonly PlayEvent[]): Room | null =>
+    roomWithMoves(deps.roomFor?.(playSessionId) ?? null, log);
+
+  /**
+   * The creatures that would get a swing in as `moverId` walks away.
+   *
+   * HOSTILITY IS SIDES, not a relationship: player characters threaten
+   * monsters and monsters threaten player characters. That is coarse, and it is
+   * the right kind of coarse — a charmed ally who should not swing is a FICTION
+   * call, and the holder declining the card is how the table makes it. The app
+   * offering the chance and a person saying no beats the app deciding for them
+   * (Law 1).
+   *
+   * Sorted by initiative, because Brief 08 §3 #1 resolves several candidates in
+   * that order and the prompts are built in the order they arrive here.
+   */
+  const threatsTo = (moverId: string, state: ProjectionState, log: readonly PlayEvent[]): Threat[] => {
+    const mover = state.combatants[moverId];
+    if (!mover) return [];
+    const reactions = reactionsFrom(log);
+    const order = state.order ?? [];
+    const byInitiative = (a: string, b: string): number => {
+      const ia = order.indexOf(a);
+      const ib = order.indexOf(b);
+      /* Nobody in the order yet (exploring) keeps map order rather than
+         jumping to the front — -1 would sort them above everyone. */
+      return (ia < 0 ? order.length : ia) - (ib < 0 ? order.length : ib);
+    };
+    return Object.values(state.combatants)
+      .filter((c) => c.id !== moverId && c.isPlayer !== mover.isPlayer && c.hp > 0)
+      .map((c) => c.id)
+      .sort(byInitiative)
+      .map((creatureId) => ({
+        creatureId,
+        reachFt: DEFAULT_REACH_FT,
+        /* One option, named for what it is. The per-creature attack list is
+           Brief 03 sheet data the projection does not carry yet; a card that
+           says "Attack" is still a real choice, where no card at all is not. */
+        attackOptions: ['Attack'],
+        reactionAvailable: hasReaction(reactions, creatureId),
+      }));
+  };
+
+  return (envelope, state, actor, context = { playSessionId: '', log: [] }) => {
     const intent = envelope.intent as {
       kind?: string;
       attackerId?: string; targetId?: string; actionName?: string;
@@ -356,30 +411,74 @@ export function makeSliceResolver(deps: SliceResolverDeps = {}): IntentResolver 
        * is that a move REACHES EVERYONE: a table where one person drags a token
        * and nobody else sees it move is not a shared table.
        */
+      /**
+       * A move, and whatever it walked away from.
+       *
+       * THE OPPORTUNITY ATTACK IS PART OF THE MOVE, not a separate intent, and
+       * that is the whole reason this pairing exists: nothing anywhere asked
+       * whether a fighter wanted to swing at a fleeing goblin, so Brief 08's
+       * prompt machinery sat complete and unreachable while the one moment it
+       * was written for went past untouched every round (Brief 02 §6 #5 left
+       * the detection to "the movement/reaction system"; this is it).
+       *
+       * The cascade is deliberately one intent: the move lands FIRST and the
+       * prompts follow in the same batch, so the board never shows a card about
+       * a step that has not been drawn yet.
+       */
       case 'move': {
         if (!intent.tokenId || !intent.path?.length) return { ok: false, reason: 'Nowhere to go.' };
         const to = intent.path[intent.path.length - 1]!;
         const from = intent.path[0] ?? to;
         n++;
-        return {
-          ok: true,
-          events: [{
-            ...stamp(),
-            causeId: `cause-move-${String(n)}`,
-            actor: { kind: isDm ? 'dm' : 'player', accountId: actor.accountId },
-            visibility: 'public',
-            body: {
-              t: 'token_moved',
-              tokenId: intent.tokenId,
-              from, to,
-              path: intent.path,
-              forced: false,
-              /* Chebyshev, five feet a square (ADR-0012) — the same metric the
-                 engine's own geometry uses. */
-              costFt: 5 * Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y)),
-            },
-          }] as PlayEvent[],
-        };
+        const cause = `cause-move-${String(n)}`;
+        const events: PlayEvent[] = [{
+          ...stamp(0),
+          causeId: cause,
+          actor: { kind: isDm ? 'dm' : 'player', accountId: actor.accountId },
+          visibility: 'public',
+          body: {
+            t: 'token_moved',
+            tokenId: intent.tokenId,
+            from, to,
+            path: intent.path,
+            forced: false,
+            /* Chebyshev, five feet a square (ADR-0012) — the same metric the
+               engine's own geometry uses. */
+            costFt: 5 * Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y)),
+          },
+        }];
+
+        /* Who the mover is, in creature terms: a move names the TOKEN, because
+           that is what a person dragged, and reach is about creatures. */
+        const room = liveRoom(context.playSessionId, context.log);
+        const moverId = creatureForToken(room, intent.tokenId);
+        if (moverId !== null && room) {
+          const provoked = provocations(
+            intent.path,
+            positionsOf(room),
+            threatsTo(moverId, state, context.log),
+          );
+          for (const { threat, step } of provoked) {
+            const [prompt] = opportunityPrompts(
+              moverId, step,
+              [{ holderId: threat.creatureId, attackOptions: threat.attackOptions, reactionAvailable: true }],
+              () => `oa-${String(n)}-${threat.creatureId}`,
+            );
+            if (!prompt) continue;
+            events.push({
+              ...stamp(events.length),
+              causeId: cause,
+              /* The ENGINE raises it, not whoever moved. A card that claimed to
+                 come from the player running away would read as them asking to
+                 be attacked. */
+              actor: { kind: 'engine' },
+              visibility: 'public',
+              body: promptedEvent(prompt),
+            } as PlayEvent);
+          }
+        }
+
+        return { ok: true, events };
       }
 
       /**
@@ -438,26 +537,61 @@ export function makeSliceResolver(deps: SliceResolverDeps = {}): IntentResolver 
       }
 
       /**
-       * Answering a reaction prompt (Brief 08). The engine owns what a taken
-       * reaction DOES; this closes the prompt's lifecycle so the holder is not
-       * left with a card that never resolves.
+       * Answering a reaction prompt (Brief 08).
+       *
+       * TAKING IT HAS TO ACTUALLY DO SOMETHING. Closing the lifecycle was only
+       * half the job: a holder who tapped "Swing" got a tidy `reaction_taken`
+       * and no attack, which is the app saying yes and meaning no. An accepted
+       * opportunity attack now runs the same d20 pipeline an ordinary swing
+       * does — the brief's whole point is that the reaction is a normal attack
+       * that happens at an unusual moment, not a second kind of attack.
+       *
+       * A prompt nobody opened, or one already answered, is refused rather than
+       * logged: two people tapping the same card should not swing twice.
        */
       case 'prompt_reply': {
         if (!intent.promptId) return { ok: false, reason: 'That prompt has gone.' };
+        const open = openPromptsFrom(context.log).get(intent.promptId);
+        if (!open) return { ok: false, reason: 'That prompt has already been answered.' };
         n++;
-        const body = intent.take
-          ? takenEvent(intent.promptId, intent.optionName)
-          : declinedEvent(intent.promptId, 'holder');
-        return {
-          ok: true,
-          events: [{
-            ...stamp(),
-            causeId: `cause-prompt-${String(n)}`,
-            actor: { kind: isDm ? 'dm' : 'player', accountId: actor.accountId },
-            visibility: 'public',
-            body,
-          }] as PlayEvent[],
-        };
+        const cause = `cause-prompt-${String(n)}`;
+        const events: PlayEvent[] = [{
+          ...stamp(0),
+          causeId: cause,
+          actor: { kind: isDm ? 'dm' : 'player', accountId: actor.accountId },
+          visibility: 'public',
+          body: intent.take
+            ? takenEvent(intent.promptId, intent.optionName)
+            : declinedEvent(intent.promptId, 'holder'),
+        }];
+
+        if (intent.take && open.context.kind === 'opportunity_attack') {
+          const swinger = state.combatants[open.holderId];
+          const target = state.combatants[open.context.moverId];
+          /* Either of them can have left the board between the prompt and the
+             answer — a goblin cut down mid-flight, a card answered late. The
+             prompt still closes; there is simply nothing to swing at. */
+          if (swinger && target && swinger.hp > 0) {
+            events.push(...resolveAttack(
+              {
+                kind: 'attack', attackerId: swinger.id, targetId: target.id,
+                actionName: intent.optionName ?? open.context.attackOptions[0] ?? 'Attack',
+                damageDice: '1d8 + 3', damageType: 'slashing', coverDegree: 'none',
+              },
+              state, rules, rng,
+              {
+                seq: seq + events.length,
+                timestamps: [at, at, at],
+                ids: [`e-${String(n)}-oa-a`, `e-${String(n)}-oa-b`, `e-${String(n)}-oa-c`],
+                rollId: `roll-oa-${String(n)}`,
+                actor: { kind: 'engine', creatureId: swinger.id },
+              },
+              cause,
+            ));
+          }
+        }
+
+        return { ok: true, events };
       }
 
       /**

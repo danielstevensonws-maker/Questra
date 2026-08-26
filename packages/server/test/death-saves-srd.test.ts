@@ -45,7 +45,7 @@ function rollOf(d20: number, s: ProjectionState) {
   try {
     return makeSliceResolver()(
       { idempotencyKey: 'k-death-1', intent: { kind: 'death_save', creatureId: 'mira' } },
-      s, PLAYER, { playSessionId: 'ps_test' });
+      s, PLAYER, { playSessionId: 'ps_test', log: [] });
   } finally {
     Math.random = real;
   }

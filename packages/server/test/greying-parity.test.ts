@@ -83,7 +83,7 @@ const REFUSALS: { what: string; intent: unknown; state: ProjectionState; actor: 
 
 describe('every refusal is written for a person', () => {
   it.each(REFUSALS)('$what', ({ intent, state: s, actor }) => {
-    const out = makeSliceResolver()(envelope(intent), s, actor, { playSessionId: 'ps_test' });
+    const out = makeSliceResolver()(envelope(intent), s, actor, { playSessionId: 'ps_test', log: [] });
     expect(out.ok).toBe(false);
     if (out.ok) return;
 
@@ -109,7 +109,7 @@ describe('the turn rule, told the same way twice', () => {
     const intent = { kind: 'attack' as const, attackerId: 'mira', targetId: 'goblin', actionName: 'Longsword' };
 
     const greyed = greyingReason(intent, s, { activeTurnEnforced: true });
-    const rejected = makeSliceResolver()(envelope(intent), s, PLAYER, { playSessionId: 'ps_test' });
+    const rejected = makeSliceResolver()(envelope(intent), s, PLAYER, { playSessionId: 'ps_test', log: [] });
 
     expect(greyed, 'the client greys it').not.toBeNull();
     expect(rejected.ok, 'and the server refuses it').toBe(false);
@@ -126,6 +126,6 @@ describe('the turn rule, told the same way twice', () => {
     const intent = { kind: 'attack' as const, attackerId: 'mira', targetId: 'goblin', actionName: 'Longsword' };
 
     expect(greyingReason(intent, s, { activeTurnEnforced: true })).toBeNull();
-    expect(makeSliceResolver()(envelope(intent), s, PLAYER, { playSessionId: 'ps_test' }).ok).toBe(true);
+    expect(makeSliceResolver()(envelope(intent), s, PLAYER, { playSessionId: 'ps_test', log: [] }).ok).toBe(true);
   });
 });

@@ -11,7 +11,7 @@ import type { PlayEvent } from '@questra/contracts';
 import { promptsFrom } from '../src/play/promptsFrom.js';
 import { tilesFrom } from '../src/play/tilesFrom.js';
 import { rulingsFrom } from '../src/play/rulingsFrom.js';
-import { roomWithMoves } from '../src/play/roomWithMoves.js';
+import { roomWithMoves } from '@questra/engine';
 import { dyingFrom, logFrom, castFrom, type Combatant, type Projection } from '../src/play/projectionToView.js';
 
 const at = '2026-08-23T00:00:00.000Z';
