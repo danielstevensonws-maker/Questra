@@ -12,7 +12,7 @@
  * every-intent engine resolver is the play-slice's job, not the dev-env's.
  */
 import {
-  RulesEntitySchema, RoomSchema, type Cell, type PlayEvent, type Room,
+  RulesEntitySchema, RoomSchema, type Cell, type PlayEvent, type Room, type RulesEntity,
 } from '@questra/contracts';
 import {
   buildRulesData, resolveAttack, CONDITIONS, type Combatant, type RulesData,
@@ -30,15 +30,17 @@ import {
   arrivalCell, roomWithMoves, positionsOf, creatureForToken, provocations,
   reactionsFrom, hasReaction, openPromptsFrom, opportunityPrompts, promptedEvent,
   DEFAULT_REACH_FT, type Threat, type ProjectionState,
+  awardDefeatXp, defeatXpTotal, levelOfferAfterXp, levelUp, fullDataset,
+  buy, sell, defaultSellPriceCp, type ShopLine,
 } from '@questra/engine';
 import { SyncCore, type IntentResolver, type ResolvedToken } from './sync-core.js';
 import { InMemoryEventStore, type EventStore } from './store/event-store.js';
 import { PostgresEventStore } from './store/postgres-event-store.js';
 import {
-  CLASSES, DRAFT_ITEMS, DRAFT_SPELLS,
+  CLASSES, DRAFT_ITEMS, DRAFT_SPELLS, VERIFIED_BACKGROUNDS,
   buildSheetRulesData, combatantFromCharacter, speciesSpeedFt,
 } from '@questra/engine';
-import { CharacterChoicesSchema } from '@questra/contracts';
+import { CharacterChoicesSchema, type CharacterChoices } from '@questra/contracts';
 import {
   AuthService, CampaignService, InMemoryAuthRepo, LogMailer, makeResolveToken,
   registerAuthRoutes, registerCampaignRoutes, registerCompendiumRoutes,
@@ -129,6 +131,17 @@ export function createApp(config: ServerConfig): App {
    */
   const roomBySession = new Map<string, Room>();
 
+  /**
+   * The wizard's output per character, cached for the resolver.
+   *
+   * SAME SEAM, SAME REASON as the roster and the room above: a level-up
+   * recomputes the sheet from the character's CHOICES (Brief 07 §3 step 4), the
+   * resolver is synchronous, so the choices are loaded on the connect path and
+   * read from here. Keyed by character id across all sessions — a character
+   * belongs to a campaign, not to the socket that happened to load it.
+   */
+  const choicesByCharacter = new Map<string, CharacterChoices>();
+
   const primeCampaignRoster = async (playSessionId: string): Promise<void> => {
     const campaignId = await repo.campaignIdForSession(playSessionId);
     if (!campaignId) return;
@@ -147,18 +160,53 @@ export function createApp(config: ServerConfig): App {
       const parsed = CharacterChoicesSchema.safeParse(row.choices);
       if (!parsed.success) continue;
       const rules = buildSheetRulesData(
-        [...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS],
+        [...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS],
         speciesSpeedFt(parsed.data.speciesId),
       );
-      seated.push(combatantFromCharacter({ id: row.id, choices: parsed.data }, rules));
+      choicesByCharacter.set(row.id, parsed.data);
+      const seatedCombatant = combatantFromCharacter({ id: row.id, choices: parsed.data }, rules);
+      /* The level the character arrives with, so a level-up can check it is
+         taking the next one rather than jumping. */
+      seated.push({ ...seatedCombatant, level: parsed.data.level });
     }
     seatedByCampaign.set(playSessionId, seated);
+  };
+
+  /**
+   * A level, written through to the character row.
+   *
+   * FIRE AND FORGET, DELIBERATELY. The event has already been accepted and the
+   * fold has already moved the numbers, so the table has its level whatever the
+   * database does next; this is the copy that has to still be there next
+   * Tuesday. A failure is logged rather than thrown for the same reason the
+   * durable event write is: the socket path must not be held up by, or lost to,
+   * a database having a bad moment.
+   */
+  const persistLevel = (playSessionId: string, characterId: string, toLevel: number): void => {
+    const choices = choicesByCharacter.get(characterId);
+    if (!choices) return;
+    const next: CharacterChoices = { ...choices, level: toLevel };
+    choicesByCharacter.set(characterId, next);
+    void (async () => {
+      const campaignId = await repo.campaignIdForSession(playSessionId);
+      if (!campaignId) return;
+      const rows = await repo.charactersOfCampaign(campaignId);
+      const row = rows.find((r) => r.id === characterId);
+      if (!row) return;
+      await repo.putCharacter({ ...row, choices: next });
+    })().catch((err: unknown) => {
+      console.error(`[app] could not persist level ${String(toLevel)} for ${characterId}:`, err);
+    });
   };
 
   // --- SyncCore with the REAL resolveToken (stub is dead) + the slice resolver ---
   const core = new SyncCore({
     resolveToken: makeResolveToken(repo, tokens),
-    resolveIntent: makeSliceResolver({ roomFor: (playSessionId) => roomBySession.get(playSessionId) ?? null }),
+    resolveIntent: makeSliceResolver({
+      roomFor: (playSessionId) => roomBySession.get(playSessionId) ?? null,
+      choicesFor: (_playSessionId, characterId) => choicesByCharacter.get(characterId) ?? null,
+      onLevelUp: persistLevel,
+    }),
     store: eventStore,
     initialCombatants: (playSessionId) => seatedByCampaign.get(playSessionId) ?? [],
   });
@@ -199,6 +247,28 @@ export function createApp(config: ServerConfig): App {
 /** Exported so its behaviour can be asserted directly — the alternative is
     driving a socket to observe a pure function. */
 export interface SliceResolverDeps {
+  /**
+   * The wizard's output for a character, so a level-up can RECOMPUTE the sheet
+   * rather than patch it (Brief 07 §3 step 4).
+   *
+   * Synchronous for the reason everything else on this seam is: the resolver
+   * runs inside the intent path and cannot await, so the roster is loaded ahead
+   * of time by `primeCampaignRoster` and read from a cache here. A character
+   * whose choices have not been primed cannot level — which is a refusal with a
+   * sentence in it, not a wrong sheet.
+   */
+  choicesFor?: (playSessionId: string, characterId: string) => CharacterChoices | null;
+  /**
+   * A level, on its way to the character row.
+   *
+   * THE EVENT IS THE TRUTH; this is a projection of it, and the two live at
+   * different lifetimes: the log belongs to one play session, and a character's
+   * level has to still be there next Tuesday. So the fold moves the numbers now
+   * and this writes the level through for the sessions after this one. Failure
+   * is logged, never thrown — a database that is briefly unhappy must not cost
+   * the table the level it just earned on screen.
+   */
+  onLevelUp?: (playSessionId: string, characterId: string, toLevel: number) => void;
   /**
    * The map this table is playing on, or null if it has not been opened yet.
    *
@@ -302,6 +372,45 @@ export function makeSliceResolver(deps: SliceResolverDeps = {}): IntentResolver 
       }));
   };
 
+  /**
+   * The compendium, indexed once. Every monster carries its own XP on
+   * `meta.xp`, which is what makes "award the XP for that fight" a single tap
+   * rather than arithmetic somebody does while four people wait.
+   */
+  const monsters = new Map<string, RulesEntity>();
+  /** Every item, for its list price (`meta.costCp` — copper, the lossless base). */
+  const items = new Map<string, RulesEntity>();
+  for (const e of fullDataset()) {
+    if (e.entityType === 'monster') monsters.set(e.id, e);
+    if (e.entityType === 'item') items.set(e.id, e);
+  }
+
+  /**
+   * The monsters killed since the last time XP was handed out for a fight.
+   *
+   * SCOPED TO THE LAST AWARD so a second tap does not pay for the same corpses
+   * twice — the DM presses the button once a fight, and a table that has three
+   * fights in a session gets three separate awards rather than a running total
+   * that keeps re-including the goblins from the first one.
+   */
+  const unpaidDead = (state: ProjectionState, log: readonly PlayEvent[]): RulesEntity[] => {
+    let since = -1;
+    log.forEach((e, i) => {
+      if (e.body.t === 'xp_awarded' && e.body.source === 'defeat') since = i;
+    });
+    const out: RulesEntity[] = [];
+    for (const e of log.slice(since + 1)) {
+      if (e.body.t !== 'creature_died') continue;
+      const monsterId = state.combatants[e.body.creatureId]?.monsterId;
+      const entity = monsterId === undefined ? undefined : monsters.get(monsterId);
+      /* A creature the DM invented has no compendium price, and guessing one
+         would be the app inventing rules. It simply contributes nothing to the
+         total; the DM names an amount if they want it counted. */
+      if (entity) out.push(entity);
+    }
+    return out;
+  };
+
   return (envelope, state, actor, context = { playSessionId: '', log: [] }) => {
     const intent = envelope.intent as {
       kind?: string;
@@ -316,6 +425,12 @@ export function makeSliceResolver(deps: SliceResolverDeps = {}): IntentResolver 
       tokenId?: string; path?: { x: number; y: number }[];
       toAccountId?: string;
       promptId?: string; take?: boolean; optionName?: string;
+      characterIds?: string[]; amount?: number;
+      characterId?: string; toLevel?: number;
+      hp?: { method: 'average' } | { method: 'rolled'; roll: number };
+      featureChoices?: Record<string, unknown>; spells?: string[];
+      direction?: 'buy' | 'sell';
+      lines?: { itemId: string; qty: number; unitPriceCp?: number }[];
     };
     const at = new Date().toISOString();
     const seq = state.nextSeq;
@@ -925,6 +1040,201 @@ export function makeSliceResolver(deps: SliceResolverDeps = {}): IntentResolver 
             visibility: 'public',
             body: { t: 'creature_removed', creatureId: intent.creatureId },
           }] as PlayEvent[],
+        };
+      }
+
+      /**
+       * Handing out experience (Brief 07 §2).
+       *
+       * ONE TAP FOR THE COMMON CASE. No amount named means "the XP for what we
+       * just killed": the dead monsters are priced from the compendium, split
+       * evenly across the party, and rounded down — the engine's own
+       * `awardDefeatXp`, so the split cannot drift from the rule. A named
+       * amount is the escape hatch for everything the rules do not price, which
+       * at a real table is most of what a session is (Law 2).
+       *
+       * MILESTONE IS STILL THE DEFAULT (ADR-0006). Nothing here forces a table
+       * into XP mode; this is the button for the tables that want it, and the
+       * ones that do not simply never press it.
+       */
+      case 'award_xp': {
+        if (!isDm) return dmOnly();
+        const party = (intent.characterIds?.length
+          ? intent.characterIds.filter((id) => state.combatants[id]?.isPlayer)
+          : Object.values(state.combatants).filter((c) => c.isPlayer).map((c) => c.id));
+        if (party.length === 0) return { ok: false, reason: 'There is nobody here to earn it.' };
+
+        const manual = intent.amount !== undefined;
+        const total = manual
+          ? intent.amount!
+          : defeatXpTotal(unpaidDead(state, context.log));
+        if (total <= 0) {
+          return { ok: false, reason: 'Nothing has been defeated since the last time you handed out experience.' };
+        }
+
+        n++;
+        const cause = `cause-xp-${String(n)}`;
+        const award = awardDefeatXp(party, total);
+        if (award.perCharacter <= 0) {
+          return { ok: false, reason: `${String(total)} experience does not go round ${String(party.length)} people.` };
+        }
+        const body = manual
+          ? { ...award.event, source: 'manual' as const, ...(intent.reason === undefined ? {} : { reason: intent.reason }) }
+          : award.event;
+        const events: PlayEvent[] = [{
+          ...stamp(0),
+          causeId: cause,
+          actor: { kind: 'dm', accountId: actor.accountId },
+          visibility: 'public',
+          body: body as PlayEvent['body'],
+        }];
+
+        /**
+         * And say who can level, because a threshold nobody announces is a
+         * threshold nobody crosses. The offer is a SENTENCE, not a state flag:
+         * the DM reads it and decides, which is the same shape every other
+         * table decision has.
+         */
+        const ready = party
+          .map((id) => ({ c: state.combatants[id]!, to: levelOfferAfterXp(state.combatants[id]?.level ?? 1, (state.combatants[id]?.xp ?? 0) + award.perCharacter) }))
+          .filter((r) => r.to !== null);
+        if (ready.length > 0) {
+          events.push({
+            ...stamp(1),
+            causeId: cause,
+            actor: { kind: 'engine' },
+            visibility: 'public',
+            body: {
+              t: 'narration',
+              text: ready.length === 1
+                ? `${ready[0]!.c.name} has earned enough to reach level ${String(ready[0]!.to)}.`
+                : `${ready.map((r) => r.c.name).join(', ')} have earned enough to go up a level.`,
+              from: 'engine',
+            },
+          } as PlayEvent);
+        }
+        return { ok: true, events };
+      }
+
+      /**
+       * Buying and selling (Brief 07 §4).
+       *
+       * THE PRICES ARE THE SERVER'S. A list price is compendium data and a sell
+       * price is half of it (rounded down), so a client naming its own numbers
+       * would be a client naming its own economy. The DM can still override a
+       * line — haggling is a real thing that happens at a table — and the price
+       * actually charged goes on the event, which is what makes the override
+       * legible a week later.
+       *
+       * ONE TRANSACTION, ATOMIC. Coins and pack move together under one
+       * causeId, and an unaffordable basket is refused whole rather than partly
+       * applied; a rope that arrives without the money leaving is how a table
+       * stops trusting the numbers.
+       */
+      case 'shop': {
+        const characterId = intent.characterId;
+        if (!characterId) return { ok: false, reason: 'Who is shopping?' };
+        const c = state.combatants[characterId];
+        if (!c) return { ok: false, reason: 'That character is not at this table.' };
+        if (!isDm && !c.isPlayer) return dmOnly();
+        const requested = intent.lines ?? [];
+        if (requested.length === 0) return { ok: false, reason: 'Nothing in the basket.' };
+
+        const priced: ShopLine[] = [];
+        for (const line of requested) {
+          const item = items.get(line.itemId);
+          const listCp = (item?.meta as { costCp?: number } | undefined)?.costCp;
+          const unitPriceCp = line.unitPriceCp
+            ?? (listCp === undefined ? undefined : (intent.direction === 'sell' ? defaultSellPriceCp(listCp) : listCp));
+          if (unitPriceCp === undefined) {
+            /* Something the compendium does not price. The DM names a figure —
+               the app must not invent one, and must not refuse the trade. */
+            return { ok: false, reason: `Nobody has priced ${item?.name ?? line.itemId} — say what it costs.` };
+          }
+          priced.push({ itemId: line.itemId, qty: line.qty, unitPriceCp });
+        }
+
+        const wallet = c.coins ?? { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
+        const pack = c.inventory ?? [];
+        const result = intent.direction === 'sell'
+          ? sell(characterId, wallet, priced, (itemId) => pack.filter((i) => i === itemId).length)
+          : buy(characterId, wallet, priced);
+        /* The refusal is the engine's own sentence — "that costs 5 gp, but you
+           only have 2" — which tells a player something a greyed row cannot. */
+        if (!result.ok) return { ok: false, reason: result.reason };
+
+        n++;
+        return {
+          ok: true,
+          events: [{
+            ...stamp(0),
+            causeId: `cause-shop-${String(n)}`,
+            actor: { kind: isDm ? 'dm' : 'player', accountId: actor.accountId },
+            visibility: 'public',
+            body: result.event as PlayEvent['body'],
+          }] as PlayEvent[],
+        };
+      }
+
+      /**
+       * Taking a level (Brief 07 §3).
+       *
+       * THE NUMBERS ARE RECOMPUTED, NEVER PATCHED (§3 step 4): the engine
+       * re-runs `computeSheet` over the bumped choices and the difference is
+       * what the character gained. That is why this takes decisions — a hit
+       * die rolled or averaged, a feature slot filled — and not a sheet.
+       *
+       * Either the player or the DM may send it. Levelling is something that
+       * happens TO a character, and a DM catching up an absent player's level
+       * between sessions is ordinary table business; the alternative is a
+       * table that cannot start because one person is late.
+       */
+      case 'level_up': {
+        const characterId = intent.characterId;
+        if (!characterId) return { ok: false, reason: 'Which character is levelling?' };
+        const c = state.combatants[characterId];
+        if (!c) return { ok: false, reason: 'That character is not at this table.' };
+        if (!isDm && actor.accountId !== undefined && !c.isPlayer) {
+          return { ok: false, reason: 'Only whoever runs the game can level a monster.' };
+        }
+        const toLevel = intent.toLevel ?? (c.level ?? 1) + 1;
+        if (toLevel !== (c.level ?? 1) + 1) {
+          return { ok: false, reason: 'Levels are taken one at a time.' };
+        }
+        const choices = deps.choicesFor?.(context.playSessionId, characterId) ?? null;
+        if (!choices) {
+          return { ok: false, reason: 'That character sheet has not loaded yet — try again in a moment.' };
+        }
+
+        n++;
+        const result = levelUp(
+          characterId, choices, toLevel,
+          { hp: intent.hp ?? { method: 'average' }, ...(intent.featureChoices ? { featureChoices: intent.featureChoices } : {}), ...(intent.spells ? { spells: intent.spells } : {}) },
+          buildSheetRulesData([...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS], speciesSpeedFt(choices.speciesId)),
+        );
+        deps.onLevelUp?.(context.playSessionId, characterId, toLevel);
+
+        const cause = `cause-level-${String(n)}`;
+        return {
+          ok: true,
+          events: [
+            {
+              ...stamp(0), causeId: cause,
+              actor: { kind: isDm ? 'dm' : 'player', accountId: actor.accountId },
+              visibility: 'public',
+              body: result.event as PlayEvent['body'],
+            },
+            {
+              ...stamp(1), causeId: cause,
+              actor: { kind: 'engine' },
+              visibility: 'public',
+              body: {
+                t: 'narration',
+                text: `${c.name} is level ${String(toLevel)} — ${String(result.hpGained)} more hit points.`,
+                from: 'engine',
+              },
+            },
+          ] as PlayEvent[],
         };
       }
 

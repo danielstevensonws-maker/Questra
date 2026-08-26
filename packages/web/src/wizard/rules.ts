@@ -96,7 +96,7 @@ export function backgroundById(id: string | null): BackgroundOption | undefined 
  */
 export function sheetFor(choices: CharacterChoices): ComputedSheet {
   const rules = buildSheetRulesData(
-    [...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS],
+    [...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS],
     speciesSpeedFt(choices.speciesId),
   );
   return computeSheet(choices, rules);

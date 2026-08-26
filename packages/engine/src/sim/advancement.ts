@@ -96,23 +96,42 @@ export interface SheetDiffLine {
  * before/after diff + the `character_level_up` event body. The caller commits it.
  */
 export function levelUp(
+  characterId: string,
   choices: CharacterChoices,
   toLevel: number,
   levelChoices: LevelUpChoices,
   rules: SheetRulesData,
-): { before: ComputedSheet; after: ComputedSheet; diff: SheetDiffLine[]; event: Body } {
+): { before: ComputedSheet; after: ComputedSheet; diff: SheetDiffLine[]; hpGained: number; event: Body } {
   const before = computeSheet(choices, rules);
   const nextChoices: CharacterChoices = { ...choices, level: toLevel };
   const after = computeSheet(nextChoices, rules);
   const diff = diffSheets(before, after);
+  /**
+   * The hit points the level actually granted, taken from the RECOMPUTED sheet
+   * rather than added up here. Doing the arithmetic twice is how the two answers
+   * start to differ, and the sheet is the one that is right by construction
+   * (§3 step 4: never hand-patched).
+   *
+   * A rolled hit die is the exception the sheet cannot know about — it rolls
+   * nothing — so a roll is honoured over the average the sheet assumed, and the
+   * SRD minimum of one point still applies.
+   */
+  const fromSheet = (s: ComputedSheet): number => (s.hp.value as { max: number }).max;
+  const averaged = fromSheet(after) - fromSheet(before);
+  const conMod = Math.floor(((after.abilities.con.value as number) - 10) / 2);
+  const hpGained = levelChoices.hp.method === 'rolled'
+    ? Math.max(1, levelChoices.hp.roll + conMod)
+    : Math.max(1, averaged);
   return {
     before,
     after,
     diff,
+    hpGained,
     event: {
       t: 'character_level_up',
-      characterId: choices.classId, // caller overrides with the real character id
+      characterId,
       toLevel,
+      hpGained,
       choices: { hp: levelChoices.hp, ...(levelChoices.featureChoices ? { featureChoices: levelChoices.featureChoices } : {}), ...(levelChoices.spells ? { spells: levelChoices.spells } : {}) },
     },
   };

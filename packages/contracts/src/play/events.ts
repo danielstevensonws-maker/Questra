@@ -154,6 +154,73 @@ export const IntentSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('prompt_reply'), promptId: ID, take: z.boolean(), optionName: z.string().optional() }),
 
   /**
+   * Brief 07 §2 — handing out experience. The DM's, because deciding a fight is
+   * over is a fiction call, not something a hit-point total can know.
+   *
+   * `amount` absent means "the XP for what we just killed": the server totals
+   * the dead monsters' own values and splits it, so the common case is one tap
+   * rather than arithmetic at the table. A named amount is the escape hatch for
+   * everything the rules do not price — talking the guard down, finding the
+   * passage, surviving the night (Law 2).
+   */
+  z.object({
+    kind: z.literal('award_xp'),
+    /** Who earns it. Empty means everybody at the table. */
+    characterIds: z.array(ID),
+    amount: z.number().int().positive().optional(),
+    reason: z.string().optional(),
+  }),
+
+  /**
+   * Brief 07 §4 — buying and selling. ONE transaction, so undo reverses the
+   * coins and the pack together.
+   *
+   * Prices are the server's, not the client's: a list price is compendium data
+   * and a sell price is half of it by default, so a client naming its own
+   * numbers would be a client naming its own economy. `unitPriceCp` on the
+   * EVENT records what was actually charged, which is what makes a DM's
+   * override legible afterwards.
+   */
+  z.object({
+    kind: z.literal('shop'),
+    characterId: ID,
+    direction: z.enum(['buy', 'sell']),
+    lines: z.array(z.object({
+      itemId: ID,
+      qty: z.number().int().positive(),
+      /** A price the DM set for this line, in copper. Absent ⇒ the list price. */
+      unitPriceCp: z.number().int().nonnegative().optional(),
+    })).nonempty(),
+  }),
+
+  /**
+   * Brief 07 §3 — taking a level. The choices are the player's; the numbers are
+   * recomputed from them, never patched (§3 step 4), which is why this carries
+   * decisions and not a sheet.
+   */
+  z.object({
+    kind: z.literal('level_up'),
+    characterId: ID,
+    /**
+     * The level being taken. Optional because the SERVER knows what level a
+     * character is and a screen does not have to: absent means "the next one",
+     * which is the only answer levelling ever has. Naming it is how a client
+     * says which level it BELIEVED it was taking, so a stale screen is refused
+     * rather than silently advancing somebody twice.
+     */
+    toLevel: z.number().int().min(2).max(20).optional(),
+    /** Roll the hit die or take the fixed average — the one choice every class makes. */
+    hp: z.discriminatedUnion('method', [
+      z.object({ method: z.literal('average') }),
+      z.object({ method: z.literal('rolled'), roll: z.number().int().positive() }),
+    ]),
+    /** Feature slots resolved this level (subclass pick, ASI-or-feat), by slot id. */
+    featureChoices: z.record(z.string(), z.unknown()).optional(),
+    /** Spells learned or prepared this level. */
+    spells: z.array(ID).optional(),
+  }),
+
+  /**
    * THE MOST COMMON THING THAT HAPPENS AT A TABLE: "give me a perception
    * check". The DM names a skill and who owes the roll; those players get a
    * card they tap.
@@ -297,7 +364,20 @@ export const EventBodySchema = z.discriminatedUnion('t', [
     kind: z.enum(['short', 'long', 'interrupted_partial']),
     applied: z.record(z.string(), z.unknown()),
   }),
-  z.object({ t: z.literal('character_level_up'), characterId: ID, toLevel: z.number().int().min(2).max(20), choices: z.record(z.string(), z.unknown()) }),
+  /**
+   * Brief 07 §3. `hpGained` is on the event rather than recomputed by every
+   * reader because the fold has to move a hit-point total the moment the level
+   * lands, and it has neither the class hit die nor the character's choices to
+   * work it out from — it has the log. The SERVER computes it once, from the
+   * recomputed sheet, and everybody replays the same number.
+   */
+  z.object({
+    t: z.literal('character_level_up'),
+    characterId: ID,
+    toLevel: z.number().int().min(2).max(20),
+    hpGained: z.number().int().positive(),
+    choices: z.record(z.string(), z.unknown()),
+  }),
   // Brief 07 §2 — XP mode. Defeated-monster XP split evenly + DM manual awards;
   // the engine tallies and flags a level offer when a threshold is crossed.
   z.object({

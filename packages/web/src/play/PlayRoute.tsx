@@ -301,6 +301,13 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
         onEndCombat={() => { send({ kind: 'end_combat' }); }}
         onAdvanceTurn={() => { send({ kind: 'advance_turn' }); }}
         onRest={(rest) => { send({ kind: 'rest', rest }); }}
+        /* Everybody at the table, because a fight is survived together. The
+           server prices it from what was defeated and splits it. */
+        onAwardXp={() => { send({ kind: 'award_xp', characterIds: [] }); }}
+        /* Averaged hit points, because that is the choice that needs no
+           dialogue — a table that wants to roll for them gets the rolled
+           branch when the level-up flow's own surface lands (Brief 07 §3). */
+        onLevelUp={(characterId) => { send({ kind: 'level_up', characterId, hp: { method: 'average' } }); }}
         onAnswerPrompt={(promptId, take, optionName) => {
           send(optionName === undefined
             ? { kind: 'prompt_reply', promptId, take }

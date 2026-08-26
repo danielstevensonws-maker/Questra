@@ -127,6 +127,18 @@ interface BackgroundFacts {
   abilityOptions: ['str' | 'dex' | 'con' | 'int' | 'wis' | 'cha', ...('str' | 'dex' | 'con' | 'int' | 'wis' | 'cha')[]];
   featId: string;
   skills: [string, string];
+  /**
+   * The starting purse, in gold, for each of the SRD's two equipment packages:
+   * (A) the kit plus a small purse, or (B) all coin and no kit.
+   *
+   * STRUCTURED HERE FOR THE SAME REASON THE ABILITY OPTIONS ARE. The SRD prints
+   * it inside a sentence — "…Robe, 8 GP; or (B) 50 GP" — and a character with
+   * no money cannot buy anything, so the shop is a form over zeros until
+   * somebody turns that sentence into a number. Both figures are asserted
+   * against `srd_text` in the golden suite, so neither can drift.
+   */
+  startingGoldGp: number;
+  startingGoldAltGp: number;
 }
 
 /** The four SRD backgrounds. */
@@ -137,6 +149,7 @@ const BACKGROUNDS: BackgroundFacts[] = [
     abilityOptions: ['int', 'wis', 'cha'],
     featId: 'feat.magic-initiate',
     skills: ['Insight', 'Religion'],
+    startingGoldGp: 8, startingGoldAltGp: 50,
   },
   {
     id: 'background.criminal', name: 'Criminal',
@@ -144,6 +157,7 @@ const BACKGROUNDS: BackgroundFacts[] = [
     abilityOptions: ['dex', 'con', 'int'],
     featId: 'feat.alert',
     skills: ['Sleight of Hand', 'Stealth'],
+    startingGoldGp: 16, startingGoldAltGp: 50,
   },
   {
     id: 'background.sage', name: 'Sage',
@@ -151,6 +165,7 @@ const BACKGROUNDS: BackgroundFacts[] = [
     abilityOptions: ['con', 'int', 'wis'],
     featId: 'feat.magic-initiate',
     skills: ['Arcana', 'History'],
+    startingGoldGp: 8, startingGoldAltGp: 50,
   },
   {
     id: 'background.soldier', name: 'Soldier',
@@ -158,6 +173,7 @@ const BACKGROUNDS: BackgroundFacts[] = [
     abilityOptions: ['str', 'dex', 'con'],
     featId: 'feat.savage-attacker',
     skills: ['Athletics', 'Intimidation'],
+    startingGoldGp: 14, startingGoldAltGp: 50,
   },
 ];
 
@@ -201,6 +217,8 @@ const RAW: unknown[] = [
       abilityOptions: b.abilityOptions,
       featId: b.featId,
       skills: b.skills,
+      startingGoldGp: b.startingGoldGp,
+      startingGoldAltGp: b.startingGoldAltGp,
       plainAuthored: true,
     },
   })),

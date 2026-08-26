@@ -125,6 +125,10 @@ export interface DmScreenProps {
   onEndCombat: () => void;
   onAdvanceTurn: () => void;
   onRest: (rest: 'short' | 'long') => void;
+  /** Hand out the fight's experience (Brief 07 §2). */
+  onAwardXp: () => void;
+  /** Take one character up a level (Brief 07 §3). */
+  onLevelUp: (creatureId: string) => void;
   onAnswerPrompt: (promptId: string, take: boolean, optionName?: string) => void;
   onAskCheck: (ask: { skill: string; creatureIds: string[]; secret: boolean; dc?: number; reason?: string }) => void;
   onRule: (onSeq: number, verdict: 'allow' | 'refuse', note?: string) => void;
@@ -155,7 +159,7 @@ export function DmScreen(props: DmScreenProps): ReactElement {
   const {
     view, room, campaignName, seats, prompts, rulings, effect, fetchJson,
     onLeave, onSay, onSpeakAs, onWhisper, onStartCombat, onEndCombat, onAdvanceTurn,
-    onRest, onAnswerPrompt, onAskCheck, onRule, onAddCreature, onRemoveCreature,
+    onRest, onAwardXp, onLevelUp, onAnswerPrompt, onAskCheck, onRule, onAddCreature, onRemoveCreature,
     onEffect, onMove, onTableScreenLink, notice = null, onDismissNotice,
   } = props;
 
@@ -473,6 +477,8 @@ export function DmScreen(props: DmScreenProps): ReactElement {
         onVoice={setVoice}
         onEffect={onEffect}
         onRest={onRest}
+        onAwardXp={onAwardXp}
+        onLevelUp={onLevelUp}
         onAddCreature={toggle('add')}
         onRemoveCreature={onRemoveCreature}
         onAskCheck={toggle('ask')}

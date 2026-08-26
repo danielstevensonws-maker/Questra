@@ -108,7 +108,7 @@ describe('Brief 07 §5 #3 — Fighter 4→5: prof 2→3 ripples; Extra Attack + 
   };
 
   it('the before/after diff is byte-matched', () => {
-    const { diff, after } = levelUp(torvaldChoices, 5, { hp: { method: 'average' } }, rules);
+    const { diff, after } = levelUp('char_torvald', torvaldChoices, 5, { hp: { method: 'average' } }, rules);
     expect(diff).toEqual([
       { path: 'profBonus', before: 2, after: 3 },
       { path: 'hp.max', before: 36, after: 44 },
@@ -124,7 +124,7 @@ describe('Brief 07 §5 #3 — Fighter 4→5: prof 2→3 ripples; Extra Attack + 
   });
 
   it('the recomputed sheet equals a fresh computeSheet at level 5 (no hand-patching)', () => {
-    const { after } = levelUp(torvaldChoices, 5, { hp: { method: 'average' } }, rules);
+    const { after } = levelUp('char_torvald', torvaldChoices, 5, { hp: { method: 'average' } }, rules);
     const fresh = computeSheet({ ...torvaldChoices, level: 5 }, rules);
     expect(after).toEqual(fresh);
   });

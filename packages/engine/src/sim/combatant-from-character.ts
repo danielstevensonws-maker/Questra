@@ -73,5 +73,12 @@ export function combatantFromCharacter(character: CharacterAtTable, rules: Sheet
        unconscious and rolls death saves, a monster dies. Getting this wrong
        would kill somebody's character outright. */
     isPlayer: true,
+    /* The level they arrive at, so advancement can check it is taking the next
+       one rather than jumping — and so a screen can say what they are. */
+    level: character.choices.level,
+    /* The purse and the pack they walked in with (Brief 07 §4). The opening
+       balance: `shop_transaction` folds on top of it. */
+    coins: { ...sheet.coins },
+    inventory: [...character.choices.equipment],
   };
 }

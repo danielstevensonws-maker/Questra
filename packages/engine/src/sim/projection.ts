@@ -176,7 +176,76 @@ function apply(state: ProjectionState, event: PlayEvent): void {
            outright rather than knocking it unconscious, and what makes a
            player's screen show it as a word rather than a number. */
         isPlayer: false,
+        /* Which monster it is, when the DM picked one. Kept so the fight can be
+           priced afterwards: the XP is on the compendium entity, and this is
+           the only record connecting the corpse to it. */
+        ...(b.monsterId !== undefined ? { monsterId: b.monsterId } : {}),
       };
+      break;
+    }
+
+    /**
+     * Experience earned (Brief 07 §2). Folded rather than stored so undo takes
+     * it back with everything else — a DM who awards the wrong fight's XP
+     * presses the same button they press for every other mistake.
+     */
+    case 'xp_awarded': {
+      for (const id of b.characterIds) {
+        const c = state.combatants[id];
+        if (c) c.xp = (c.xp ?? 0) + b.perCharacter;
+      }
+      break;
+    }
+
+    /**
+     * A level, taken mid-session (Brief 07 §3).
+     *
+     * The hit points come off the EVENT, not from arithmetic here: the server
+     * computed them once from the recomputed sheet, and every screen replays
+     * the same number rather than each deriving its own. Current HP rises with
+     * the maximum because new levels are not a wound — a character who levels
+     * at 3 of 12 stands at 10 of 19, still hurt by the same amount.
+     */
+    case 'character_level_up': {
+      const c = state.combatants[b.characterId];
+      if (!c) break;
+      c.level = b.toLevel;
+      c.maxHp += b.hpGained;
+      c.hp += b.hpGained;
+      break;
+    }
+
+    /**
+     * A purchase or a sale (Brief 07 §4), applied as ONE movement: coins and
+     * pack together, under one causeId, so undo reverses both. A rope that
+     * arrives without the money leaving is how a table stops trusting the
+     * numbers.
+     *
+     * The delta is per-denomination and signed, so this is addition rather than
+     * a recalculation — the engine's `buy`/`sell` already did the money maths in
+     * copper, and doing it a second time here is how the two answers start to
+     * differ.
+     */
+    case 'shop_transaction': {
+      const c = state.combatants[b.characterId];
+      if (!c) break;
+      const purse = c.coins ?? { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
+      c.coins = {
+        cp: purse.cp + b.coinsDelta.cp, sp: purse.sp + b.coinsDelta.sp,
+        ep: purse.ep + b.coinsDelta.ep, gp: purse.gp + b.coinsDelta.gp,
+        pp: purse.pp + b.coinsDelta.pp,
+      };
+      const pack = [...(c.inventory ?? [])];
+      for (const line of b.lines) {
+        for (let i = 0; i < line.qty; i++) {
+          if (b.direction === 'buy') pack.push(line.itemId);
+          else {
+            const at = pack.indexOf(line.itemId);
+            if (at >= 0) pack.splice(at, 1);
+          }
+        }
+      }
+      c.inventory = pack;
       break;
     }
 

@@ -100,6 +100,10 @@ export interface DirectorBarProps {
   onVoice: (v: { creatureId?: string; name: string } | null) => void;
   onEffect: (e: EffectId) => void;
   onRest: (rest: 'short' | 'long') => void;
+  /** Hand out the fight's experience (Brief 07 §2). */
+  onAwardXp: () => void;
+  /** Take a level for one character (Brief 07 §3). */
+  onLevelUp: (creatureId: string) => void;
   onAddCreature: () => void;
   onRemoveCreature: (creatureId: string) => void;
   onAskCheck: () => void;
@@ -130,6 +134,7 @@ export interface DirectorBarProps {
 export function DirectorBar(props: DirectorBarProps): ReactElement {
   const {
     cast, seats, focusedId, onFocus, exploring, voice, onVoice, onEffect, onRest,
+    onAwardXp, onLevelUp,
     onAddCreature, onRemoveCreature, onAskCheck, onRules, onMoveCreature,
     onWhisper, onShowScreenLink, movingId = null, onBoard,
     openTool = null, onTool,
@@ -150,11 +155,11 @@ export function DirectorBar(props: DirectorBarProps): ReactElement {
   }));
 
   const table = tableVerbs({ exploring, onAskCheck, onAddCreature, onRules, onShowScreenLink, onRest, openTool });
-  const rests = restVerbs({ exploring, onRest });
+  const rests = restVerbs({ exploring, onRest, onAwardXp });
   const theirs = focused === null
     ? []
     : creatureVerbs({
-        focused, seat, movingId, onVoice, onWhisper, onAskCheck, onMoveCreature, onRemoveCreature, onFocus,
+        focused, seat, movingId, onVoice, onWhisper, onAskCheck, onMoveCreature, onRemoveCreature, onFocus, onLevelUp,
         placed: onBoard === undefined || onBoard(focused.id),
         openTool,
       });
@@ -397,7 +402,7 @@ function tableVerbs(o: {
  * cannot rest mid-swing, and the rule says so on the tile rather than letting a
  * DM press it and wonder why nothing happened.
  */
-function restVerbs(o: { exploring: boolean; onRest: (r: 'short' | 'long') => void }): Verb[] {
+function restVerbs(o: { exploring: boolean; onRest: (r: 'short' | 'long') => void; onAwardXp: () => void }): Verb[] {
   const mid = o.exploring ? null : 'There is a fight running. End it before anybody rests.';
   return [
     {
@@ -416,6 +421,20 @@ function restVerbs(o: { exploring: boolean; onRest: (r: 'short' | 'long') => voi
       refusal: mid,
       onPress: () => { o.onRest('long'); },
     },
+    /**
+     * Experience sits with the rests because it belongs to the same moment: the
+     * fight is over, everyone breathes out, and the DM settles up. It is NOT
+     * refused mid-fight the way a rest is — a DM handing out the last room's XP
+     * while the next one starts is doing something ordinary, and the server
+     * says so in a sentence if there is nothing to hand out.
+     */
+    {
+      id: 'party:xp',
+      glyph: 'bless',
+      name: 'Hand out experience',
+      detail: 'Hand out experience — what the party just defeated, split between them. Milestone tables never press this.',
+      onPress: o.onAwardXp,
+    },
   ];
 }
 
@@ -429,6 +448,7 @@ function creatureVerbs(o: {
   onMoveCreature: (id: string) => void;
   onRemoveCreature: (id: string) => void;
   onFocus: (id: string | null) => void;
+  onLevelUp: (id: string) => void;
   placed: boolean;
   openTool: string | null;
 }): Verb[] {
@@ -477,6 +497,20 @@ function creatureVerbs(o: {
         : `Move ${focused.name} — pick them up, then tap the square they walk to.`,
       refusal: o.placed ? null : `${focused.name} is in the running order but has no token on the map yet, so there is nothing to pick up.`,
       onPress: () => { o.onMoveCreature(focused.id); },
+    },
+    /**
+     * A level, taken here because this is where a DM already works on one
+     * person. Milestone is the default (ADR-0006), which means levelling is
+     * something the DM SAYS happens rather than something a threshold triggers
+     * — so it is a verb on a creature, not a badge that appears by itself.
+     */
+    {
+      id: 'who:level',
+      glyph: 'bless',
+      name: 'Level them up',
+      detail: `Take ${focused.name} up a level — the sheet is recomputed, and the new hit points are averaged unless you roll them.`,
+      refusal: focused.kind === 'foe' ? `${focused.name} is a monster. Monsters do not level.` : null,
+      onPress: () => { o.onLevelUp(focused.id); },
     },
     {
       id: 'who:remove',
