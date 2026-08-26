@@ -62,15 +62,31 @@ jobs:
       - name: Migrate
         run: npm run migrate:up -w @questra/server
 
-      # And prove the database is actually being USED, rather than trusting that
-      # it is. The suites skip themselves when DATABASE_URL is unset — which is
-      # right for a contributor and wrong here — so this fails the run if any of
-      # them skipped. It is the check that would have caught the weeks of silent
-      # green, and it is one step rather than a convention somebody remembers.
+      # check:all = contracts + theme + ui + engine + server + ai (typecheck +
+      # vitest, incl. the Torvald trace / sheet / wire / slice golden tests).
+      # precheck:all builds contracts + engine first (server/ai import their dist).
+      - name: check:all
+        run: npm run check:all
+
+      # AND THE DURABILITY SUITES DID NOT SKIP. They skip themselves when
+      # DATABASE_URL is unset — right for a contributor with no database, wrong
+      # here — and skipping is invisible in a green run, which is how the
+      # ADR-0015 exit criterion stayed "verified" for weeks without ever
+      # reaching Postgres. This is the one line that makes that loud.
+      #
+      # AFTER check:all, not before, and that is load-bearing: `npm ci` does not
+      # build, and the server's tests import @questra/engine's dist, which
+      # precheck:all produces as part of check:all. Run earlier, this step fails
+      # on a missing import rather than on anything it is about (which is
+      # exactly what it did on its first run).
+      #
+      # Both reporters: json for the machine to count skips, default so a human
+      # can read the failure. The json reporter alone writes everything to a
+      # file and prints nothing, so a failing run said only "exit code 1".
       - name: The durability suites are not skipping
         working-directory: packages/server
         run: |
-          npx vitest run --reporter=json --outputFile=/tmp/db.json \
+          npx vitest run --reporter=default --reporter=json --outputFile=/tmp/db.json \
             test/persistence.golden.test.ts \
             test/auth-postgres.golden.test.ts \
             test/restart-over-the-wire.test.ts
@@ -80,12 +96,6 @@ jobs:
               process.exit(1);
             }
             console.log(r.numPassedTests + ' durability tests ran against Postgres');"
-
-      # check:all = contracts + theme + ui + engine + server + ai (typecheck +
-      # vitest, incl. the Torvald trace / sheet / wire / slice golden tests).
-      # precheck:all builds contracts + engine first (server/ai import their dist).
-      - name: check:all
-        run: npm run check:all
 
       # The web package builds through Vite/Storybook, not tsc-in-check:all;
       # build it to catch story/primitive breakage on PRs too.
