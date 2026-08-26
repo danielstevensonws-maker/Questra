@@ -72,6 +72,7 @@ import { Ctl, Eyebrow, Glyph, prose, sceneName, statMeta } from '../design/index
 import { PromptDock, type PromptVM } from './PromptDock.js';
 import { EffectLayer } from './EffectLayer.js';
 import { Compendium } from './Compendium.js';
+import { Shop } from './Shop.js';
 import { AskForCheck } from './AskForCheck.js';
 import { AddCreature } from './AddCreature.js';
 import { RulingDock } from './RulingDock.js';
@@ -85,7 +86,7 @@ import type { PlayView } from './projectionToView.js';
  * The tools that open on the workbench. Absent ⇒ the glossary, which is the
  * resting state rather than an empty column.
  */
-export type ToolId = 'ask' | 'add' | 'rules' | 'screen' | 'whisper';
+export type ToolId = 'ask' | 'add' | 'rules' | 'screen' | 'whisper' | 'shop';
 
 /**
  * What the workbench calls itself. Named for what the DM is DOING rather than
@@ -99,6 +100,7 @@ const BENCH_LABEL: Record<ToolId | 'glossary', string> = {
   rules: 'Rules',
   screen: 'The screen in the middle of the table',
   whisper: 'Whisper · yours alone',
+  shop: 'Buying and selling',
 };
 
 export interface DmSeat {
@@ -129,6 +131,14 @@ export interface DmScreenProps {
   onAwardXp: () => void;
   /** Take one character up a level (Brief 07 §3). */
   onLevelUp: (creatureId: string) => void;
+  /** Buy or sell one item for one character (Brief 07 §4). */
+  onTrade: (trade: { characterId: string; direction: 'buy' | 'sell'; itemId: string }) => void;
+  /**
+   * What each character is carrying, so the sell side offers only what exists.
+   * A separate prop rather than a field on the cast entry: the running order is
+   * what a fight consults, and a pack is not part of that.
+   */
+  inventories?: Record<string, readonly string[]>;
   onAnswerPrompt: (promptId: string, take: boolean, optionName?: string) => void;
   onAskCheck: (ask: { skill: string; creatureIds: string[]; secret: boolean; dc?: number; reason?: string }) => void;
   onRule: (onSeq: number, verdict: 'allow' | 'refuse', note?: string) => void;
@@ -159,7 +169,7 @@ export function DmScreen(props: DmScreenProps): ReactElement {
   const {
     view, room, campaignName, seats, prompts, rulings, effect, fetchJson,
     onLeave, onSay, onSpeakAs, onWhisper, onStartCombat, onEndCombat, onAdvanceTurn,
-    onRest, onAwardXp, onLevelUp, onAnswerPrompt, onAskCheck, onRule, onAddCreature, onRemoveCreature,
+    onRest, onAwardXp, onLevelUp, onTrade, inventories = {}, onAnswerPrompt, onAskCheck, onRule, onAddCreature, onRemoveCreature,
     onEffect, onMove, onTableScreenLink, notice = null, onDismissNotice,
   } = props;
 
@@ -372,6 +382,19 @@ export function DmScreen(props: DmScreenProps): ReactElement {
 
             {tool === 'rules' && <Compendium fetchJson={fetchJson} />}
 
+            {/* The purse belongs to whoever is focused, which is why this tool
+                reads the focus rather than carrying a picker of its own — the
+                running order is already the navigation on this screen. */}
+            {tool === 'shop' && (
+              <Shop
+                fetchJson={fetchJson}
+                characterId={focused}
+                characterName={view.cast.find((c) => c.id === focused)?.name ?? null}
+                inventory={focused === null ? [] : inventories[focused] ?? []}
+                onTrade={(t) => { onTrade(t); }}
+              />
+            )}
+
             {tool === 'screen' && (
               <div className="qa2-bench-note">
                 <p style={{ ...prose, margin: 0 }}>
@@ -479,6 +502,7 @@ export function DmScreen(props: DmScreenProps): ReactElement {
         onRest={onRest}
         onAwardXp={onAwardXp}
         onLevelUp={onLevelUp}
+        onShop={toggle('shop')}
         onAddCreature={toggle('add')}
         onRemoveCreature={onRemoveCreature}
         onAskCheck={toggle('ask')}

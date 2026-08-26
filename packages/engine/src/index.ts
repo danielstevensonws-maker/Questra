@@ -48,20 +48,57 @@ export * from './sim/legality.js';
 import { CONDITIONS } from './data/conditions.js';
 import { GOBLIN_WARRIOR, FIREBALL } from './data/slice.js';
 import { CLASSES } from './data/classes.js';
+import { ORIGINS } from './data/origins.js';
 import { draftSpells } from './data/spells.js';
-import { draftMonsters } from './data/monsters.js';
+import { MONSTERS } from './data/monsters.js';
 import { draftNamed } from './data/named.js';
-import { draftItems } from './data/items.js';
+import { ITEMS } from './data/items.js';
 import type { RulesEntity } from '@questra/contracts';
 
 /**
- * The verified dataset: 15 conditions + the slice monster/spell + the 12 full
- * classes. (The Fighter comes from the full class dataset — the fixture's 1–5
- * excerpt is superseded, so it is not added separately here.) Safe in real sessions.
+ * Everything safe to put in front of a real table.
+ *
+ * IT USED TO BE TWENTY-NINE ENTRIES — fifteen conditions, twelve classes, one
+ * goblin and one fireball — because the whole ingested corpus sat at
+ * `qa: 'draft'` and the loader refuses drafts outside dev (Brief 01 §7). The
+ * compendium browser reads THIS list, and so does the DM's "bring something in":
+ * a DM searching for a monster was offered a single goblin, with the entire SRD
+ * bestiary present in the repo and unreachable.
+ *
+ * The monsters and items now arrive promoted — each one checked back against
+ * the numbers printed in its own `srd_text` (`ingest/verify.ts`), never
+ * rubber-stamped. Whatever could not be proven is still draft and still refused,
+ * which is why this is a filter rather than a concatenation.
+ *
+ * SPELLS AND ORIGINS-AS-INGESTED ARE DELIBERATELY ABSENT. The 338 draft spells
+ * carry `effects: []` with `resolution: 'routine'` — a claim that the engine
+ * resolves mechanics nobody has encoded — and putting unreviewed rules in front
+ * of players who cannot tell the app is wrong is the one failure this project
+ * says is worse than a crash. They need the rules-lawyer pass the conditions
+ * got. (The species and backgrounds ARE here, via `ORIGINS`, because they were
+ * authored and signed off in `data/origins.ts`.)
  */
-export const VERIFIED_DATASET: RulesEntity[] = [...CONDITIONS, GOBLIN_WARRIOR, FIREBALL, ...CLASSES];
+export const VERIFIED_DATASET: RulesEntity[] = [
+  ...CONDITIONS,
+  GOBLIN_WARRIOR,
+  FIREBALL,
+  ...CLASSES,
+  ...ORIGINS,
+  ...MONSTERS.filter((m) => m.qa === 'verified'),
+  ...ITEMS.filter((i) => i.qa === 'verified'),
+];
 
-/** The full dataset including drafts (verified core + draft spells/monsters/species/backgrounds/feats/items). Drafts are dev-only via the loader. */
+/**
+ * Everything, verified or not — what dev and the ingestion tooling read.
+ *
+ * Deduplicated by id, because the verified list now CONTAINS most of the
+ * monsters and items rather than sitting beside them, and a compendium that
+ * offered two of every goblin would be its own bug.
+ */
 export function fullDataset(): RulesEntity[] {
-  return [...VERIFIED_DATASET, ...draftSpells(), ...draftMonsters(), ...draftNamed(), ...draftItems()];
+  const byId = new Map<string, RulesEntity>();
+  for (const e of [...VERIFIED_DATASET, ...draftSpells(), ...MONSTERS, ...draftNamed(), ...ITEMS]) {
+    if (!byId.has(e.id)) byId.set(e.id, e);
+  }
+  return [...byId.values()];
 }

@@ -37,7 +37,7 @@ import { SyncCore, type IntentResolver, type ResolvedToken } from './sync-core.j
 import { InMemoryEventStore, type EventStore } from './store/event-store.js';
 import { PostgresEventStore } from './store/postgres-event-store.js';
 import {
-  CLASSES, DRAFT_ITEMS, DRAFT_SPELLS, VERIFIED_BACKGROUNDS,
+  CLASSES, ITEMS, DRAFT_SPELLS, VERIFIED_BACKGROUNDS,
   buildSheetRulesData, combatantFromCharacter, speciesSpeedFt,
 } from '@questra/engine';
 import { CharacterChoicesSchema, type CharacterChoices } from '@questra/contracts';
@@ -160,7 +160,7 @@ export function createApp(config: ServerConfig): App {
       const parsed = CharacterChoicesSchema.safeParse(row.choices);
       if (!parsed.success) continue;
       const rules = buildSheetRulesData(
-        [...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS],
+        [...CLASSES, ...ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS],
         speciesSpeedFt(parsed.data.speciesId),
       );
       choicesByCharacter.set(row.id, parsed.data);
@@ -1210,7 +1210,7 @@ export function makeSliceResolver(deps: SliceResolverDeps = {}): IntentResolver 
         const result = levelUp(
           characterId, choices, toLevel,
           { hp: intent.hp ?? { method: 'average' }, ...(intent.featureChoices ? { featureChoices: intent.featureChoices } : {}), ...(intent.spells ? { spells: intent.spells } : {}) },
-          buildSheetRulesData([...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS], speciesSpeedFt(choices.speciesId)),
+          buildSheetRulesData([...CLASSES, ...ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS], speciesSpeedFt(choices.speciesId)),
         );
         deps.onLevelUp?.(context.playSessionId, characterId, toLevel);
 

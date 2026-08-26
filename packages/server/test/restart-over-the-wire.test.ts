@@ -22,29 +22,16 @@
  * stay green without one. Bring it up with:
  *   docker compose up -d && npm run migrate:up -w @questra/server
  */
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, beforeAll } from 'vitest';
 import pg from 'pg';
 import { WebSocket } from 'ws';
 import type { PlayEvent, ServerMsg } from '@questra/contracts';
 import { SyncCore, PostgresEventStore, type ResolvedToken, type IntentResolver } from '../src/index.js';
 import { start } from '../src/main.js';
+import { DATABASE_URL, WANTS_POSTGRES, requirePostgres } from './postgres.js';
 
-const DATABASE_URL = process.env.DATABASE_URL;
 const PS = `ps-wire-${Date.now()}`;
 const TOKEN = 'tok-dm';
-
-async function postgresReady(): Promise<boolean> {
-  if (!DATABASE_URL) return false;
-  const pool = new pg.Pool({ connectionString: DATABASE_URL, connectionTimeoutMillis: 1500 });
-  try {
-    await pool.query('SELECT 1 FROM play_event LIMIT 1');
-    return true;
-  } catch {
-    return false;
-  } finally {
-    await pool.end().catch(() => {});
-  }
-}
 
 const resolveToken = (token: string, playSessionId: string): ResolvedToken | null =>
   token === TOKEN && playSessionId === PS
@@ -94,13 +81,14 @@ async function helloAndListen(port: number, forMs = 900): Promise<ServerMsg[]> {
 
 const LINE = 'The floor gives way.';
 
-/* Probed at COLLECTION time, so a missing database shows as SKIPPED in the
-   reporter rather than as a passing test that quietly returned. That confusion
-   is exactly what let the neighbouring durability suite report green for weeks
-   without ever reaching Postgres. */
-const ready = await postgresReady();
+/* Skipped on the ENV rather than on a probe: a suite that needs a database has
+   two honest outcomes, ran or skipped, and "DATABASE_URL is set but nothing
+   answered" is a failure rather than a third one. See test/postgres.ts — that
+   confusion is what let the neighbouring durability suite report green for
+   weeks without ever reaching Postgres. */
+describe.skipIf(!WANTS_POSTGRES)('a session restored over the wire', () => {
+  beforeAll(requirePostgres);
 
-describe.skipIf(!ready)('a session restored over the wire', () => {
   afterAll(async () => {
     const pool = new pg.Pool({ connectionString: DATABASE_URL! });
     await pool.query('DELETE FROM idempotency WHERE play_session_id = $1', [PS]).catch(() => {});

@@ -49,6 +49,7 @@ function bar(over: Partial<Parameters<typeof DirectorBar>[0]> = {}) {
       onRest={noop}
       onAwardXp={noop}
       onLevelUp={noop}
+      onShop={noop}
       onAddCreature={noop}
       onRemoveCreature={noop}
       onAskCheck={noop}
@@ -208,6 +209,13 @@ describe('experience and levels', () => {
     bar({ focusedId: mira.id, onLevelUp: levelled });
     fireEvent.click(screen.getByRole('button', { name: /Level them up/i }));
     expect(levelled).toHaveBeenCalledWith(mira.id);
+  });
+
+  it('opens the equipment list on the person whose purse it is', () => {
+    const shopping = vi.fn();
+    bar({ focusedId: mira.id, onShop: shopping });
+    fireEvent.click(screen.getByRole('button', { name: /Buy and sell/i }));
+    expect(shopping).toHaveBeenCalledWith(mira.id);
   });
 
   it('says why a monster cannot level, rather than going quietly grey', () => {

@@ -16,9 +16,9 @@ import {
 import { buy, sell, coinsToCp, cpToCoins, defaultSellPriceCp } from '../src/sim/shop.js';
 import { computeSheet, buildSheetRulesData } from '../src/sim/sheet.js';
 import { CLASSES } from '../src/data/classes.js';
-import { DRAFT_ITEMS } from '../src/data/items.js';
+import { ITEMS } from '../src/data/items.js';
 
-const rules = buildSheetRulesData([...CLASSES, ...DRAFT_ITEMS], 30);
+const rules = buildSheetRulesData([...CLASSES, ...ITEMS], 30);
 
 const restBase: RestResources = {
   creatureId: 'pc-torvald', hp: 20, maxHp: 44, hitDie: 10,

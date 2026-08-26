@@ -104,6 +104,8 @@ export interface DirectorBarProps {
   onAwardXp: () => void;
   /** Take a level for one character (Brief 07 §3). */
   onLevelUp: (creatureId: string) => void;
+  /** Open the equipment list for one character (Brief 07 §4). */
+  onShop: (creatureId: string) => void;
   onAddCreature: () => void;
   onRemoveCreature: (creatureId: string) => void;
   onAskCheck: () => void;
@@ -134,7 +136,7 @@ export interface DirectorBarProps {
 export function DirectorBar(props: DirectorBarProps): ReactElement {
   const {
     cast, seats, focusedId, onFocus, exploring, voice, onVoice, onEffect, onRest,
-    onAwardXp, onLevelUp,
+    onAwardXp, onLevelUp, onShop,
     onAddCreature, onRemoveCreature, onAskCheck, onRules, onMoveCreature,
     onWhisper, onShowScreenLink, movingId = null, onBoard,
     openTool = null, onTool,
@@ -159,7 +161,7 @@ export function DirectorBar(props: DirectorBarProps): ReactElement {
   const theirs = focused === null
     ? []
     : creatureVerbs({
-        focused, seat, movingId, onVoice, onWhisper, onAskCheck, onMoveCreature, onRemoveCreature, onFocus, onLevelUp,
+        focused, seat, movingId, onVoice, onWhisper, onAskCheck, onMoveCreature, onRemoveCreature, onFocus, onLevelUp, onShop,
         placed: onBoard === undefined || onBoard(focused.id),
         openTool,
       });
@@ -449,6 +451,7 @@ function creatureVerbs(o: {
   onRemoveCreature: (id: string) => void;
   onFocus: (id: string | null) => void;
   onLevelUp: (id: string) => void;
+  onShop: (id: string) => void;
   placed: boolean;
   openTool: string | null;
 }): Verb[] {
@@ -511,6 +514,21 @@ function creatureVerbs(o: {
       detail: `Take ${focused.name} up a level — the sheet is recomputed, and the new hit points are averaged unless you roll them.`,
       refusal: focused.kind === 'foe' ? `${focused.name} is a monster. Monsters do not level.` : null,
       onPress: () => { o.onLevelUp(focused.id); },
+    },
+    /**
+     * The equipment list, opened on the person whose purse it is. Shopping is a
+     * thing that happens TO a character — their money, their pack — so it lives
+     * here rather than on the table row, where it would need a picker of its own.
+     */
+    {
+      id: 'who:shop',
+      glyph: 'flask',
+      name: 'Buy and sell',
+      detail: `Open the equipment list for ${focused.name} — prices come from the rules, and you can name your own.`,
+      refusal: focused.kind === 'foe' ? `${focused.name} is not going shopping.` : null,
+      opens: true,
+      isOpen: o.openTool === 'shop',
+      onPress: () => { o.onShop(focused.id); },
     },
     {
       id: 'who:remove',

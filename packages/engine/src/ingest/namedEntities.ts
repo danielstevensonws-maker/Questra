@@ -16,7 +16,34 @@ export const SPECIES_NAMES = [
 
 export const BACKGROUND_NAMES = ['Acolyte', 'Criminal', 'Sage', 'Soldier'] as const;
 
-export const FEAT_NAMES = ['Alert', 'Magic Initiate', 'Savage Attacker', 'Skilled'] as const;
+/**
+ * Every feat the SRD 5.2.1 prints, in document order (the extractor walks
+ * forwards, so order is load-bearing).
+ *
+ * IT USED TO BE FOUR — the Origin category only — which left the wizard and the
+ * level-up flow with nothing to offer at the two moments feats exist for.
+ * A background grants an Origin feat, so those four carried the wizard; but
+ * ASI-or-feat at level-up needs Ability Score Improvement, and a Fighter's
+ * level-one choice needs the Fighting Style feats, and neither was in the list
+ * so neither was in the data.
+ *
+ * Seventeen is the SRD's whole roster, not a subset of a larger one: the SRD
+ * publishes four Origin feats, two General, four Fighting Style and seven Epic
+ * Boon. (The full 5e feat list is much longer and is not CC-licensed — ADR-0010
+ * and CLAUDE.md: SRD 5.2 content only.)
+ */
+export const FEAT_NAMES = [
+  // Origin — one is granted by every background.
+  'Alert', 'Magic Initiate', 'Savage Attacker', 'Skilled',
+  // General — the ASI-or-feat choice at level-up picks from here.
+  'Ability Score Improvement', 'Grappler',
+  // Fighting Style — a Fighter's level-one choice.
+  'Archery', 'Defense', 'Great Weapon Fighting', 'Two-Weapon Fighting',
+  // Epic Boon — level 19.
+  'Boon of Combat Prowess', 'Boon of Dimensional Travel', 'Boon of Fate',
+  'Boon of Irresistible Offense', 'Boon of Spell Recall', 'Boon of the Night Spirit',
+  'Boon of Truesight',
+] as const;
 
 export interface NamedEntity {
   name: string;

@@ -14,11 +14,11 @@ import { describe, it, expect } from 'vitest';
 import { ComputedSheetSchema, derivationSumsToValue, type CharacterChoices } from '@questra/contracts';
 import { computeSheet, buildSheetRulesData, IllegalChoiceError } from '../src/sim/sheet.js';
 import { CLASSES } from '../src/data/classes.js';
-import { DRAFT_ITEMS } from '../src/data/items.js';
+import { ITEMS } from '../src/data/items.js';
 import { DRAFT_SPELLS } from '../src/data/spells.js';
 import { FIREBALL } from '../src/data/slice.js';
 
-const rules = buildSheetRulesData([...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS, FIREBALL], 30);
+const rules = buildSheetRulesData([...CLASSES, ...ITEMS, ...DRAFT_SPELLS, FIREBALL], 30);
 
 /** A character of `classId` at `level`, with everything irrelevant held fixed. */
 const who = (classId: string, level: number, extra: Partial<CharacterChoices> = {}): CharacterChoices => ({

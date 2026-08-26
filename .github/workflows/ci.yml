@@ -13,6 +13,36 @@ jobs:
   check:
     name: check:all (typecheck + tests + engine goldens)
     runs-on: ubuntu-latest
+
+    # The durability suites (persistence.golden, restart-over-the-wire,
+    # auth-postgres) guard the ADR-0015 exit criterion — "the event log survives
+    # a server restart" — and they SKIP CLEANLY when DATABASE_URL is unset. That
+    # is the right behaviour for a contributor with no database running and
+    # exactly the wrong behaviour here: without a Postgres, CI reported those
+    # suites green for weeks while they had never touched a database, and three
+    # real bugs hid behind it (see 1fa5f95). A criterion nothing runs is not a
+    # criterion. So CI gets a database.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: questra
+          POSTGRES_PASSWORD: questra_dev
+          POSTGRES_DB: questra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U questra -d questra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://questra:questra_dev@localhost:5432/questra
+      # The server refuses to start without one, on purpose: a default secret
+      # that works in dev is a default secret that reaches production.
+      QUESTRA_JWT_SECRET: ci-only-not-a-real-secret-0000000000000000
+
     steps:
       - uses: actions/checkout@v4
 
@@ -25,6 +55,31 @@ jobs:
       # poppler/pdftotext is needed at test time — the suite is hermetic.
       - name: Install
         run: npm ci
+
+      # The durability suites read a MIGRATED schema — they probe for the
+      # play_event table and skip when it is missing, so an unmigrated database
+      # is indistinguishable from no database at all.
+      - name: Migrate
+        run: npm run migrate:up -w @questra/server
+
+      # And prove the database is actually being USED, rather than trusting that
+      # it is. The suites skip themselves when DATABASE_URL is unset — which is
+      # right for a contributor and wrong here — so this fails the run if any of
+      # them skipped. It is the check that would have caught the weeks of silent
+      # green, and it is one step rather than a convention somebody remembers.
+      - name: The durability suites are not skipping
+        working-directory: packages/server
+        run: |
+          npx vitest run --reporter=json --outputFile=/tmp/db.json \
+            test/persistence.golden.test.ts \
+            test/auth-postgres.golden.test.ts \
+            test/restart-over-the-wire.test.ts
+          node -e "const r=require('/tmp/db.json');
+            if (r.numPendingTests > 0) {
+              console.error(r.numPendingTests + ' durability test(s) skipped - is DATABASE_URL reaching vitest?');
+              process.exit(1);
+            }
+            console.log(r.numPassedTests + ' durability tests ran against Postgres');"
 
       # check:all = contracts + theme + ui + engine + server + ai (typecheck +
       # vitest, incl. the Torvald trace / sheet / wire / slice golden tests).

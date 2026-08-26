@@ -9,7 +9,7 @@
  */
 import {
   CLASSES,
-  DRAFT_ITEMS,
+  ITEMS,
   DRAFT_SPELLS,
   VERIFIED_BACKGROUNDS,
   VERIFIED_SPECIES,
@@ -96,7 +96,7 @@ export function backgroundById(id: string | null): BackgroundOption | undefined 
  */
 export function sheetFor(choices: CharacterChoices): ComputedSheet {
   const rules = buildSheetRulesData(
-    [...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS],
+    [...CLASSES, ...ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS],
     speciesSpeedFt(choices.speciesId),
   );
   return computeSheet(choices, rules);

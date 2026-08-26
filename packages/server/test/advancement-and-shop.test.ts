@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import type { CharacterChoices, PlayEvent, Viewer } from '@questra/contracts';
 import { makeSliceResolver } from '../src/app.js';
 import {
-  CLASSES, DRAFT_ITEMS, DRAFT_SPELLS, VERIFIED_BACKGROUNDS,
+  CLASSES, ITEMS, DRAFT_SPELLS, VERIFIED_BACKGROUNDS,
   buildSheetRulesData, combatantFromCharacter, speciesSpeedFt,
   type Combatant, type ProjectionState,
 } from '@questra/engine';
@@ -43,7 +43,7 @@ const choices: CharacterChoices = {
 };
 
 const rules = buildSheetRulesData(
-  [...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS],
+  [...CLASSES, ...ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS],
   speciesSpeedFt(choices.speciesId),
 );
 

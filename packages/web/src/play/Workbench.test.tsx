@@ -52,7 +52,7 @@ function dm(over: Partial<Parameters<typeof DmScreen>[0]> = {}) {
       fetchJson={(async () => ({ entries: [], types: [] })) as <T>(p: string) => Promise<T>}
       onLeave={noop} onSay={noop} onSpeakAs={noop} onWhisper={noop}
       onStartCombat={noop} onEndCombat={noop} onAdvanceTurn={noop} onRest={noop}
-      onAwardXp={noop} onLevelUp={noop}
+      onAwardXp={noop} onLevelUp={noop} onTrade={noop}
       onAnswerPrompt={noop} onAskCheck={noop} onRule={noop}
       onAddCreature={noop} onRemoveCreature={noop} onEffect={noop} onMove={noop}
       {...over}

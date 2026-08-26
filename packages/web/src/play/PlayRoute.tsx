@@ -218,6 +218,20 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
   }, [sync.snapshot, sync.events, liveRoom, myCharacter, table, rosterNames]);
 
   /**
+   * What each character is carrying, straight off the folded projection — the
+   * shop's sell side needs it, and nothing else on the screen does, so it stays
+   * out of the view model rather than riding along in the cast.
+   */
+  const inventories = useMemo<Record<string, readonly string[]>>(() => {
+    const snapshot = (sync.snapshot ?? { combatants: {}, round: 1, nextSeq: 0 }) as Projection;
+    const out: Record<string, readonly string[]> = {};
+    for (const c of Object.values(castWithArrivals(snapshot, sync.events).combatants)) {
+      if (c.inventory) out[c.id] = c.inventory;
+    }
+    return out;
+  }, [sync.snapshot, sync.events]);
+
+  /**
    * Who each token is TO THIS VIEWER — the room stores a creatureRef and knows
    * nothing about allegiance, so the map cannot colour a token without this.
    * The chosen target is marked here too, because "which one am I aiming at"
@@ -308,6 +322,11 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
            dialogue — a table that wants to roll for them gets the rolled
            branch when the level-up flow's own surface lands (Brief 07 §3). */
         onLevelUp={(characterId) => { send({ kind: 'level_up', characterId, hp: { method: 'average' } }); }}
+        /* One row at a time — the server prices it and settles the coins. */
+        onTrade={({ characterId, direction, itemId }) => {
+          send({ kind: 'shop', characterId, direction, lines: [{ itemId, qty: 1 }] });
+        }}
+        inventories={inventories}
         onAnswerPrompt={(promptId, take, optionName) => {
           send(optionName === undefined
             ? { kind: 'prompt_reply', promptId, take }

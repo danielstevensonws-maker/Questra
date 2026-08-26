@@ -13,35 +13,22 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import pg from 'pg';
+import { DATABASE_URL, WANTS_POSTGRES, requirePostgres } from './postgres.js';
 import {
   AuthService, PostgresAuthRepo, LogMailer, makeResolveToken, signSession, verifySession,
   type TokenConfig,
 } from '../src/auth/index.js';
 
-const DATABASE_URL = process.env.DATABASE_URL;
 const SECRET = new TextEncoder().encode('pg-round-trip-secret-32-bytes-long!!');
 const tokens: TokenConfig = { secret: SECRET };
 const RUN = Date.now().toString(36); // unique-per-run ids so re-runs don't collide
 
-async function postgresReady(): Promise<boolean> {
-  if (!DATABASE_URL) return false;
-  const pool = new pg.Pool({ connectionString: DATABASE_URL, connectionTimeoutMillis: 1500 });
-  try {
-    await pool.query('SELECT 1 FROM membership LIMIT 1'); // needs the §1 migration applied
-    return true;
-  } catch {
-    return false;
-  } finally {
-    await pool.end().catch(() => {});
-  }
-}
 
 function extractToken(body: string): string {
   return body.split('token: ')[1]!.trim();
 }
 
-describe('accounts + tokens round-trip against live Postgres (ADR-0015 dev-env DoD)', () => {
-  let ready = false;
+describe.skipIf(!WANTS_POSTGRES)('accounts + tokens round-trip against live Postgres (ADR-0015 dev-env DoD)', () => {
   let pool: pg.Pool | null = null;
   let repo: PostgresAuthRepo | null = null;
 
@@ -50,8 +37,8 @@ describe('accounts + tokens round-trip against live Postgres (ADR-0015 dev-env D
   const email = `alice_${RUN}@example.com`;
 
   beforeAll(async () => {
-    ready = await postgresReady();
-    if (!ready) return;
+    /* DATABASE_URL was set, so a database that is not there is the news. */
+    await requirePostgres();
     pool = new pg.Pool({ connectionString: DATABASE_URL! });
     repo = new PostgresAuthRepo(DATABASE_URL!);
   });
@@ -68,11 +55,8 @@ describe('accounts + tokens round-trip against live Postgres (ADR-0015 dev-env D
     await repo?.close();
   });
 
-  it('signup → verify → login → resolveToken(real membership) → role [skips without PG]', async () => {
-    if (!ready || !repo || !pool) {
-      console.warn('[auth-postgres] SKIPPED — no reachable Postgres with the §1 migration (docker compose up -d && npm run migrate:up)');
-      return;
-    }
+  it('signup → verify → login → resolveToken(real membership) → role', async () => {
+    if (!repo || !pool) throw new Error('beforeAll should have opened the pool');
     const mailer = new LogMailer(() => {});
     const svc = new AuthService({
       repo, mailer, tokens,

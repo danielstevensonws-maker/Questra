@@ -8,7 +8,7 @@
  */
 import { CharacterChoicesSchema, CharacterSchema, RoomSchema, filterRoomForViewer } from '@questra/contracts';
 import {
-  CLASSES, DRAFT_ITEMS, DRAFT_SPELLS, VERIFIED_SPECIES, VERIFIED_BACKGROUNDS,
+  CLASSES, ITEMS, DRAFT_SPELLS, VERIFIED_SPECIES, VERIFIED_BACKGROUNDS,
   buildSheetRulesData, computeSheet, speciesSpeedFt, starterRoom,
 } from '@questra/engine';
 import type {
@@ -64,7 +64,7 @@ function summarise(choices: CharacterChoices): string {
 function sheetFor(choices: CharacterChoices): ComputedSheet {
   return computeSheet(
     choices,
-    buildSheetRulesData([...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS], speciesSpeedFt(choices.speciesId)),
+    buildSheetRulesData([...CLASSES, ...ITEMS, ...DRAFT_SPELLS, ...VERIFIED_BACKGROUNDS], speciesSpeedFt(choices.speciesId)),
   );
 }
 
