@@ -7,8 +7,8 @@
  * the table rather than here.
  */
 import { describe, it, expect } from 'vitest';
-import { RoomSchema, distFt, filterRoomForViewer } from '@questra/contracts';
-import { starterRoom } from '../src/sim/starter-room.js';
+import { RoomSchema, distFt, filterRoomForViewer, type Room } from '@questra/contracts';
+import { starterRoom, seatLatecomers } from '../src/sim/starter-room.js';
 
 describe('the starter room', () => {
   it('is a valid Room', () => {
@@ -92,5 +92,77 @@ describe('the starter room', () => {
     const room = starterRoom({ roomId: 'room_1', creatureIds: [] });
     expect(() => RoomSchema.parse(room)).not.toThrow();
     expect(room.tokens).toEqual([]);
+  });
+});
+
+/**
+ * The chair a latecomer gets on a map that was drawn without them.
+ *
+ * FOUND BY RUNNING THE APP. A campaign's room is minted the first time anybody
+ * opens it — the DM, before a single player has run the wizard — so it is built
+ * with nobody on it, and every character made afterwards had a seat in the turn
+ * order and no token on the board, permanently. The symptom was opportunity
+ * attacks: a goblin walked out of a fighter's reach and provoked nothing,
+ * because the fighter was not anywhere for the geometry to find.
+ */
+describe('seating somebody who arrived after the map was drawn', () => {
+  const empty = starterRoom({ roomId: 'room_1', creatureIds: [] });
+
+  it('a room built before anybody existed has no tokens at all', () => {
+    expect(empty.tokens).toHaveLength(0);
+  });
+
+  it('gives the latecomer a token, on a legal square', () => {
+    const seated = seatLatecomers(empty, ['char_torvald']);
+    expect(seated.tokens).toHaveLength(1);
+    expect(seated.tokens[0]!.creatureRef).toBe('char_torvald');
+    expect(RoomSchema.safeParse(seated).success).toBe(true);
+    const { x, y } = seated.tokens[0]!.cell;
+    expect(x).toBeGreaterThanOrEqual(0);
+    expect(y).toBeGreaterThanOrEqual(0);
+    expect(x).toBeLessThan(seated.gridSize.w);
+    expect(y).toBeLessThan(seated.gridSize.h);
+  });
+
+  it('seats them beside the party, not where a monster would arrive', () => {
+    /* The party column is the west edge; an arrival lands about two thirds
+       across. A character who came in late is one of the party. */
+    const seated = seatLatecomers(empty, ['char_torvald']);
+    expect(seated.tokens[0]!.cell.x).toBeLessThan(seated.gridSize.w / 2);
+  });
+
+  it('leaves anybody already on the map exactly where they are', () => {
+    const withOne = starterRoom({ roomId: 'room_1', creatureIds: ['char_a'] });
+    const moved: Room = {
+      ...withOne,
+      tokens: withOne.tokens.map((t) => ({ ...t, cell: { x: 11, y: 9 }, hidden: true })),
+    };
+    const seated = seatLatecomers(moved, ['char_a', 'char_b']);
+    const a = seated.tokens.find((t) => t.creatureRef === 'char_a')!;
+    /* Rebuilding an existing token would silently undo a move, a hide or a
+       stage — which is why this only ever adds. */
+    expect(a.cell).toEqual({ x: 11, y: 9 });
+    expect(a.hidden).toBe(true);
+    expect(seated.tokens).toHaveLength(2);
+  });
+
+  it('does not stack a latecomer on somebody already standing there', () => {
+    const withOne = starterRoom({ roomId: 'room_1', creatureIds: ['char_a'] });
+    const seated = seatLatecomers(withOne, ['char_a', 'char_b']);
+    const a = seated.tokens.find((t) => t.creatureRef === 'char_a')!;
+    const b = seated.tokens.find((t) => t.creatureRef === 'char_b')!;
+    expect(a.cell).not.toEqual(b.cell);
+  });
+
+  it('is a no-op — the same object — when nobody is missing', () => {
+    const withOne = starterRoom({ roomId: 'room_1', creatureIds: ['char_a'] });
+    expect(seatLatecomers(withOne, ['char_a'])).toBe(withOne);
+    expect(seatLatecomers(withOne, [])).toBe(withOne);
+  });
+
+  it('seats several at once, each on their own square', () => {
+    const seated = seatLatecomers(empty, ['a', 'b', 'c']);
+    const cells = seated.tokens.map((t) => `${String(t.cell.x)},${String(t.cell.y)}`);
+    expect(new Set(cells).size).toBe(3);
   });
 });

@@ -9,6 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import type { PlayEvent } from '@questra/contracts';
 import { promptsFrom } from '../src/play/promptsFrom.js';
+import { namesFrom } from '../src/play/namesFrom.js';
 import { tilesFrom } from '../src/play/tilesFrom.js';
 import { rulingsFrom } from '../src/play/rulingsFrom.js';
 import { roomWithMoves } from '@questra/engine';
@@ -404,5 +405,51 @@ describe('the DM performing rather than narrating', () => {
       as: { name: 'The Goblin Boss' },
     })]);
     expect(open).toHaveLength(0);
+  });
+});
+
+/**
+ * The names a card can use.
+ *
+ * FOUND BY RUNNING THE APP. The opportunity-attack card read "foe-1787742502386-22
+ * is moving out of reach" — the server's own id, on a card with a timer, shown to
+ * a player who has seconds to read it. The roster only knows player characters,
+ * and a monster is exactly who provokes.
+ */
+describe('naming everybody on the board', () => {
+  const added = (seq: number, creatureId: string, name: string) =>
+    ev(seq, { t: 'creature_added', creatureId, name, maxHp: 7, ac: 15, cell: { x: 9, y: 3 } });
+
+  it('keeps the party the roster already knows', () => {
+    expect(namesFrom({ mira: 'Mira' }, [])).toEqual({ mira: 'Mira' });
+  });
+
+  it('learns the name of a creature the DM brought in', () => {
+    const names = namesFrom({ mira: 'Mira' }, [added(1, 'foe-1', 'Goblin Warrior')]);
+    expect(names['foe-1']).toBe('Goblin Warrior');
+    expect(names['mira']).toBe('Mira');
+  });
+
+  it('is what stops a card printing an id at a player', () => {
+    const events = [
+      added(1, 'foe-1787742502386-22', 'Goblin Warrior'),
+      ev(2, {
+        t: 'reaction_prompted', promptId: 'p1', creatureId: 'mira', timeoutSec: 60,
+        context: {
+          kind: 'opportunity_attack',
+          moverId: 'foe-1787742502386-22', provokerId: 'mira',
+          pathStep: { from: { x: 10, y: 3 }, to: { x: 13, y: 3 } },
+          attackOptions: ['Attack'],
+        },
+      }),
+    ];
+    const [card] = promptsFrom(events, namesFrom({ mira: 'Mira' }, events));
+    expect(card!.context).toBe('Goblin Warrior is moving out of reach. You can take a swing as they go.');
+    expect(card!.context).not.toMatch(/foe-\d/);
+  });
+
+  it('knows a creature by the name it has now', () => {
+    const names = namesFrom({}, [added(1, 'foe-1', 'Goblin'), added(2, 'foe-1', 'Grishnak')]);
+    expect(names['foe-1']).toBe('Grishnak');
   });
 });

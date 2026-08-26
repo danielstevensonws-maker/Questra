@@ -64,6 +64,62 @@ function partyCells(count: number, grid: { w: number; h: number }): Cell[] {
   return cells;
 }
 
+/**
+ * Put a character who arrived LATE onto a map that was built without them.
+ *
+ * THE ROOM IS MADE ONCE AND THE PARTY IS NOT FINISHED ARRIVING. A campaign's
+ * map is minted the first time anybody opens it — which is the DM, before a
+ * single player has run the wizard — so its token list is whoever existed at
+ * that instant, and that is usually nobody. Every character made afterwards
+ * got a seat in the turn order and NO TOKEN ON THE BOARD: present in the
+ * roster, absent from the map, for the rest of the campaign.
+ *
+ * That is the same bug the seating fix already caught one layer up ("a base
+ * built once, so a player who made their character afterwards never reached
+ * the table"). The seat was fixed; the square was not. Found by running the
+ * app: a goblin walked out of a fighter's reach and provoked nothing, because
+ * the fighter was not anywhere.
+ *
+ * ONLY ADDING IS SAFE, exactly as it is for reseating. A character already on
+ * the map may have been moved, hidden or staged since, and rebuilding their
+ * token would silently undo it — so anyone who already has one is left alone.
+ *
+ * They land beside the party rather than where an arriving monster would: the
+ * party's column is the west edge, and the first free cell in it is the chair
+ * nobody has taken.
+ */
+export function seatLatecomers(room: Room, creatureIds: readonly string[]): Room {
+  const missing = creatureIds.filter(
+    (id) => !room.tokens.some((t) => t.creatureRef === id),
+  );
+  if (missing.length === 0) return room;
+
+  const taken = new Set(room.tokens.map((t) => `${String(t.cell.x)},${String(t.cell.y)}`));
+  /* Enough party cells for everybody who could be standing there, so the
+     newcomers fill the gaps in the column rather than starting a second one
+     beside a map that already has room. */
+  const column = partyCells(room.tokens.length + missing.length, room.gridSize);
+
+  const tokens = [...room.tokens];
+  for (const creatureRef of missing) {
+    const free = column.find((c) => !taken.has(`${String(c.x)},${String(c.y)}`));
+    /* A column with no gap left is not a reason to refuse a chair — the DM can
+       move somebody. Stacking is visible and fixable; being off the board is
+       neither. */
+    const cell = free ?? { x: 2, y: 2 };
+    taken.add(`${String(cell.x)},${String(cell.y)}`);
+    tokens.push({
+      id: `tok_${creatureRef}`,
+      creatureRef,
+      cell,
+      size: 'medium',
+      hidden: false,
+      staged: false,
+    });
+  }
+  return { ...room, tokens };
+}
+
 export function starterRoom({ roomId, creatureIds }: StarterRoomInput): Room {
   const grid = { ...DEFAULT_GRID };
   const cells = partyCells(creatureIds.length, grid);

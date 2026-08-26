@@ -36,6 +36,28 @@ const CSS = `
    placement. Positioning is applied here rather than in the design layer so
    the same chrome can sit in an ordinary document flow elsewhere. */
 .qa2-scene, .qa2-spine, .qa2-journal, .qa2-you, .qa2-act { position: absolute; z-index: 2; }
+/**
+ * The reaction card, placed.
+ *
+ * IT HAD NO PLACEMENT AT ALL and the play screen is a full-bleed fixed surface,
+ * so the card landed in ordinary flow BELOW the viewport — present, correct,
+ * counting down, and off the bottom of the screen. A card with a timer that
+ * nobody can see is the app asking a question it never lets you answer. Found
+ * by running the app; it applied to every card in this dock, checks included.
+ *
+ * Fixed and centred rather than tucked into a corner because Brief 08 §1 calls
+ * it modal-priority: one at a time, and the one that is up is the thing the
+ * table is waiting on. It sits above the map's empty middle, clear of the near
+ * edge bottom-left and the journal on the right.
+ */
+.qa2-promptdock {
+  position: fixed;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  z-index: 8;
+  width: min(520px, calc(100vw - var(--qa-hud-inset) * 2));
+}
 .qa2-pill.is-spine, .qa2-pill.is-journal, .qa2-pill.is-act { position: absolute; z-index: 2; }
 
 .qa2-screen {

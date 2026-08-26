@@ -9,7 +9,7 @@
 import { CharacterChoicesSchema, CharacterSchema, RoomSchema, filterRoomForViewer } from '@questra/contracts';
 import {
   CLASSES, ITEMS, DRAFT_SPELLS, VERIFIED_SPECIES, VERIFIED_BACKGROUNDS,
-  buildSheetRulesData, computeSheet, speciesSpeedFt, starterRoom,
+  buildSheetRulesData, computeSheet, speciesSpeedFt, starterRoom, seatLatecomers,
 } from '@questra/engine';
 import type {
   Campaign, CampaignMember, CampaignSession, Character, CharacterChoices,
@@ -208,9 +208,30 @@ export class CampaignService {
       filterRoomForViewer(room, { role: me.role, accountId: callerAccountId });
 
     const existing = await this.deps.repo.currentRoom(campaignId);
-    if (existing) return forMe(RoomSchema.parse(existing.body));
-
     const characters = await this.deps.repo.charactersOfCampaign(campaignId);
+
+    /**
+     * AN EXISTING ROOM STILL HAS TO GAIN THE PEOPLE WHO ARRIVED SINCE.
+     *
+     * The map is minted the first time anybody opens the campaign — which is
+     * the DM, before a single player has run the wizard — so it was built with
+     * whoever existed then, and that is usually nobody. Returning it unchanged
+     * meant every character made afterwards had a seat in the turn order and no
+     * token on the board, permanently. Opportunity attacks were the symptom
+     * that surfaced it: a goblin walked out of a fighter's reach and provoked
+     * nothing, because the fighter was not anywhere.
+     *
+     * Adding only, and persisted so every viewer replays the same squares
+     * rather than each deriving its own.
+     */
+    if (existing) {
+      const room = RoomSchema.parse(existing.body);
+      const seated = seatLatecomers(room, characters.map((c) => c.id));
+      if (seated !== room) {
+        await this.deps.repo.putRoom({ ...existing, body: seated });
+      }
+      return forMe(seated);
+    }
     const room = starterRoom({
       roomId: this.deps.newRoomId(),
       creatureIds: characters.map((c) => c.id),

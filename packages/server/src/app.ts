@@ -30,7 +30,7 @@ import {
   arrivalCell, roomWithMoves, positionsOf, creatureForToken, provocations,
   reactionsFrom, hasReaction, openPromptsFrom, opportunityPrompts, promptedEvent,
   DEFAULT_REACH_FT, type Threat, type ProjectionState,
-  awardDefeatXp, defeatXpTotal, levelOfferAfterXp, levelUp, fullDataset,
+  awardDefeatXp, defeatXpTotal, levelOfferAfterXp, levelUp, fullDataset, seatLatecomers,
   buy, sell, defaultSellPriceCp, type ShopLine,
 } from '@questra/engine';
 import { SyncCore, type IntentResolver, type ResolvedToken } from './sync-core.js';
@@ -146,15 +146,36 @@ export function createApp(config: ServerConfig): App {
     const campaignId = await repo.campaignIdForSession(playSessionId);
     if (!campaignId) return;
 
+    const characters = await repo.charactersOfCampaign(campaignId);
+
     const storedRoom = await repo.currentRoom(campaignId);
     if (storedRoom) {
       const parsed = RoomSchema.safeParse(storedRoom.body);
       /* A room that fails validation costs the table its placement heuristic,
          not its session — the same trade the roster makes one line down. */
-      if (parsed.success) roomBySession.set(playSessionId, parsed.data);
+      if (parsed.success) {
+        /**
+         * SEAT THE LATECOMERS HERE TOO, and not because it is tidy.
+         *
+         * The HTTP room route does this already, but this cache is primed on
+         * `hello` and the two race: the socket opens and the room is fetched at
+         * the same moment a play screen mounts. Prime first and the resolver
+         * spends the whole session holding a map with no player characters on
+         * it — which reads as opportunity attacks silently not firing, because
+         * a creature the geometry cannot find cannot threaten anybody.
+         *
+         * Seating in both places costs one comparison and removes the ordering
+         * from the answer entirely.
+         */
+        const seated = seatLatecomers(parsed.data, characters.map((c) => c.id));
+        if (seated !== parsed.data) {
+          await repo.putRoom({ ...storedRoom, body: seated }).catch((err: unknown) => {
+            console.error(`[app] could not persist late seating for ${campaignId}:`, err);
+          });
+        }
+        roomBySession.set(playSessionId, seated);
+      }
     }
-
-    const characters = await repo.charactersOfCampaign(campaignId);
     const seated: Combatant[] = [];
     for (const row of characters) {
       const parsed = CharacterChoicesSchema.safeParse(row.choices);
