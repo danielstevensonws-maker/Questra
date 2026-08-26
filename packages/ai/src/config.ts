@@ -47,20 +47,31 @@ export function makeRulingModelFromEnv(): RulingModelSelection {
 
 export interface ImageGenSelection {
   gen: ImageGen;
+  /** true only when a REAL vendor is behind the seam — never merely because a key is set. */
   live: boolean;
+  /** true when a key is configured. With `live: false` that pair means "configured, and inert". */
+  keyPresent: boolean;
 }
 
 /**
- * Build the ImageGen from the environment. With QUESTRA_IMAGE_API_KEY set, a real
- * vendor implementation would slot in here (behind the same ImageGen seam, no
- * caller change); until one is wired, we return the deterministic stub so the
- * app runs keyless. The seam is what ADR-0015 requires; the concrete vendor call
- * is the slice-environment step.
+ * Build the ImageGen from the environment.
+ *
+ * `live` MEANS A REAL VENDOR ANSWERED, and it used to lie: with a key present it
+ * reported `live: true` while handing back the deterministic stub. Nothing yet
+ * reads it, which is the only reason that had not caused an incident — but
+ * ADR-0017's asset-acceptability row is meant to be measured against a live
+ * vendor, and a gate that reads `live` would have recorded a verdict on
+ * `stub://` refs and called the AI bet settled.
+ *
+ * There is no image vendor wired, and that is an owner decision rather than a
+ * missing line of code: it carries a bill and an AI-art policy (ADR-0010, and
+ * ADR-0016's DP-1 on tiers and quotas). When one is chosen it constructs here,
+ * behind this same seam, in its own vendors/ module exactly like the ruling
+ * model — the import-graph rule (09a §5.4) means no caller changes.
+ *
+ * The key is still read, so `keyPresent` can say "somebody has configured this
+ * and it is not doing anything", which is a thing worth being able to see.
  */
 export function makeImageGenFromEnv(): ImageGenSelection {
-  const apiKey = env('QUESTRA_IMAGE_API_KEY');
-  // A real vendor ImageGen constructs here when apiKey is present. It lives in
-  // its own vendors/ module (import-graph rule) exactly like the ruling model.
-  // Not yet wired to a concrete image vendor; the stub keeps the app running.
-  return { gen: makeStubImageGen(), live: apiKey !== undefined };
+  return { gen: makeStubImageGen(), live: false, keyPresent: env('QUESTRA_IMAGE_API_KEY') !== undefined };
 }

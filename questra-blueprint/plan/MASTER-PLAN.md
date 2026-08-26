@@ -27,12 +27,16 @@ Build exactly the Playbook §7 slice: room → asset → two tokens → player a
 - **Deploy (minimal dev env):** server + web reachable over the network on a real host, env-config for vendor keys + DB URL — so "a second device joins as the player" is a real device, not localhost.
 - **Content:** narration template pack (the Engine's plain-English voice — GAP-AUDIT A5), paired with the engine work; seed art set attached to generations (owner deliverable C1) before the image measurement.
 
+**Status (2026-08-26):** the deterministic spine is green and the durable log genuinely survives a restart (CI now provisions Postgres, so that criterion is gated rather than asserted). The gate itself is still open, and ADR-0017 now separates the four blocked rows by what each is actually waiting on: **one is an environment variable** (a `RulingModel` key — the vendor is wired), and **three are owner decisions with a cost** (an image vendor + C1 seed art; a deployed dev environment; a second device). The sync-load row is measured and passing (`npm run metrics -w @questra/server`).
+
 **Exit:** every Playbook metric measured against the real vendors and published to **ADR-0017** (first-token p95, roll→narration round trip, replay determinism, fog payload cleanliness); the event log **survives a server restart** (replayed session == pre-restart state, ADR-0015); the slice runs on **two physical devices** against the dev environment. *Go/no-go on the AI bets happens here, by numbers.*
 
 ## M3 — Full Combat & the Play Screens
 Briefs: 04 (complete), 07, 08, 10 (**+ compendium browser scope — GAP-AUDIT B4, reads rules data + InfoPanel**), **14 §2–4 (membership plumbing + minimal app shell: landing → home → join → nav → settings)**. Everything Part-1/Part-2 of the In-Play spec, dying, rests, leveling, bosses, both screens to Design-matched polish, table_display mode.
 **Persistence (complete, ADR-0015):** entity persistence for accounts/campaigns/memberships/characters/rooms finished here as the shell needs durable accounts.
 **Responsive (ADR-0016 A7):** the player hub, death-save card, and dice surface ship responsive (in-person mode is v1, played on phones); prep surfaces stay desktop-first.
+**Status (2026-08-26):** both play screens, the shell, combat, death saves, rests, compendium and table-display are in. Since then: opportunity attacks are detected and prompted (Brief 08's machinery had no producer — Brief 02 §6 #5's deferred detection), XP/levelling/the shop are wired end to end (Brief 07's engine half had no callers), and the rules corpus is promoted with evidence, so the compendium serves 546 entries rather than 29 — a DM searching for a monster used to be offered one goblin. Still open for M3: legendary/lair actions (blocked on structured monster stat blocks, which is Brief 01 ingestion work, not wiring) and the responsive pass (ADR-0016 A7) on a real handset.
+
 **Exit:** a real table can run a full multi-session fight arc with zero spreadsheet fallback; the join link is a player's entire front door (brief-14 golden); all golden suites green; greying-parity and payload-cleanliness tests green.
 
 ## M4 — Prep: Wizard, Planner, Campaign

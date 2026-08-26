@@ -42,3 +42,43 @@ describe('makeImageGenFromEnv — keyless returns the deterministic stub', () =>
     expect(a.imageRef).toBe(b.imageRef);
   });
 });
+
+/**
+ * `live` is a claim about what actually answered, and ADR-0017's asset row is
+ * meant to be measured against a live vendor. It used to return `true` whenever
+ * a key happened to be set, while handing back the deterministic stub — so a
+ * gate reading it would have recorded a verdict on `stub://` refs and called
+ * the image bet settled. Nothing read it yet, which is the only reason that had
+ * not cost anything.
+ */
+describe('the ImageGen seam does not claim a vendor it has not got', () => {
+  const KEY = 'QUESTRA_IMAGE_API_KEY';
+  const before = process.env[KEY];
+  afterEach(() => {
+    if (before === undefined) delete process.env[KEY];
+    else process.env[KEY] = before;
+  });
+
+  it('is not live with no key', () => {
+    delete process.env[KEY];
+    const sel = makeImageGenFromEnv();
+    expect(sel.live).toBe(false);
+    expect(sel.keyPresent).toBe(false);
+  });
+
+  it('is STILL not live with a key, because no vendor is wired', () => {
+    process.env[KEY] = 'sk-whatever';
+    const sel = makeImageGenFromEnv();
+    expect(sel.live).toBe(false);
+    /* Configured and inert — a state worth being able to see, and the reason
+       `keyPresent` is reported separately rather than folded into `live`. */
+    expect(sel.keyPresent).toBe(true);
+  });
+
+  it('and what it hands back really is the stub', async () => {
+    process.env[KEY] = 'sk-whatever';
+    const { imageRef, meta } = await makeImageGenFromEnv().gen.generate('a mossy flagstone floor', [], 'terrain');
+    expect(imageRef.startsWith('stub://')).toBe(true);
+    expect(meta.vendor).toBe('stub');
+  });
+});
