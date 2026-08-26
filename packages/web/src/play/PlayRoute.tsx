@@ -23,8 +23,9 @@ import type { CampaignSession, Intent, Room } from '@questra/contracts';
 import { PlayerViewV2 } from '../primitives/v2/PlayerViewV2.js';
 import { DmScreen } from './DmScreen.js';
 import { promptsFrom } from './promptsFrom.js';
+import { namesFrom } from './namesFrom.js';
 import { rulingsFrom } from './rulingsFrom.js';
-import { roomWithMoves } from './roomWithMoves.js';
+import { roomWithMoves } from '@questra/engine';
 import { useMapAction } from './useMapAction.js';
 import { tilesFrom } from './tilesFrom.js';
 import { PromptDock, type PromptVM } from './PromptDock.js';
@@ -120,6 +121,11 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
     return out;
   }, [table]);
 
+  /* Everybody the table can name — the party AND whatever the DM brought in.
+     The roster is only the players, and a monster is exactly who provokes an
+     opportunity attack; see namesFrom for the card that printed an id. */
+  const names = useMemo(() => namesFrom(rosterNames, sync.events), [rosterNames, sync.events]);
+
   /**
    * One place that turns an intent into a sent frame, so no caller has to
    * remember how an idempotency key is built. Every key is unique per press:
@@ -139,12 +145,12 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
    * not yet been closed by a taken/declined event.
    */
   const prompts = useMemo<PromptVM[]>(
-    () => promptsFrom(sync.events, rosterNames, myCharacter?.id ?? null),
-    [sync.events, rosterNames, myCharacter],
+    () => promptsFrom(sync.events, names, myCharacter?.id ?? null),
+    [sync.events, names, myCharacter],
   );
 
   /* What players have described and the DM has not answered. */
-  const rulings = useMemo(() => rulingsFrom(sync.events, rosterNames), [sync.events, rosterNames]);
+  const rulings = useMemo(() => rulingsFrom(sync.events, names), [sync.events, names]);
 
   /* What this character can do, straight off their sheet. */
   const tiles = useMemo(() => tilesFrom(myCharacter?.sheet ?? null), [myCharacter]);
@@ -216,6 +222,20 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
       rosterNames,
     });
   }, [sync.snapshot, sync.events, liveRoom, myCharacter, table, rosterNames]);
+
+  /**
+   * What each character is carrying, straight off the folded projection — the
+   * shop's sell side needs it, and nothing else on the screen does, so it stays
+   * out of the view model rather than riding along in the cast.
+   */
+  const inventories = useMemo<Record<string, readonly string[]>>(() => {
+    const snapshot = (sync.snapshot ?? { combatants: {}, round: 1, nextSeq: 0 }) as Projection;
+    const out: Record<string, readonly string[]> = {};
+    for (const c of Object.values(castWithArrivals(snapshot, sync.events).combatants)) {
+      if (c.inventory) out[c.id] = c.inventory;
+    }
+    return out;
+  }, [sync.snapshot, sync.events]);
 
   /**
    * Who each token is TO THIS VIEWER — the room stores a creatureRef and knows
@@ -301,6 +321,18 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
         onEndCombat={() => { send({ kind: 'end_combat' }); }}
         onAdvanceTurn={() => { send({ kind: 'advance_turn' }); }}
         onRest={(rest) => { send({ kind: 'rest', rest }); }}
+        /* Everybody at the table, because a fight is survived together. The
+           server prices it from what was defeated and splits it. */
+        onAwardXp={() => { send({ kind: 'award_xp', characterIds: [] }); }}
+        /* Averaged hit points, because that is the choice that needs no
+           dialogue — a table that wants to roll for them gets the rolled
+           branch when the level-up flow's own surface lands (Brief 07 §3). */
+        onLevelUp={(characterId) => { send({ kind: 'level_up', characterId, hp: { method: 'average' } }); }}
+        /* One row at a time — the server prices it and settles the coins. */
+        onTrade={({ characterId, direction, itemId }) => {
+          send({ kind: 'shop', characterId, direction, lines: [{ itemId, qty: 1 }] });
+        }}
+        inventories={inventories}
         onAnswerPrompt={(promptId, take, optionName) => {
           send(optionName === undefined
             ? { kind: 'prompt_reply', promptId, take }
@@ -509,6 +541,10 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
       )}
       {/* A player answers their own reactions — an opportunity attack is theirs
           to take or let pass, and the card queues where they are looking. */}
+      {/* Placed, not merely rendered: the play screen is a fixed full-bleed
+          surface, so a card with no placement falls below the fold — which is
+          exactly where every reaction card was going. */}
+      <div className="qa2-promptdock">
       <PromptDock
         prompts={prompts}
         onAnswer={(promptId, take, optionName) => {
@@ -530,6 +566,7 @@ export function PlayRoute({ campaignId, session, onLeave }: PlayRouteProps): Rea
             : { kind: 'prompt_reply', promptId, take, optionName });
         }}
       />
+      </div>
       <EffectLayer effect={effect} />
     </>
   );

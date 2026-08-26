@@ -13,7 +13,7 @@ import type { CharacterChoices } from '@questra/contracts';
 import { combatantFromCharacter } from '../src/sim/combatant-from-character.js';
 import { computeSheet, buildSheetRulesData } from '../src/sim/sheet.js';
 import { CLASSES } from '../src/data/classes.js';
-import { DRAFT_ITEMS } from '../src/data/items.js';
+import { ITEMS } from '../src/data/items.js';
 import { DRAFT_SPELLS } from '../src/data/spells.js';
 import { speciesSpeedFt } from '../src/data/origins.js';
 
@@ -36,7 +36,7 @@ function choicesFor(over: Partial<CharacterChoices> = {}): CharacterChoices {
 }
 
 const rulesFor = (choices: CharacterChoices) =>
-  buildSheetRulesData([...CLASSES, ...DRAFT_ITEMS, ...DRAFT_SPELLS], speciesSpeedFt(choices.speciesId));
+  buildSheetRulesData([...CLASSES, ...ITEMS, ...DRAFT_SPELLS], speciesSpeedFt(choices.speciesId));
 
 describe('a character becomes a combatant', () => {
   it('takes every number from the computed sheet, not from a second calculation', () => {

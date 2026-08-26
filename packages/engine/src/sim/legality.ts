@@ -172,6 +172,27 @@ export function checkIntent(
     /* Speaking is never a rules question — a DM performing is authorisation
        (theirs), decided server-side by role. */
     case 'speak_as':
+    /**
+     * Handing out experience and taking a level are not rules gates either.
+     *
+     * Awarding is the DM's call about the fiction ("that fight is over", "you
+     * talked your way past the guard"), which no hit-point total can answer.
+     * And levelling is milestone by default (ADR-0006), which means it happens
+     * when the DM says so — there is no threshold for a button to grey against.
+     * The server still refuses an award from a player and a level nobody has
+     * earned; that is authorisation and eligibility, decided next to the data
+     * rather than twice.
+     */
+    case 'award_xp':
+    case 'level_up':
+    /**
+     * The shop does not grey either, and this one is worth saying plainly: a
+     * character who cannot afford something gets a SENTENCE about the price
+     * ("that costs 5 gp, but you only have 2"), not a dead button. The engine's
+     * `buy` already writes it, and it tells the player something a greyed row
+     * never could.
+     */
+    case 'shop':
       return LEGAL;
   }
 }

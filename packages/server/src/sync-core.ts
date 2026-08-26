@@ -62,8 +62,19 @@ export type IntentResolver = (
    * An id rather than the room itself, deliberately. This module stays engine-
    * agnostic and knows nothing about geometry; it hands over the one fact it
    * already owns and lets whoever wired the resolver decide what to look up.
+   *
+   * THE LOG COMES TOO, for the second class of the same problem. A projection
+   * keeps numbers — hit points, turns, conditions — and drops everything that
+   * is not one, so an intent whose answer depends on what HAPPENED rather than
+   * on what is now has nowhere to look. Two do: where a creature is standing
+   * (the fold has no positions; `roomWithMoves` replays them) and whether it
+   * still has its reaction (spent by a `reaction_taken` two turns ago). Both
+   * are facts about the log, and deriving them beats keeping a second copy
+   * beside it that is free to drift.
+   *
+   * Read-only by type. The resolver may look; appending is SyncCore's alone.
    */
-  context: { playSessionId: string },
+  context: { playSessionId: string; log: readonly PlayEvent[] },
 ) => { ok: true; events: PlayEvent[] } | { ok: false; reason: string };
 
 export interface SyncCoreOptions {
@@ -291,7 +302,7 @@ export class SyncCore {
     /* The viewer was established at hello and is the server's own record of
        who this connection is — not anything the client asserted in the frame. */
     const viewer = s.viewers.get(conn.connId)!.viewer;
-    const result = this.opts.resolveIntent(envelope, state, viewer, { playSessionId: sid });
+    const result = this.opts.resolveIntent(envelope, state, viewer, { playSessionId: sid, log: s.log });
     if (!result.ok) {
       conn.send({ m: 'intent_rejected', idempotencyKey: envelope.idempotencyKey, reason: result.reason });
       return;

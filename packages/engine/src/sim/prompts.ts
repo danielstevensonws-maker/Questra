@@ -246,3 +246,69 @@ export function lairPrompt(
     context: { kind: 'lair', options: options.map((o) => ({ name: o.name })) },
   };
 }
+
+// ---- reading the lifecycle back out of the log ----------------------------
+
+/**
+ * A PROMPT IS NOT STATE ANYBODY OWNS — it is a fact about the log, exactly as
+ * the play screens already treat it (`promptsFrom` on the web). The server needs
+ * the same reading for the opposite reason: to answer a reply it has to know
+ * which prompt is still open, who holds it, and what it was about.
+ *
+ * Keeping both sides derived is what stops them drifting. A prompt list held
+ * beside the log is a second copy of the truth, and the drift shows up as a
+ * card that will not go away while five people wait.
+ */
+export function openPromptsFrom(events: readonly PlayEvent[]): Map<string, PromptRequest> {
+  const open = new Map<string, PromptRequest>();
+  for (const e of events) {
+    const b = e.body;
+    if (b.t === 'reaction_prompted') {
+      open.set(b.promptId, {
+        promptId: b.promptId,
+        holderId: b.creatureId,
+        context: b.context,
+        timeoutSec: b.timeoutSec ?? DEFAULT_TIMEOUT_SEC,
+      });
+    } else if (b.t === 'reaction_taken' || b.t === 'reaction_declined') {
+      open.delete(b.promptId);
+    }
+  }
+  return open;
+}
+
+/**
+ * Whose reaction is still available, folded from the log (§3 #2).
+ *
+ * A reaction is spent by TAKING a prompt, and the taking event names only the
+ * prompt — so the holder is recovered from the `reaction_prompted` that opened
+ * it. Declining costs nothing, which is why only the taken branch spends.
+ *
+ * `turn_advanced` refunds ONLY the creature whose turn began. This is the fix
+ * Brief 08 §3 #2 asks to verify: a global reset would hand back reactions spent
+ * on other creatures' turns, and a fighter would get a free swing every round.
+ *
+ * Creatures absent from the result have their reaction: unspent is the default,
+ * so a creature that has never reacted needs no entry.
+ */
+export function reactionsFrom(events: readonly PlayEvent[]): ReactionState {
+  const holderOf = new Map<string, string>();
+  let state: ReactionState = {};
+  for (const e of events) {
+    const b = e.body;
+    if (b.t === 'reaction_prompted') {
+      holderOf.set(b.promptId, b.creatureId);
+    } else if (b.t === 'reaction_taken') {
+      const holder = holderOf.get(b.promptId);
+      if (holder !== undefined) state = spendReaction(state, holder);
+    } else if (b.t === 'turn_advanced') {
+      state = resetReactionsOnTurn(state, b.activeCreatureId);
+    }
+  }
+  return state;
+}
+
+/** Whether a creature may spend a reaction right now (default: yes). */
+export function hasReaction(state: ReactionState, creatureId: string): boolean {
+  return state[creatureId]?.reactionAvailable ?? true;
+}

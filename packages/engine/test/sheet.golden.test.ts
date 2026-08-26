@@ -13,12 +13,12 @@ import {
 } from '@questra/contracts';
 import { computeSheet, buildSheetRulesData, IllegalChoiceError } from '../src/sim/sheet.js';
 import { CLASSES } from '../src/data/classes.js';
-import { DRAFT_ITEMS } from '../src/data/items.js';
+import { ITEMS } from '../src/data/items.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const fx = (name: string) => JSON.parse(readFileSync(here + '../../contracts/src/fixtures/' + name, 'utf8')) as ComputedSheet;
 
-const rules = buildSheetRulesData([...CLASSES, ...DRAFT_ITEMS], 30);
+const rules = buildSheetRulesData([...CLASSES, ...ITEMS], 30);
 
 const torvaldChoices: CharacterChoices = {
   classId: 'class.fighter', level: 1,

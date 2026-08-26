@@ -11,7 +11,7 @@
  * until that lands, callers construct combatants directly (the golden trace does
  * this from the fixture's stated stats).
  */
-import type { Ability } from '@questra/contracts';
+import type { Ability, Coins } from '@questra/contracts';
 
 export interface ActiveCondition {
   conditionId: string;
@@ -43,6 +43,32 @@ export interface Combatant {
   concentratingOn?: string;
   /** Whether this creature is a player character (affects the 0-HP branch: unconscious vs dies). */
   isPlayer: boolean;
+  /**
+   * Character level, for a player character (Brief 07 §3). Carried here because
+   * a level-up has to move a hit-point total the moment it lands, and the fold
+   * is the only thing at the table that sees every event.
+   */
+  level?: number;
+  /**
+   * Experience earned, for a player character (Brief 07 §2). Folded from
+   * `xp_awarded` rather than stored, so undo takes it back with everything else.
+   */
+  xp?: number;
+  /**
+   * The compendium monster this creature came from, when the DM picked one
+   * rather than inventing it. Kept so a defeated monster can be priced — its
+   * XP is on the entity, and by the time the fight ends the only record that it
+   * WAS a Goblin Warrior is this.
+   */
+  monsterId?: string;
+  /**
+   * The purse and the pack (Brief 07 §4). Seeded from the computed sheet when a
+   * character is seated and moved by `shop_transaction` — so buying a rope
+   * changes what the table can see, rather than a receipt in the journal and a
+   * sheet that never heard about it.
+   */
+  coins?: Coins;
+  inventory?: string[];
   /**
    * The death-save ladder, while this creature is dying. Folded from the log
    * rather than held anywhere else — a tally kept beside the events is a second
@@ -92,6 +118,11 @@ export function cloneCombatant(c: Combatant): Combatant {
     ...(c.damageImmunities ? { damageImmunities: [...c.damageImmunities] } : {}),
     ...(c.deathSuccesses !== undefined ? { deathSuccesses: c.deathSuccesses } : {}),
     ...(c.deathFailures !== undefined ? { deathFailures: c.deathFailures } : {}),
+    ...(c.level !== undefined ? { level: c.level } : {}),
+    ...(c.xp !== undefined ? { xp: c.xp } : {}),
+    ...(c.monsterId !== undefined ? { monsterId: c.monsterId } : {}),
+    ...(c.coins !== undefined ? { coins: { ...c.coins } } : {}),
+    ...(c.inventory !== undefined ? { inventory: [...c.inventory] } : {}),
   };
 }
 

@@ -19,7 +19,7 @@ import {
   computeSheet, buildSheetRulesData,
   buildRulesData, resolveAttack,
   initialState, fold,
-  CONDITIONS, CLASSES, DRAFT_ITEMS,
+  CONDITIONS, CLASSES, ITEMS,
   type Combatant,
 } from '@questra/engine';
 import { getRuling, makeStubModel, toRulingDecidedBody, type RulingRecipe } from '@questra/ai';
@@ -30,7 +30,7 @@ const PS = 'ps-slice';
 
 // ---- 1. sheet computation → the two combatants -----------------------------
 
-const sheetRules = buildSheetRulesData([...CLASSES, ...DRAFT_ITEMS], 30);
+const sheetRules = buildSheetRulesData([...CLASSES, ...ITEMS], 30);
 const torvaldChoices: CharacterChoices = {
   classId: 'class.fighter', level: 1, backgroundId: 'background.soldier', speciesId: 'species.human',
   abilityMethod: 'standard_array',

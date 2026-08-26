@@ -26,7 +26,7 @@ describe('what the table can do', () => {
       { idempotencyKey: 'k-12345678', intent: { kind: 'free_text', creatureId: 'c1', text: 'The door gives.' } },
       state,
       PLAYER,
-      { playSessionId: 'ps_test' },
+      { playSessionId: 'ps_test', log: [] },
     );
 
     expect(out.ok, 'free text is the escape hatch — it must never be refused').toBe(true);
@@ -48,7 +48,7 @@ describe('what the table can do', () => {
         intent: { kind: 'move', tokenId: 't1', path: [{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 4, y: 2 }] },
       },
       { combatants: {}, round: 1, nextSeq: 0 } as never,
-      PLAYER, { playSessionId: 'ps_test' });
+      PLAYER, { playSessionId: 'ps_test', log: [] });
 
     expect(out.ok).toBe(true);
     if (!out.ok) return;
@@ -64,7 +64,7 @@ describe('what the table can do', () => {
     const out = makeSliceResolver()(
       { idempotencyKey: 'k-32345678', intent: { kind: 'use_feature', creatureId: 'c1', featureId: 'f1' } },
       { combatants: {}, round: 1, nextSeq: 0 } as never,
-      PLAYER, { playSessionId: 'ps_test' });
+      PLAYER, { playSessionId: 'ps_test', log: [] });
     expect(out.ok).toBe(false);
     if (out.ok) return;
     expect(out.reason).not.toMatch(/undefined|Error|null/);

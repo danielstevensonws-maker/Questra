@@ -27,7 +27,7 @@ import { ShellStyles } from '../shell/ShellStyles.js';
 import { Road } from '../shell/road/Road.js';
 import { useSync, API_BASE } from './useSync.js';
 import { projectionToView, type Projection } from './projectionToView.js';
-import { roomWithMoves } from './roomWithMoves.js';
+import { roomWithMoves } from '@questra/engine';
 import { castWithArrivals } from './castWithArrivals.js';
 import type { EffectId } from './ImmersionConsole.js';
 

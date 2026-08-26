@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { RulesEntitySchema } from '@questra/contracts';
 import { ingestItems, ingestTables } from '../src/ingest/pipeline.js';
-import { draftItems } from '../src/data/items.js';
+import { draftItems, INGESTED_ITEMS, ITEMS } from '../src/data/items.js';
+import { verdictFor, promoteVerifiable } from '../src/ingest/verify.js';
 import { ADVANCEMENT, ENCOUNTER_BUDGET, xpForLevel, encounterBudget } from '../src/data/tables.js';
 import { loadEntities } from '../src/data/loader.js';
 
@@ -38,8 +39,34 @@ describe('item ingestion — equipment with prices', () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const it of items) { expect(it.id).toMatch(/^item\.[a-z0-9-]+$/); expect(it.qa).toBe('draft'); }
   });
-  it('the draft item dataset is refused outside dev', () => {
-    expect(() => loadEntities(draftItems().slice(0, 5), { allowDraft: false })).toThrow(/draft/i);
+  /**
+   * The loader's rule is unchanged and still bites — what changed is which
+   * entities are subject to it. As INGESTED every row is draft and refused;
+   * promotion is what moves them across, and only where the price checks out.
+   */
+  it('the item dataset is refused outside dev before promotion', () => {
+    expect(() => loadEntities(INGESTED_ITEMS.slice(0, 5), { allowDraft: false })).toThrow(/draft/i);
+  });
+
+  it('and accepted outside dev after it', () => {
+    expect(() => loadEntities(ITEMS, { allowDraft: false })).not.toThrow();
+  });
+
+  /**
+   * Promotion has to be able to FAIL, or `verified` is a rubber stamp. A price
+   * that no longer matches the one on its own equipment row falls back to draft.
+   */
+  it('refuses to promote a price that disagrees with the printed one', () => {
+    const sound = INGESTED_ITEMS[0]!;
+    expect(verdictFor(sound).verified).toBe(true);
+
+    /* Re-parsed rather than spread: `meta` is keyed off entityType. */
+    const mistyped = RulesEntitySchema.parse({
+      ...(sound as unknown as Record<string, unknown>),
+      meta: { ...(sound.meta as Record<string, unknown>), costCp: (sound.meta as { costCp: number }).costCp + 1 },
+    });
+    expect(verdictFor(mistyped).reason).toMatch(/price/);
+    expect(promoteVerifiable([mistyped])[0]!.qa).toBe('draft');
   });
 });
 

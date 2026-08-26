@@ -25,7 +25,7 @@ import { starterRoom, type Combatant, type ProjectionState } from '@questra/engi
 
 const DM: Viewer = { role: 'dm', accountId: 'acct-dm' };
 const PLAYER: Viewer = { role: 'player', accountId: 'acct-mira' };
-const SESSION = { playSessionId: 'ps_test' };
+const SESSION = { playSessionId: 'ps_test', log: [] };
 
 const room = starterRoom({ roomId: 'room_1', creatureIds: ['char_a', 'char_b'] });
 
@@ -109,7 +109,7 @@ describe('a pack of them', () => {
   it('keeps one table\'s squares out of another\'s', () => {
     const resolve = seated();
     const here = addedBody(resolve(envelope(goblin()), state(), DM, SESSION));
-    const there = addedBody(resolve(envelope(goblin()), state(), DM, { playSessionId: 'ps_other' }));
+    const there = addedBody(resolve(envelope(goblin()), state(), DM, { playSessionId: 'ps_other', log: [] }));
     expect(there.cell).toEqual(here.cell);
   });
 });

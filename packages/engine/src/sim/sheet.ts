@@ -38,6 +38,8 @@ export interface SheetRulesData {
   classesById: Map<string, RulesEntity>;
   itemsById: Map<string, RulesEntity>;
   spellsById: Map<string, RulesEntity>;
+  /** Backgrounds, for the starting purse (Brief 07 §4). */
+  backgroundsById: Map<string, RulesEntity>;
   speciesSpeedFt: number;
 }
 
@@ -45,12 +47,14 @@ export function buildSheetRulesData(entities: readonly RulesEntity[], speciesSpe
   const classesById = new Map<string, RulesEntity>();
   const itemsById = new Map<string, RulesEntity>();
   const spellsById = new Map<string, RulesEntity>();
+  const backgroundsById = new Map<string, RulesEntity>();
   for (const e of entities) {
     if (e.entityType === 'class') classesById.set(e.id, e);
     if (e.entityType === 'item') itemsById.set(e.id, e);
     if (e.entityType === 'spell') spellsById.set(e.id, e);
+    if (e.entityType === 'background') backgroundsById.set(e.id, e);
   }
-  return { classesById, itemsById, spellsById, speciesSpeedFt };
+  return { classesById, itemsById, spellsById, backgroundsById, speciesSpeedFt };
 }
 
 /** A choice-validation failure, in plain language (Brief 03 §4 #3). */
@@ -286,7 +290,23 @@ export function computeSheet(choices: CharacterChoices, rules: SheetRulesData): 
   }
 
   // ---- coins ----
-  const coins = { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
+  /**
+   * The starting purse, from the background (Brief 07 §4 needs one to exist).
+   *
+   * IT WAS ZERO, ALWAYS. Every sheet came back with an empty coin bag, which
+   * made the shop a form over nothing: a character could look at prices and
+   * never afford a rope. The SRD gives a background two equipment packages —
+   * the kit plus a small purse, or all coin and no kit — and which one a
+   * character took is legible from their own choices: they either walked out
+   * with the gear or they walked out with the money.
+   *
+   * The bag itself moves from here; `shop_transaction` deltas fold on top, so
+   * this is the opening balance rather than the balance.
+   */
+  const background = rules.backgroundsById.get(choices.backgroundId);
+  const purse = background?.meta as { startingGoldGp?: number; startingGoldAltGp?: number } | undefined;
+  const purseGp = (choices.equipment.length > 0 ? purse?.startingGoldGp : purse?.startingGoldAltGp) ?? 0;
+  const coins = { cp: 0, sp: 0, ep: 0, gp: purseGp, pp: 0 };
 
   const sheet: ComputedSheet = {
     abilities, profBonus, hp,

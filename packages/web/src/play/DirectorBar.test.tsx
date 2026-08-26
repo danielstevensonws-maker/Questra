@@ -47,6 +47,9 @@ function bar(over: Partial<Parameters<typeof DirectorBar>[0]> = {}) {
       onVoice={noop}
       onEffect={noop}
       onRest={noop}
+      onAwardXp={noop}
+      onLevelUp={noop}
+      onShop={noop}
       onAddCreature={noop}
       onRemoveCreature={noop}
       onAskCheck={noop}
@@ -183,5 +186,45 @@ describe('a creature with no token on the map', () => {
     bar({ focusedId: goblin.id, onBoard: () => true, onMoveCreature });
     fireEvent.click(screen.getByRole('button', { name: /^Move them\./ }));
     expect(onMoveCreature).toHaveBeenCalledWith('npc-goblin-1');
+  });
+});
+
+/**
+ * Brief 07's two verbs, on the surface a DM actually works from.
+ *
+ * They were the last mile of a path that existed end to end everywhere else:
+ * the engine could level a character and price a fight, the server could accept
+ * both intents, and there was no way to ask for either from a screen.
+ */
+describe('experience and levels', () => {
+  it('hands out experience from the party row', () => {
+    const awarded = vi.fn();
+    bar({ onAwardXp: awarded });
+    fireEvent.click(screen.getByRole('button', { name: /Hand out experience/i }));
+    expect(awarded).toHaveBeenCalledTimes(1);
+  });
+
+  it('levels the character a DM is working on', () => {
+    const levelled = vi.fn();
+    bar({ focusedId: mira.id, onLevelUp: levelled });
+    fireEvent.click(screen.getByRole('button', { name: /Level them up/i }));
+    expect(levelled).toHaveBeenCalledWith(mira.id);
+  });
+
+  it('opens the equipment list on the person whose purse it is', () => {
+    const shopping = vi.fn();
+    bar({ focusedId: mira.id, onShop: shopping });
+    fireEvent.click(screen.getByRole('button', { name: /Buy and sell/i }));
+    expect(shopping).toHaveBeenCalledWith(mira.id);
+  });
+
+  it('says why a monster cannot level, rather than going quietly grey', () => {
+    const levelled = vi.fn();
+    bar({ focusedId: goblin.id, onLevelUp: levelled });
+    const tile = screen.getByRole('button', { name: /Level them up/i });
+    fireEvent.mouseEnter(tile);
+    expect(screen.getByText(/Monsters do not level/i)).toBeTruthy();
+    fireEvent.click(tile);
+    expect(levelled).not.toHaveBeenCalled();
   });
 });

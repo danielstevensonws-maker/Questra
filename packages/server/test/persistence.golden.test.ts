@@ -12,28 +12,13 @@
  * Bring it up:  docker compose up -d  &&  npm run migrate:up -w @questra/server
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import pg from 'pg';
 import { RulesEntitySchema, type PlayEvent } from '@questra/contracts';
 import { buildRulesData, resolveAttack, initialState, fold, CONDITIONS, type Combatant } from '@questra/engine';
 import { SyncCore, PostgresEventStore, type ResolvedToken, type IntentResolver } from '../src/index.js';
 import { connectMemory } from '../src/transport.js';
+import { DATABASE_URL, WANTS_POSTGRES, requirePostgres } from './postgres.js';
 
-const DATABASE_URL = process.env.DATABASE_URL;
 const PS = `ps-persist-${Date.now()}`; // unique per run so re-runs don't collide
-
-/** Probe: is a Postgres reachable at DATABASE_URL with the schema migrated? */
-async function postgresReady(): Promise<boolean> {
-  if (!DATABASE_URL) return false;
-  const pool = new pg.Pool({ connectionString: DATABASE_URL, connectionTimeoutMillis: 1500 });
-  try {
-    await pool.query('SELECT 1 FROM play_event LIMIT 1');
-    return true;
-  } catch {
-    return false;
-  } finally {
-    await pool.end().catch(() => {});
-  }
-}
 
 const torvald: Combatant = {
   id: 'pc-torvald', name: 'Torvald',
@@ -65,22 +50,18 @@ const resolveToken = (token: string, playSessionId: string): ResolvedToken | nul
 
 const initialCombatants = () => [{ ...torvald }, { ...goblin }];
 
-describe('ADR-0015 — the event log survives a server restart', () => {
-  let ready = false;
+describe.skipIf(!WANTS_POSTGRES)('ADR-0015 — the event log survives a server restart', () => {
   let store: PostgresEventStore | null = null;
 
   beforeAll(async () => {
-    ready = await postgresReady();
-    if (ready) store = new PostgresEventStore(DATABASE_URL!);
+    /* DATABASE_URL was set, so a database that is not there is the news —
+       never a quiet pass. See test/postgres.ts. */
+    await requirePostgres();
+    store = new PostgresEventStore(DATABASE_URL!);
   });
   afterAll(async () => { await store?.close(); });
 
-  it.runIf(true)('fold(reloaded) === fold(pre-restart) [skips cleanly without Postgres]', async () => {
-    if (!ready) {
-      console.warn('[persistence] SKIPPED — no reachable Postgres at DATABASE_URL (run: docker compose up -d && npm run migrate:up -w @questra/server)');
-      return;
-    }
-
+  it('fold(reloaded) === fold(pre-restart)', async () => {
     // --- server instance #1: drive the attack, persist, capture pre-restart state ---
     const core1 = new SyncCore({ resolveToken, resolveIntent, initialCombatants, store: store! });
     const player = connectMemory(core1, 'c-persist');

@@ -1,6 +1,12 @@
 /**
  * The room, with everybody standing where they actually are.
  *
+ * IT LIVES IN THE ENGINE because both sides of the wire need it and for
+ * opposite reasons: the screens draw the result, and the server has to KNOW it
+ * to decide who a mover just walked away from (`provocations` in `reach.ts`).
+ * A second copy on the server would be a second answer to "where is everybody",
+ * and the two would disagree on exactly the move that matters.
+ *
  * THE MAP WAS FROZEN. A room arrives once over HTTP and never changes, while
  * `token_moved` events flow past on the socket — and nothing applied them, so
  * tokens sat wherever they were when the page loaded no matter how much the
@@ -20,7 +26,7 @@
  * replays the same moves onto the newer room.
  */
 import type { Cell, PlacedToken, PlayEvent, Room } from '@questra/contracts';
-import { arrivalToken } from '@questra/engine';
+import { arrivalToken } from './placement.js';
 
 export function roomWithMoves(room: Room | null, events: readonly PlayEvent[]): Room | null {
   if (!room) return null;

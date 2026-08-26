@@ -26,6 +26,7 @@ import type { ExplainVM } from '../design/explain.js';
 import type {
   AbilityKey, AbilityVM, ConditionVM, HeroVM, Hurt, LogEntryVM, SpineEntryVM,
 } from '../primitives/v2/viewModel.js';
+import { fmtCoins } from '../primitives/v2/viewModel.js';
 
 /** The engine's shape, restated structurally — the web package has no engine dep. */
 export interface Combatant {
@@ -42,6 +43,11 @@ export interface Combatant {
   conditions: { conditionId: string }[];
   concentratingOn?: string;
   isPlayer: boolean;
+  /** Brief 07: the level taken, the purse spent from, and the pack carried. */
+  level?: number;
+  xp?: number;
+  coins?: { cp: number; sp: number; ep: number; gp: number; pp: number };
+  inventory?: string[];
 }
 
 export interface Projection {
@@ -189,7 +195,17 @@ export function heroFrom(c: Combatant, me: MyCharacter): HeroVM {
     initiative: fromDerived('initiative', 'Turn order', 'Initiative', sheet.initiative,
       'Rolled at the start of a fight to decide who goes when.'),
     hitDice: { die: sheet.hp.value.hitDie, max: sheet.hp.value.hitDiceMax },
-    coins: '0 gp',
+    /**
+     * The purse, as it stands right now.
+     *
+     * IT WAS THE STRING '0 gp', HARDCODED — and it was not even wrong at the
+     * time, because every computed sheet came back with an empty coin bag. Now
+     * the background pays out a starting purse and `shop_transaction` folds on
+     * top of it, so the projection's coins are the live figure and the sheet's
+     * are only the opening balance. Preferring the folded one is what makes a
+     * purchase visible on the screen that spent the money.
+     */
+    coins: fmtCoins(c.coins ?? sheet.coins),
     abilities: abilitiesOf(sheet),
     /* The projection carries condition ids; naming them plainly is the
        compendium's job and it is not wired here yet, so the id stands in

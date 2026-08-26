@@ -8,8 +8,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { RulesEntitySchema, type RulesEntity } from '@questra/contracts';
 import { ingestMonsters } from '../src/ingest/pipeline.js';
-import { draftMonsters } from '../src/data/monsters.js';
+import { draftMonsters, INGESTED_MONSTERS, MONSTERS } from '../src/data/monsters.js';
 import { loadEntities } from '../src/data/loader.js';
+import { verdictFor, promoteVerifiable } from '../src/ingest/verify.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const rawSrd = readFileSync(here + '../ingest/.extracted/srd-raw.txt', 'utf8');
@@ -68,7 +69,46 @@ describe('the draft monster dataset', () => {
     expect(ids).not.toContain('monster.goblin-warrior');
     expect(new Set(ids).size).toBe(ids.length);
   });
-  it('is refused outside dev', () => {
-    expect(() => loadEntities(draftMonsters().slice(0, 5), { allowDraft: false })).toThrow(/draft/i);
+  /**
+   * The loader's rule is unchanged and still bites — what changed is which
+   * entities are subject to it. As INGESTED every monster is draft and refused;
+   * promotion is what moves them across, and only with evidence.
+   */
+  it('is refused outside dev before promotion', () => {
+    expect(() => loadEntities(INGESTED_MONSTERS.slice(0, 5), { allowDraft: false })).toThrow(/draft/i);
+  });
+
+  it('is accepted outside dev after it', () => {
+    expect(() => loadEntities(MONSTERS, { allowDraft: false })).not.toThrow();
+  });
+
+  /**
+   * The promotion is only worth anything if it can FAIL. A stat block whose
+   * recorded armour class stops matching the one printed in its own text must
+   * fall back to draft — otherwise `verified` is a rubber stamp, and the loader
+   * is guarding nothing.
+   */
+  it('refuses to promote a stat block that disagrees with its own printed rule', () => {
+    const sound = INGESTED_MONSTERS[0]!;
+    expect(verdictFor(sound).verified).toBe(true);
+
+    /* Re-parsed rather than spread: `meta` is keyed off entityType, so the only
+       honest way to build a wrong one is to build a whole entity. */
+    const mistyped = RulesEntitySchema.parse({
+      ...(sound as unknown as Record<string, unknown>),
+      meta: { ...(sound.meta as Record<string, unknown>), ac: (sound.meta as { ac: number }).ac + 1 },
+    });
+    const verdict = verdictFor(mistyped);
+    expect(verdict.verified).toBe(false);
+    expect(verdict.reason).toMatch(/armour class/);
+    expect(promoteVerifiable([mistyped])[0]!.qa).toBe('draft');
+  });
+
+  it('every promoted monster carries the evidence that promoted it', () => {
+    for (const m of MONSTERS.filter((x) => x.qa === 'verified')) {
+      const evidence = verdictFor(RulesEntitySchema.parse({ ...(m as unknown as Record<string, unknown>), qa: 'draft' })).evidence;
+      expect(evidence.length, `${m.id} should have checkable claims`).toBeGreaterThan(0);
+      expect(evidence.every((e) => e.holds), `${m.id} evidence should hold`).toBe(true);
+    }
   });
 });

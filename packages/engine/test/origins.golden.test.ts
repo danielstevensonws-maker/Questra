@@ -103,6 +103,23 @@ describe('origins are transcribed from the SRD, not remembered', () => {
     expect(flat(bg.srd_text)).toContain(`Feat: ${featName}`);
   });
 
+  /**
+   * The starting purse, checked against the sentence it was read out of. A
+   * character with no money cannot buy anything, so this is the number that
+   * decides whether the shop is a real surface or a form over zeros — and it
+   * lives in a clause at the end of an equipment list, which is exactly the
+   * kind of place a transcription quietly goes wrong.
+   */
+  it('the starting purse matches both packages printed in the SRD', () => {
+    for (const b of VERIFIED_BACKGROUNDS) {
+      const meta = b.meta as { startingGoldGp: number; startingGoldAltGp: number };
+      const printed = /\(A\)[^;]*?(\d+) GP; or \(B\) (\d+) GP/.exec(b.srd_text);
+      expect(printed, `${b.id} should print two equipment packages`).not.toBeNull();
+      expect(meta.startingGoldGp).toBe(Number(printed![1]));
+      expect(meta.startingGoldAltGp).toBe(Number(printed![2]));
+    }
+  });
+
   it('every origin is verified and no longer carries the ingestion stub', () => {
     for (const e of ORIGINS) {
       expect(e.qa, `${e.id} is not verified`).toBe('verified');
